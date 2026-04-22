@@ -23,6 +23,9 @@ type CardTemplateProps = {
   editPath?: string;
 };
 
+const stripHtmlTags = (html: string) =>
+  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
 const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/editar" }: CardTemplateProps) => {
   const { openModal } = useDeleteModal();
   const { getBlogPostById } = newsContext();
@@ -86,7 +89,7 @@ const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/ed
             </DropdownMenu>
           </div>
           <CardDescription className="leading-7">
-            {blogPost?.description}
+            {stripHtmlTags(blogPost?.description || "")}
           </CardDescription>
         </CardContent>
       </Card>

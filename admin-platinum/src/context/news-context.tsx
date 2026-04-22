@@ -13,6 +13,7 @@ interface NewsContextType {
   getBlogPosts: () => Promise<void>;
   getBlogPostById: (id: BlogPost["id"]) => Promise<BlogPost | void>;
   deleteBlogPost: (id: BlogPost["id"]) => Promise<void>;
+  updateBlogPost: (id: BlogPost["id"], payload: Partial<BlogPost>) => Promise<boolean>;
 }
 
 const NewsContext = createContext<NewsContextType>({} as NewsContextType);
@@ -108,6 +109,29 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const updateBlogPost = async (id: BlogPost["id"], payload: Partial<BlogPost>) => {
+    try {
+      setLoading(true);
+      await client.patch(`/blog/posts/${id}`, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+      await getBlogPosts();
+      toast({ title: "Blog actualizado correctamente.", variant: "success" });
+      return true;
+    } catch (error: any) {
+      setErrorMsg(error.response?.data?.error || "Error al actualizar blog");
+      toast({
+        title: "Error al actualizar blog",
+        variant: "destructive",
+        description: error.response?.data?.error || "No se pudo actualizar el blog",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+      setErrorMsg("");
+    }
+  };
+
   return (
     <NewsContext.Provider
       value={{
@@ -119,6 +143,7 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
         getBlogPosts,
         getBlogPostById,
         deleteBlogPost,
+        updateBlogPost,
       }}
     >
       {children}

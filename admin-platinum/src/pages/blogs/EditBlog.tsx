@@ -14,13 +14,13 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { newsContext } from "@/context/news-context";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
-import { useToast } from "@/hooks/use-toast";
+
+const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 const EditBlog = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { blogPost, getBlogPostById } = newsContext();
-  const { toast } = useToast();
+  const { blogPost, getBlogPostById, updateBlogPost } = newsContext();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -28,12 +28,21 @@ const EditBlog = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
     if (!id) {
       navigate("/dashboard/blogs", { replace: true });
       return;
     }
-    getBlogPostById(id).finally(() => setLoading(false));
-  }, [id, getBlogPostById, navigate]);
+    getBlogPostById(id).finally(() => {
+      if (mounted) setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+    // getBlogPostById viene del context y cambia de referencia en cada render;
+    // si lo incluimos en deps dispara fetch infinito del mismo blog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, navigate]);
 
   useEffect(() => {
     if (blogPost) {
@@ -43,12 +52,18 @@ const EditBlog = () => {
     }
   }, [blogPost]);
 
-  const handleSave = () => {
-    toast({
-      title: "Edición de blogs",
-      description: "La actualización de blogs estará disponible cuando el backend lo soporte.",
-      variant: "default",
+  const hasDescriptionContent = stripHtmlTags(description) !== "";
+  const hasMainContent = stripHtmlTags(content) !== "";
+  const canSave = title.trim() !== "" && hasDescriptionContent && hasMainContent;
+
+  const handleSave = async () => {
+    if (!id || !canSave) return;
+    const saved = await updateBlogPost(id, {
+      title,
+      description,
+      content,
     });
+    if (saved) navigate("/dashboard/blogs");
   };
 
   if (loading || !blogPost) {
@@ -75,33 +90,29 @@ const EditBlog = () => {
           <div>
             <CardTitle>Editar blog</CardTitle>
             <CardDescription>
-              El contenido se guarda en Markdown. Vista previa y Markdown debajo.
+              Edita el contenido con el editor enriquecido de TipTap.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Título</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título del blog"
-                maxLength={255}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Descripción</Label>
-              <Input
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Breve descripción"
-                maxLength={526}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="title">Título</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título del blog"
+              maxLength={255}
+            />
           </div>
+
+          <MarkdownEditor
+            label="Descripción"
+            value={description}
+            onChange={setDescription}
+            placeholder="Escribe una descripción corta del blog."
+            minHeight="120px"
+          />
 
           <div className="space-y-2">
             <Label>Imagen de portada</Label>
@@ -130,7 +141,7 @@ const EditBlog = () => {
                 Cancelar
               </Button>
             </Link>
-            <Button type="button" onClick={handleSave}>
+            <Button type="button" onClick={handleSave} disabled={!canSave}>
               Guardar cambios
             </Button>
           </div>

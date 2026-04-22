@@ -17,6 +17,8 @@ import { useS3FileManager } from "@/hooks/useS3FileManager";
 import MyDropzone from "@/components/Dropzone";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
 
+const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
 const NewBlog = () => {
   const navigate = useNavigate();
   const { addBlogPost } = newsContext();
@@ -28,10 +30,13 @@ const NewBlog = () => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const hasDescriptionContent = stripHtmlTags(description) !== "";
+  const hasMainContent = stripHtmlTags(content) !== "";
+
   const canSubmit =
     title.trim() !== "" &&
-    description.trim() !== "" &&
-    content.trim() !== "" &&
+    hasDescriptionContent &&
+    hasMainContent &&
     coverImage != null;
 
   const handleSubmit = async () => {
@@ -71,37 +76,31 @@ const NewBlog = () => {
           <div>
             <CardTitle>Nuevo blog</CardTitle>
             <CardDescription>
-              El contenido se escribe en Markdown. Abajo verás la vista previa y el Markdown generado.
+              Escribe el contenido con el editor enriquecido de TipTap.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                <span className="text-red-500">*</span> Título
-              </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título del blog"
-                maxLength={255}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">
-                <span className="text-red-500">*</span> Descripción
-              </Label>
-              <Input
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Breve descripción"
-                maxLength={526}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="title">
+              <span className="text-red-500">*</span> Título
+            </Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título del blog"
+              maxLength={255}
+            />
           </div>
+
+          <MarkdownEditor
+            label="Descripción"
+            value={description}
+            onChange={setDescription}
+            placeholder="Escribe una descripción corta del blog."
+            minHeight="120px"
+          />
 
           <div className="space-y-2">
             <Label>
