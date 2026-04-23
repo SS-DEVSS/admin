@@ -10,6 +10,8 @@ export interface TechnicalSheet {
   variant?: Variant | null;
   /** Productos relacionados (desde el backend) */
   products?: Array<{ id: string; name: string }> | null;
+  /** Referencias vinculadas (texto libre). */
+  references?: string[] | null;
 }
 
 /** **/

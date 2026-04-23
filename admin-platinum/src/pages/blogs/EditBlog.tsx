@@ -14,6 +14,16 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { newsContext } from "@/context/news-context";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
+import BlogPreview from "@/components/blogs/BlogPreview";
+import BlogRelatedLinksEditor from "@/components/blogs/BlogRelatedLinksEditor";
+import { useProducts } from "@/hooks/useProducts";
+import {
+  BlogRelatedLinks,
+  emptyRelatedLinks,
+  parseContentWithRelatedLinks,
+  resolveRelatedLinks,
+  serializeContentWithRelatedLinks,
+} from "@/utils/blogRelatedLinks";
 
 const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -26,6 +36,8 @@ const EditBlog = () => {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
+  const [relatedLinks, setRelatedLinks] = useState<BlogRelatedLinks>(emptyRelatedLinks());
+  const { products, loading: productsLoading } = useProducts();
 
   useEffect(() => {
     let mounted = true;
@@ -48,7 +60,9 @@ const EditBlog = () => {
     if (blogPost) {
       setTitle(blogPost.title ?? "");
       setDescription(blogPost.description ?? "");
-      setContent(blogPost.content ?? "");
+      const parsed = parseContentWithRelatedLinks(blogPost.content ?? "");
+      setContent(parsed.cleanContent);
+      setRelatedLinks(parsed.relatedLinks);
     }
   }, [blogPost]);
 
@@ -61,7 +75,7 @@ const EditBlog = () => {
     const saved = await updateBlogPost(id, {
       title,
       description,
-      content,
+      content: serializeContentWithRelatedLinks(content, relatedLinks),
     });
     if (saved) navigate("/dashboard/blogs");
   };
@@ -133,6 +147,24 @@ const EditBlog = () => {
             value={content}
             onChange={setContent}
             minHeight="280px"
+          />
+
+          <div className="space-y-2">
+            <Label>Vínculos del blog</Label>
+            <BlogRelatedLinksEditor
+              products={products}
+              productsLoading={productsLoading}
+              relatedLinks={relatedLinks}
+              onChange={setRelatedLinks}
+            />
+          </div>
+
+          <BlogPreview
+            title={title}
+            description={description}
+            content={content}
+            coverImageUrl={blogPost.coverImagePath}
+            relatedLinks={resolveRelatedLinks(relatedLinks, products)}
           />
 
           <div className="flex gap-3 pt-4">

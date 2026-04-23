@@ -137,6 +137,31 @@ export const useTs = () => {
     }
   };
 
+  const updateReferencesForTechSheet = async (
+    id: TechnicalSheet["id"],
+    references: string[]
+  ) => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      await client.patch(
+        `/ts/${id}/references`,
+        { references },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      await getTechnicalSheets();
+      toast({ title: "Referencias actualizadas.", variant: "success" });
+    } catch (error: any) {
+      toast({
+        title: "Error al actualizar referencias",
+        variant: "destructive",
+        description: error.response?.data?.error || error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   //   const updateTechnicalSheet = async (ts: TechnicalSheet) => {
   //     try {
   //       const headers = {
@@ -174,5 +199,6 @@ export const useTs = () => {
     deleteTechnicalSheet,
     addProductsToTechSheet,
     removeProductsFromTechSheet,
+    updateReferencesForTechSheet,
   };
 };

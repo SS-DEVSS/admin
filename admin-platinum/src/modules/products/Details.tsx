@@ -8,6 +8,7 @@ import { Application } from "@/models/application";
 import { Product } from "@/models/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
+import ProductTechnicalSheetsCard from "@/components/products/ProductTechnicalSheetsCard";
 
 type DetailsInterface = {
   detailsState: detailsType;
@@ -60,6 +61,7 @@ const Details = ({
         <>
           <ReferencesCard state={referencesState} setState={setReferencesState} product={product} />
           <ApplicationsCard state={applicationsState} setState={setApplicationsState} product={product} />
+          <ProductTechnicalSheetsCard productId={product?.id} />
         </>
       ) : (
         <>

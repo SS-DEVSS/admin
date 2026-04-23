@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,16 @@ import { newsContext } from "@/context/news-context";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import MyDropzone from "@/components/Dropzone";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
+import BlogPreview from "@/components/blogs/BlogPreview";
+import BlogRelatedLinksEditor from "@/components/blogs/BlogRelatedLinksEditor";
+import { useProducts } from "@/hooks/useProducts";
+import {
+  BlogRelatedLinks,
+  emptyRelatedLinks,
+  parseContentWithRelatedLinks,
+  resolveRelatedLinks,
+  serializeContentWithRelatedLinks,
+} from "@/utils/blogRelatedLinks";
 
 const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -29,6 +39,8 @@ const NewBlog = () => {
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [relatedLinks, setRelatedLinks] = useState<BlogRelatedLinks>(emptyRelatedLinks());
+  const { products, loading: productsLoading } = useProducts();
 
   const hasDescriptionContent = stripHtmlTags(description) !== "";
   const hasMainContent = stripHtmlTags(content) !== "";
@@ -48,7 +60,7 @@ const NewBlog = () => {
           addBlogPost({
             title,
             description,
-            content,
+            content: serializeContentWithRelatedLinks(content, relatedLinks),
             coverImagePath: key,
           });
           resolve();
@@ -61,6 +73,17 @@ const NewBlog = () => {
       setSubmitting(false);
     }
   };
+
+  const coverImagePreview = useMemo(() => {
+    if (!coverImage || typeof coverImage === "string") return undefined;
+    return URL.createObjectURL(coverImage);
+  }, [coverImage]);
+  useEffect(() => {
+    return () => {
+      if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+    };
+  }, [coverImagePreview]);
+  const cleanMainContent = parseContentWithRelatedLinks(content).cleanContent;
 
   return (
     <Layout>
@@ -119,6 +142,24 @@ const NewBlog = () => {
             onChange={setContent}
             placeholder="Escribe el contenido del blog. Usa la barra de herramientas para títulos, listas, enlaces, etc."
             minHeight="280px"
+          />
+
+          <div className="space-y-2">
+            <Label>Vínculos del blog</Label>
+            <BlogRelatedLinksEditor
+              products={products}
+              productsLoading={productsLoading}
+              relatedLinks={relatedLinks}
+              onChange={setRelatedLinks}
+            />
+          </div>
+
+          <BlogPreview
+            title={title}
+            description={description}
+            content={cleanMainContent}
+            coverImageUrl={coverImagePreview}
+            relatedLinks={resolveRelatedLinks(relatedLinks, products)}
           />
 
           <div className="flex gap-3 pt-4">

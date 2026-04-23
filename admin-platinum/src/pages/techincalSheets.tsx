@@ -40,6 +40,7 @@ export interface TSFormType {
   imgUrl?: string | null;
   description: string;
   productIds: string[];
+  references: string[];
 }
 
 const TsFormInitialState: TSFormType = {
@@ -49,6 +50,7 @@ const TsFormInitialState: TSFormType = {
   imgUrl: null,
   description: "",
   productIds: [],
+  references: [],
 };
 
 const TechincalSheets = () => {
@@ -59,6 +61,7 @@ const TechincalSheets = () => {
     deleteTechnicalSheet,
     addProductsToTechSheet,
     removeProductsFromTechSheet,
+    updateReferencesForTechSheet,
   } = useTs();
   const { products, getProducts } = useProducts();
   const { uploadFile } = useS3FileManager();
@@ -71,6 +74,7 @@ const TechincalSheets = () => {
   const [tsForm, setTsForm] = useState<TSFormType>(TsFormInitialState);
   const [file, setFile] = useState<File | null>(null);
   const [image, setImage] = useState<File | null>(null);
+  const [referenceDraft, setReferenceDraft] = useState("");
 
   useEffect(() => {
     getProducts();
@@ -143,6 +147,7 @@ const TechincalSheets = () => {
           path: fileKey,
           description: (tsForm.description ?? "").trim(),
           productIds: tsForm.productIds.length > 0 ? tsForm.productIds : undefined,
+          references: tsForm.references.length > 0 ? tsForm.references : undefined,
         };
         await addTechnicalSheet(payload as any);
         setTsForm(TsFormInitialState);
@@ -158,6 +163,11 @@ const TechincalSheets = () => {
         const toRemove = (current?.products || []).map((p) => p.id).filter((id) => !newIds.has(id));
         if (toAdd.length > 0) await addProductsToTechSheet(editingTsId, toAdd);
         if (toRemove.length > 0) await removeProductsFromTechSheet(editingTsId, toRemove);
+        const currentReferences = current?.references ?? [];
+        const nextReferences = tsForm.references ?? [];
+        if (JSON.stringify(currentReferences) !== JSON.stringify(nextReferences)) {
+          await updateReferencesForTechSheet(editingTsId, nextReferences);
+        }
         if (toAdd.length > 0 || toRemove.length > 0) {
           toast({ title: "Boletín actualizado.", variant: "success" });
         }
@@ -189,6 +199,24 @@ const TechincalSheets = () => {
     );
   };
 
+  const addReference = () => {
+    const value = referenceDraft.trim();
+    if (!value) return;
+    setTsForm((prev) =>
+      prev.references.includes(value)
+        ? prev
+        : { ...prev, references: [...prev.references, value] }
+    );
+    setReferenceDraft("");
+  };
+
+  const removeReference = (reference: string) => {
+    setTsForm((prev) => ({
+      ...prev,
+      references: prev.references.filter((item) => item !== reference),
+    }));
+  };
+
   // Al abrir edición desde la card se usa directamente los datos del ts (setTsForm + setIsOpen en TsCard)
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,6 +242,11 @@ const TechincalSheets = () => {
             <CardDescription>
               Gestiona los boletines técnicos y asígnalos a productos.
             </CardDescription>
+            {!loading ? (
+              <p className="text-sm text-muted-foreground">
+                {listToShow.length} {listToShow.length === 1 ? "boletín" : "boletines"} en vista
+              </p>
+            ) : null}
           </div>
           <div className="ml-auto flex flex-wrap gap-3 items-center">
             <div className="relative flex-1 min-w-[200px] max-w-[336px]">
@@ -348,6 +381,44 @@ const TechincalSheets = () => {
                             </span>
                           )}
                         </label>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <Separator />
+
+                {/* 3. Referencias relacionadas */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    Referencias relacionadas
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Agrega referencias que quieras asociar al boletín.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ej. LuK 620309900"
+                      value={referenceDraft}
+                      onChange={(e) => setReferenceDraft(e.target.value)}
+                    />
+                    <Button type="button" variant="outline" onClick={addReference}>
+                      Agregar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tsForm.references.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sin referencias.</p>
+                    ) : (
+                      tsForm.references.map((reference) => (
+                        <button
+                          key={reference}
+                          type="button"
+                          className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
+                          onClick={() => removeReference(reference)}
+                        >
+                          {reference} ×
+                        </button>
                       ))
                     )}
                   </div>

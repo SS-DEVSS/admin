@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { TechnicalSheet } from "@/models/technicalSheet";
 import { useDeleteModal } from "@/context/delete-context";
-import { FileText, MoreVertical, Pencil, Trash, Eye } from "lucide-react";
+import { FileDown, FileText, MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 import axiosClient from "@/services/axiosInstance";
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -41,6 +42,7 @@ const TsCard = ({
   const { openModal } = useDeleteModal();
   const { deleteFile } = useS3FileManager();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -90,6 +92,7 @@ const TsCard = ({
       url: ts.url ?? "",
       description: ts.description ?? "",
       productIds: (ts.products || []).map((p) => p.id),
+      references: ts.references ?? [],
     });
     setIsOpen(true);
   };
@@ -101,7 +104,7 @@ const TsCard = ({
   };
 
   return (
-    <div className="border shadow bg-card w-full flex gap-4 rounded-2xl p-4">
+    <div className="border shadow-sm bg-card w-full flex gap-4 rounded-2xl p-4 transition hover:shadow-md">
       <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted">
         <FileText className="h-10 w-10 text-muted-foreground" />
       </div>
@@ -118,6 +121,11 @@ const TsCard = ({
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => setDetailsOpen(true)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  <span>Ver detalles</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleEditPrep}>
                   <Pencil className="mr-2 h-4 w-4" />
                   <span>Editar boletín</span>
@@ -137,8 +145,63 @@ const TsCard = ({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+            <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>{ts.title}</DialogTitle>
+                  <DialogDescription>{ts.description || "Sin descripción."}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {ts.products && ts.products.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold mb-1">Productos relacionados</p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {ts.products.map((product) => (
+                          <li key={product.id}>{product.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {ts.references && ts.references.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold mb-1">Referencias</p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {ts.references.map((reference) => (
+                          <li key={reference}>{reference}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2 pt-1">
+                    {ts.url ? (
+                      <>
+                        <a
+                          href={ts.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Abrir documento
+                        </a>
+                        <a
+                          href={ts.url}
+                          target="_blank"
+                          download
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <FileDown className="h-4 w-4" />
+                          Descargar documento
+                        </a>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{ts.description}</p>
+        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{ts.description || "Sin descripción."}</p>
         {ts.url && (
           <>
             <button
@@ -184,6 +247,11 @@ const TsCard = ({
         {ts.products && ts.products.length > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
             Productos: {ts.products.map((p) => p.name).join(", ")}
+          </p>
+        )}
+        {ts.references && ts.references.length > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Referencias: {ts.references.join(", ")}
           </p>
         )}
       </section>

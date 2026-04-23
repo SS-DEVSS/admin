@@ -45,18 +45,20 @@ const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/ed
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="w-full overflow-hidden rounded-2xl border shadow-sm transition hover:shadow-md">
         <img
           src={blogPost!.coverImagePath}
           alt={`${blogPost?.title} image`}
-          className="h-[340px] w-full object-cover rounded-t-lg bg-[#D9D9D9] mx-auto"
+          className="h-[260px] w-full object-cover bg-[#D9D9D9] mx-auto"
         />
-        <CardContent className="border-t">
+        <CardContent className="border-t p-4">
           <div className="flex justify-between items-center">
-            <CardTitle className="mt-6 mb-3">{blogPost?.title}</CardTitle>
+            <CardTitle className="mb-2 line-clamp-2 text-base">{blogPost?.title}</CardTitle>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <MoreHorizontal className="hover:cursor-pointer" />
+                <button type="button" className="rounded-md p-1 hover:bg-muted">
+                  <MoreHorizontal className="hover:cursor-pointer" />
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56">
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
@@ -88,7 +90,7 @@ const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/ed
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <CardDescription className="leading-7">
+          <CardDescription className="line-clamp-3 leading-6">
             {stripHtmlTags(blogPost?.description || "")}
           </CardDescription>
         </CardContent>

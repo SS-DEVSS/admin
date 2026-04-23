@@ -42,7 +42,7 @@ const BlogsDashboard = () => {
           <div className="flex flex-col gap-3">
             <CardTitle>Blogs</CardTitle>
             <CardDescription>
-              Lista de blogs creados. Crea y edita el contenido en Markdown.
+              Gestiona el contenido publicado y sus vínculos relacionados.
             </CardDescription>
           </div>
           <div className="ml-auto flex flex-wrap gap-3 items-center">
@@ -67,6 +67,11 @@ const BlogsDashboard = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0 mt-4">
+          {!loading && (
+            <div className="mb-3 text-sm text-muted-foreground">
+              {listToShow.length} {listToShow.length === 1 ? "blog encontrado" : "blogs encontrados"}
+            </div>
+          )}
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="flex flex-col items-center gap-2">
