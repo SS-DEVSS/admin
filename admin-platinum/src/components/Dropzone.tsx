@@ -1,5 +1,6 @@
 import { Dispatch, useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
+import { CheckCircle2, FileText } from "lucide-react";
 
 interface MyDropzoneProps {
   file?: File | null;
@@ -65,7 +66,12 @@ const MyDropzone = ({ file, fileSetter, type, className, currentImageUrl, onImag
     onDrop,
     accept:
       type === "document"
-        ? { "application/pdf": [] }
+        ? {
+          "application/pdf": [],
+          "image/png": [],
+          "image/jpeg": [],
+          "image/jpg": [],
+        }
         : { "image/png": [], "image/jpeg": [], "image/jpg": [], "image/webp": [] },
     maxSize: 5000 * 1000,
   });
@@ -78,7 +84,8 @@ const MyDropzone = ({ file, fileSetter, type, className, currentImageUrl, onImag
   // Si hay una imagen actual y no se ha seleccionado un nuevo archivo, mostrar vista previa en el mismo recuadro
   const showCurrentImagePreview = currentImageUrl && !file && !previewUrl && type === "image";
   const showPreview = previewUrl && type === "image";
-  const showText = !showCurrentImagePreview && !showPreview;
+  const showDocumentSelected = type === "document" && !!(file && file.name);
+  const showText = !showCurrentImagePreview && !showPreview && !showDocumentSelected;
 
   const emptyStateContent =
     emptyTextStyle === "reference" ? (
@@ -144,22 +151,44 @@ const MyDropzone = ({ file, fileSetter, type, className, currentImageUrl, onImag
         <>
           {showPreview && (
             <div className="w-full flex flex-col items-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600 mb-2" />
+              <p className="text-sm font-semibold text-[#4E5154] mb-2">
+                Archivo cargado correctamente
+              </p>
               <img
                 src={previewUrl}
                 alt="Vista previa"
                 className="max-w-full max-h-[300px] object-contain rounded-lg mb-2"
               />
-              <p
-                className={`text-[#4E5154] text-center overflow-ellipsis text-sm`}
-              >
-                {file && file.name ? test(file.name) : "Vista previa"}
-              </p>
+              <div className="inline-flex items-center gap-2 rounded-md bg-white/80 border px-3 py-2 max-w-full">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-[#4E5154] truncate max-w-[260px]">
+                  {file && file.name ? test(file.name) : "Vista previa"}
+                </span>
+              </div>
               <p className="text-center text-[#94A3B8] mt-2 text-sm underline hover:cursor-pointer">
-                Haz clic para seleccionar otra imagen
+                Haz clic para reemplazar el archivo
               </p>
             </div>
           )}
           {showText && emptyStateContent}
+          {showDocumentSelected && (
+            <div className="w-full flex flex-col items-center gap-2 px-4 text-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <p className="text-sm font-semibold text-[#4E5154]">
+                Archivo cargado correctamente
+              </p>
+              <div className="inline-flex items-center gap-2 rounded-md bg-white/80 border px-3 py-2 max-w-full">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-[#4E5154] truncate max-w-[260px]">
+                  {file?.name}
+                </span>
+              </div>
+              <p className="text-xs text-[#94A3B8] underline hover:cursor-pointer">
+                Haz clic para reemplazar el archivo
+              </p>
+            </div>
+          )}
         </>
       )}
 

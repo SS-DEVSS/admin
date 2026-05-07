@@ -15,25 +15,51 @@ import { newsContext } from "@/context/news-context";
 import { BlogPost } from "@/models/news";
 import CardBlogPost from "@/components/CardBlogPost";
 import NoData from "@/components/NoData";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 const BlogsDashboard = () => {
   const { blogPosts, loading, deleteBlogPost, getBlogPosts } = newsContext();
+  const getBlogPostsRef = useRef(getBlogPosts);
   const [searchFilter, setSearchFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const backendSortOrder = sortOrder === "newest" ? "desc" : "asc";
 
   useEffect(() => {
-    getBlogPosts().catch(() => {});
-  }, []);
+    getBlogPostsRef.current = getBlogPosts;
+  }, [getBlogPosts]);
+
+  useEffect(() => {
+    getBlogPostsRef.current(backendSortOrder).catch(() => {});
+  }, [backendSortOrder]);
+
+  useEffect(() => {
+    if (!loading && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [loading, hasLoadedOnce]);
 
   const filteredBlogs = useMemo(
-    () =>
-      blogPosts.filter((post: BlogPost) =>
-        post.title.toLowerCase().includes(searchFilter.toLowerCase())
-      ),
+    () => {
+      const query = searchFilter.trim().toLowerCase();
+      if (!query) return blogPosts;
+      return blogPosts.filter((post: BlogPost) => {
+        const title = (post.title || "").toLowerCase();
+        const description = (post.description || "").toLowerCase();
+        const content = (post.content || "").toLowerCase();
+        return (
+          title.includes(query) ||
+          description.includes(query) ||
+          content.includes(query)
+        );
+      });
+    },
     [searchFilter, blogPosts]
   );
 
-  const listToShow = searchFilter.length > 0 ? filteredBlogs : blogPosts;
+  const listToShow = filteredBlogs;
+  const showInitialLoading = loading && !hasLoadedOnce;
+  const showRefreshingOverlay = loading && hasLoadedOnce;
 
   return (
     <Layout>
@@ -56,6 +82,15 @@ const BlogsDashboard = () => {
                 className="w-full rounded-lg bg-background pl-8"
               />
             </div>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Ordenar blogs por fecha"
+            >
+              <option value="newest">Mas reciente primero</option>
+              <option value="oldest">Mas antiguo primero</option>
+            </select>
             <Link to="/dashboard/blogs/nueva">
               <Button size="sm" className="h-10 px-6 gap-1">
                 <PlusCircle className="h-3.5 w-3.5 mr-2" />
@@ -72,11 +107,11 @@ const BlogsDashboard = () => {
               {listToShow.length} {listToShow.length === 1 ? "blog encontrado" : "blogs encontrados"}
             </div>
           )}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
+          {showInitialLoading ? (
+            <div className="flex items-center justify-center min-h-[320px]">
               <div className="flex flex-col items-center gap-2">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">Cargando...</p>
+                <p className="text-sm text-muted-foreground">Cargando blogs...</p>
               </div>
             </div>
           ) : listToShow.length === 0 ? (
@@ -84,16 +119,26 @@ const BlogsDashboard = () => {
               <p className="text-muted-foreground">No hay blogs disponibles.</p>
             </NoData>
           ) : (
-            <CardSectionLayout>
-              {listToShow.map((blogPost: BlogPost) => (
-                <CardBlogPost
-                  key={blogPost.id}
-                  blogPost={blogPost}
-                  deleteItem={deleteBlogPost}
-                  editPath="/dashboard/blogs/editar"
-                />
-              ))}
-            </CardSectionLayout>
+            <div className="relative min-h-[220px]">
+              <CardSectionLayout>
+                {listToShow.map((blogPost: BlogPost) => (
+                  <CardBlogPost
+                    key={blogPost.id}
+                    blogPost={blogPost}
+                    deleteItem={deleteBlogPost}
+                    editPath="/dashboard/blogs/editar"
+                  />
+                ))}
+              </CardSectionLayout>
+              {showRefreshingOverlay && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px] rounded-lg">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground">Actualizando blogs...</p>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

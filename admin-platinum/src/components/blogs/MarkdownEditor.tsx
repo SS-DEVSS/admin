@@ -125,6 +125,16 @@ export default function MarkdownEditor({
             "& .MuiTiptap-RichTextField-content": {
               minHeight,
             },
+            "& .ProseMirror": {
+              wordBreak: "break-word",
+            },
+            "& .ProseMirror ol, & .ProseMirror ul": {
+              paddingLeft: "1.5rem",
+              marginLeft: "0.5rem",
+            },
+            "& .ProseMirror li": {
+              margin: "0.15rem 0",
+            },
           },
         }}
         renderControls={() => (

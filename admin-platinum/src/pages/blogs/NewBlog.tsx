@@ -133,6 +133,7 @@ const NewBlog = () => {
               className="p-8"
               file={coverImage}
               fileSetter={setCoverImage}
+              type="image"
             />
           </div>
 

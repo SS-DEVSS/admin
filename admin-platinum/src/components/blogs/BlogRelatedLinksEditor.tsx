@@ -3,7 +3,7 @@ import { Item } from "@/models/product";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { BlogRelatedLinks } from "@/utils/blogRelatedLinks";
 
 type BlogRelatedLinksEditorProps = {
@@ -38,30 +38,64 @@ export default function BlogRelatedLinksEditor({
   const [selectedProductId, setSelectedProductId] = useState("");
   const [referenceDraft, setReferenceDraft] = useState("");
   const [applicationDraft, setApplicationDraft] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   const selectedProducts = useMemo(
     () => products.filter((product) => relatedLinks.productIds.includes(product.id)),
     [products, relatedLinks.productIds]
   );
 
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products
+            .map((product) => product.category?.name?.trim())
+            .filter((value): value is string => Boolean(value))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [products]
+  );
+
+  const productOptions = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    return products.filter((product) => {
+      const categoryName = product.category?.name ?? "";
+      const matchesCategory =
+        selectedCategory === "all" || categoryName === selectedCategory;
+      if (!matchesCategory) return false;
+      if (!query) return true;
+      const searchableText = [
+        product.name || "",
+        ...(product.variants || []).map((variant) => variant.sku || ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return searchableText.includes(query);
+    });
+  }, [products, productSearch, selectedCategory]);
+
   const referenceSuggestions = useMemo(
     () =>
       toUniqueValues(
-        products.flatMap((product) =>
+        selectedProducts.flatMap((product) =>
           (product.references || []).map((reference) =>
             `${reference.referenceBrand ?? ""} ${reference.referenceNumber}`.trim()
           )
         )
       ).filter((value) => !relatedLinks.references.includes(value)),
-    [products, relatedLinks.references]
+    [selectedProducts, relatedLinks.references]
   );
 
   const applicationSuggestions = useMemo(
     () =>
       toUniqueValues(
-        products.flatMap((product) => (product.applications || []).map((application) => applicationLabel(application)))
+        selectedProducts.flatMap((product) =>
+          (product.applications || []).map((application) => applicationLabel(application))
+        )
       ).filter((value) => !relatedLinks.applications.includes(value)),
-    [products, relatedLinks.applications]
+    [selectedProducts, relatedLinks.applications]
   );
 
   const setNext = (next: BlogRelatedLinks) =>
@@ -102,20 +136,46 @@ export default function BlogRelatedLinksEditor({
     <div className="space-y-6">
       <div className="space-y-2">
         <Label>Productos vinculados</Label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="relative">
+            <select
+              className="h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="all">Todas las categorias</option>
+              {categoryOptions.map((categoryName) => (
+                <option key={categoryName} value={categoryName}>
+                  {categoryName}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+          <Input
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder="Buscar por nombre o SKU"
+          />
+        </div>
         <div className="flex gap-2">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <div className="relative w-full">
+            <select
+              className="h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm"
             value={selectedProductId}
             onChange={(e) => setSelectedProductId(e.target.value)}
             disabled={productsLoading}
           >
             <option value="">{productsLoading ? "Cargando productos..." : "Selecciona un producto"}</option>
-            {products.map((product) => (
+            {productOptions.map((product) => (
               <option key={product.id} value={product.id}>
                 {product.name}
+                {product.variants?.[0]?.sku ? ` (${product.variants[0].sku})` : ""}
               </option>
             ))}
-          </select>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
           <Button type="button" variant="outline" onClick={addProduct} disabled={!selectedProductId}>
             Agregar
           </Button>
@@ -177,6 +237,8 @@ export default function BlogRelatedLinksEditor({
               </button>
             ))}
           </div>
+        ) : relatedLinks.productIds.length > 0 ? (
+          <p className="text-xs text-muted-foreground">No hay referencias sugeridas para los productos seleccionados.</p>
         ) : null}
         {relatedLinks.references.length > 0 ? (
           <div className="flex flex-wrap gap-2 pt-1">
@@ -235,6 +297,8 @@ export default function BlogRelatedLinksEditor({
               </button>
             ))}
           </div>
+        ) : relatedLinks.productIds.length > 0 ? (
+          <p className="text-xs text-muted-foreground">No hay aplicaciones sugeridas para los productos seleccionados.</p>
         ) : null}
         {relatedLinks.applications.length > 0 ? (
           <div className="flex flex-wrap gap-2 pt-1">

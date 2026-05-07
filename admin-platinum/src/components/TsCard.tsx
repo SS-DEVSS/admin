@@ -46,6 +46,7 @@ const TsCard = ({
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   const isImage = ts.url && /\.(jpe?g|png|gif|webp)$/i.test(ts.url);
 
@@ -103,14 +104,50 @@ const TsCard = ({
     });
   };
 
+  const handleOpenDocument = () => {
+    setPreviewOpen(true);
+  };
+
+  const handleDownloadDocument = async () => {
+    if (!ts.id) return;
+    try {
+      setDownloadLoading(true);
+      const client = axiosClient();
+      const response = await client.get(`/ts/${ts.id}/document`, { responseType: "blob" });
+      const blob = response.data as Blob;
+      const objectUrl = URL.createObjectURL(blob);
+
+      const extension = ts.url?.split(".").pop()?.split("?")[0] || "pdf";
+      const safeTitle = (ts.title || "boletin").replace(/[^\w\-]+/g, "_");
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `${safeTitle}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error("Error downloading technical sheet:", error);
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
   return (
-    <div className="border shadow-sm bg-card w-full flex gap-4 rounded-2xl p-4 transition hover:shadow-md">
-      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted">
-        <FileText className="h-10 w-10 text-muted-foreground" />
-      </div>
-      <section className="min-w-0 flex-1 text-foreground">
-        <div className="flex justify-between gap-2">
-          <h2 className="font-semibold text-lg truncate">{ts.title}</h2>
+    <div className="border shadow-sm bg-card w-full rounded-2xl p-6 transition hover:shadow-md">
+      <section className="min-w-0 flex-1 text-foreground space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-lg line-clamp-2">{ts.title}</h2>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {ts.description || "Sin descripción."}
+              </p>
+            </div>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="shrink-0 p-1 rounded hover:bg-muted">
@@ -175,25 +212,23 @@ const TsCard = ({
                   <div className="flex gap-2 pt-1">
                     {ts.url ? (
                       <>
-                        <a
-                          href={ts.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={handleOpenDocument}
                           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                         >
                           <Eye className="h-4 w-4" />
                           Abrir documento
-                        </a>
-                        <a
-                          href={ts.url}
-                          target="_blank"
-                          download
-                          rel="noopener noreferrer"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDownloadDocument}
+                          disabled={downloadLoading}
                           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                         >
                           <FileDown className="h-4 w-4" />
-                          Descargar documento
-                        </a>
+                          {downloadLoading ? "Descargando..." : "Descargar documento"}
+                        </button>
                       </>
                     ) : null}
                   </div>
@@ -201,15 +236,15 @@ const TsCard = ({
               </DialogContent>
             </Dialog>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{ts.description || "Sin descripción."}</p>
+
         {ts.url && (
           <>
             <button
               type="button"
               onClick={() => setPreviewOpen(true)}
-              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-2 text-sm"
             >
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="h-4 w-4" />
               Ver vista previa
             </button>
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
@@ -244,16 +279,26 @@ const TsCard = ({
             </Dialog>
           </>
         )}
-        {ts.products && ts.products.length > 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Productos: {ts.products.map((p) => p.name).join(", ")}
+        <div className="border-t pt-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
+            Productos
           </p>
-        )}
-        {ts.references && ts.references.length > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Referencias: {ts.references.join(", ")}
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-3">
+            {ts.products && ts.products.length > 0
+              ? ts.products.map((p) => p.name).join(", ")
+              : "Sin productos asociados."}
           </p>
-        )}
+        </div>
+        <div className="border-t pt-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
+            Referencias
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-3">
+            {ts.references && ts.references.length > 0
+              ? ts.references.join(", ")
+              : "Sin referencias asociadas."}
+          </p>
+        </div>
       </section>
     </div>
   );
