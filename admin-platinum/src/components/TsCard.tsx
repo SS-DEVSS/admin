@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { TechnicalSheet } from "@/models/technicalSheet";
 import { useDeleteModal } from "@/context/delete-context";
-import { FileText, MoreVertical, Pencil, Trash, Eye } from "lucide-react";
+import { FileDown, FileText, MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 import axiosClient from "@/services/axiosInstance";
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -41,9 +42,11 @@ const TsCard = ({
   const { openModal } = useDeleteModal();
   const { deleteFile } = useS3FileManager();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   const isImage = ts.url && /\.(jpe?g|png|gif|webp)$/i.test(ts.url);
 
@@ -90,6 +93,7 @@ const TsCard = ({
       url: ts.url ?? "",
       description: ts.description ?? "",
       productIds: (ts.products || []).map((p) => p.id),
+      references: ts.references ?? [],
     });
     setIsOpen(true);
   };
@@ -100,14 +104,50 @@ const TsCard = ({
     });
   };
 
+  const handleOpenDocument = () => {
+    setPreviewOpen(true);
+  };
+
+  const handleDownloadDocument = async () => {
+    if (!ts.id) return;
+    try {
+      setDownloadLoading(true);
+      const client = axiosClient();
+      const response = await client.get(`/ts/${ts.id}/document`, { responseType: "blob" });
+      const blob = response.data as Blob;
+      const objectUrl = URL.createObjectURL(blob);
+
+      const extension = ts.url?.split(".").pop()?.split("?")[0] || "pdf";
+      const safeTitle = (ts.title || "boletin").replace(/[^\w\-]+/g, "_");
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `${safeTitle}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error("Error downloading technical sheet:", error);
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
   return (
-    <div className="border shadow bg-card w-full flex gap-4 rounded-2xl p-4">
-      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted">
-        <FileText className="h-10 w-10 text-muted-foreground" />
-      </div>
-      <section className="min-w-0 flex-1 text-foreground">
-        <div className="flex justify-between gap-2">
-          <h2 className="font-semibold text-lg truncate">{ts.title}</h2>
+    <div className="border shadow-sm bg-card w-full rounded-2xl p-6 transition hover:shadow-md">
+      <section className="min-w-0 flex-1 text-foreground space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-lg line-clamp-2">{ts.title}</h2>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {ts.description || "Sin descripción."}
+              </p>
+            </div>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="shrink-0 p-1 rounded hover:bg-muted">
@@ -118,6 +158,11 @@ const TsCard = ({
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => setDetailsOpen(true)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  <span>Ver detalles</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleEditPrep}>
                   <Pencil className="mr-2 h-4 w-4" />
                   <span>Editar boletín</span>
@@ -137,16 +182,69 @@ const TsCard = ({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+            <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>{ts.title}</DialogTitle>
+                  <DialogDescription>{ts.description || "Sin descripción."}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {ts.products && ts.products.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold mb-1">Productos relacionados</p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {ts.products.map((product) => (
+                          <li key={product.id}>{product.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {ts.references && ts.references.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold mb-1">Referencias</p>
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        {ts.references.map((reference) => (
+                          <li key={reference}>{reference}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2 pt-1">
+                    {ts.url ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleOpenDocument}
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Abrir documento
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDownloadDocument}
+                          disabled={downloadLoading}
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <FileDown className="h-4 w-4" />
+                          {downloadLoading ? "Descargando..." : "Descargar documento"}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{ts.description}</p>
+
         {ts.url && (
           <>
             <button
               type="button"
               onClick={() => setPreviewOpen(true)}
-              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-2 text-sm"
             >
-              <Eye className="h-3.5 w-3.5" />
+              <Eye className="h-4 w-4" />
               Ver vista previa
             </button>
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
@@ -181,11 +279,26 @@ const TsCard = ({
             </Dialog>
           </>
         )}
-        {ts.products && ts.products.length > 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Productos: {ts.products.map((p) => p.name).join(", ")}
+        <div className="border-t pt-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
+            Productos
           </p>
-        )}
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-3">
+            {ts.products && ts.products.length > 0
+              ? ts.products.map((p) => p.name).join(", ")
+              : "Sin productos asociados."}
+          </p>
+        </div>
+        <div className="border-t pt-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
+            Referencias
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-3">
+            {ts.references && ts.references.length > 0
+              ? ts.references.join(", ")
+              : "Sin referencias asociadas."}
+          </p>
+        </div>
       </section>
     </div>
   );

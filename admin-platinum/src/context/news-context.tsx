@@ -10,9 +10,10 @@ interface NewsContextType {
   loading: boolean;
   errorMsg: string;
   addBlogPost: (blogPost: BlogPost) => Promise<void>;
-  getBlogPosts: () => Promise<void>;
+  getBlogPosts: (sortOrder?: "asc" | "desc") => Promise<void>;
   getBlogPostById: (id: BlogPost["id"]) => Promise<BlogPost | void>;
   deleteBlogPost: (id: BlogPost["id"]) => Promise<void>;
+  updateBlogPost: (id: BlogPost["id"], payload: Partial<BlogPost>) => Promise<boolean>;
 }
 
 const NewsContext = createContext<NewsContextType>({} as NewsContextType);
@@ -49,11 +50,11 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: { "Content-Type": "application/json" },
       });
       await getBlogPosts();
-      toast({ title: "Noticia creada correctamente.", variant: "success" });
+      toast({ title: "Blog creado correctamente.", variant: "success" });
     } catch (error: any) {
       setErrorMsg(error.response.data.error);
       toast({
-        title: "Error al crear noticia",
+        title: "Error al crear blog",
         variant: "destructive",
         description: errorMsg,
       });
@@ -63,10 +64,12 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const getBlogPosts = async () => {
+  const getBlogPosts = async (sortOrder: "asc" | "desc" = "desc") => {
     try {
       setLoading(true);
-      const data = await client.get("/blog/posts");
+      const data = await client.get("/blog/posts", {
+        params: { sortOrder },
+      });
       setBlogPosts(data.data?.blogPosts ?? []);
     } catch (error) {
       console.error("Error fetching blogPosts:", error);
@@ -108,6 +111,29 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const updateBlogPost = async (id: BlogPost["id"], payload: Partial<BlogPost>) => {
+    try {
+      setLoading(true);
+      await client.patch(`/blog/posts/${id}`, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+      await getBlogPosts();
+      toast({ title: "Blog actualizado correctamente.", variant: "success" });
+      return true;
+    } catch (error: any) {
+      setErrorMsg(error.response?.data?.error || "Error al actualizar blog");
+      toast({
+        title: "Error al actualizar blog",
+        variant: "destructive",
+        description: error.response?.data?.error || "No se pudo actualizar el blog",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+      setErrorMsg("");
+    }
+  };
+
   return (
     <NewsContext.Provider
       value={{
@@ -119,6 +145,7 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
         getBlogPosts,
         getBlogPostById,
         deleteBlogPost,
+        updateBlogPost,
       }}
     >
       {children}

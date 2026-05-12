@@ -12,6 +12,8 @@ import {
   Folder,
   Star,
   ExternalLink,
+  Newspaper,
+  BookOpen,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "../ui/button";
@@ -36,8 +38,8 @@ const menuItems: MenuItem[] = [
   { href: "/dashboard/categorias", icon: LayoutGrid, text: "Categorías" },
   { href: "/dashboard/productos", icon: Package, text: "Productos" },
   { href: "/dashboard/productos-destacados", icon: Star, text: "Productos Destacados" },
-  // { href: "/dashboard/boletines", icon: Newspaper, text: "Boletines" },
-  // { href: "/dashboard/blogs", icon: BookOpen, text: "Blogs" },
+  { href: "/dashboard/boletines", icon: Newspaper, text: "Boletines" },
+  { href: "/dashboard/blogs", icon: BookOpen, text: "Blogs" },
   { href: "/dashboard/importaciones", icon: Import, text: "Importaciones" },
   { href: "/dashboard/archivos", icon: Folder, text: "Administrador de Archivos" },
   // { href: "/noticias", icon: Megaphone, text: "Noticias" },
