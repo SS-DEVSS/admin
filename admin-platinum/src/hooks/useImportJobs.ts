@@ -155,6 +155,12 @@ export const useImportJobs = (options: UseImportJobsOptions = {}) => {
     fetchJobs(options);
   };
 
+  const stopImportJob = useCallback(async (jobId: string) => {
+    const client = axiosClient();
+    await client.post(`/jobs/${jobId}/stop`);
+    await fetchJobs(optionsRef.current);
+  }, [fetchJobs]);
+
   return {
     jobs,
     loading,
@@ -162,6 +168,7 @@ export const useImportJobs = (options: UseImportJobsOptions = {}) => {
     pagination,
     refresh,
     fetchJobs,
+    stopImportJob,
   };
 };
 
