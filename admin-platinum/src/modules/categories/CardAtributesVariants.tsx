@@ -294,6 +294,37 @@ const CardAtributesVariants = ({
     });
   };
 
+  const reorderAttributesInForm = (
+    scope: "PRODUCT" | "VARIANT" | "APPLICATION",
+    orderedForScope: CategoryAtributes[]
+  ) => {
+    const reindexed = orderedForScope.map((attr, index) => ({ ...attr, order: index }));
+    setForm((prev) => {
+      const pickScope = (s: "PRODUCT" | "VARIANT" | "APPLICATION") =>
+        s === scope
+          ? reindexed
+          : prev.attributes
+              .filter((a) => a.scope === s)
+              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      return {
+        ...prev,
+        attributes: [
+          ...pickScope("PRODUCT"),
+          ...pickScope("VARIANT"),
+          ...pickScope("APPLICATION"),
+        ],
+      };
+    });
+    setAttributes((prev) => ({
+      ...prev,
+      ...(scope === "PRODUCT"
+        ? { productAttributes: reindexed }
+        : scope === "VARIANT"
+          ? { variantAttributes: reindexed }
+          : { applicationAttributes: reindexed }),
+    }));
+  };
+
   const handleDeleteClick = (name: string) => {
     let tempList: CategoryAtributes[] = [];
     if (type === AttributeScope.PRODUCT) {
@@ -454,6 +485,7 @@ const CardAtributesVariants = ({
             title={title}
             attributes={attributes.productAttributes}
             handleDeleteClick={handleDeleteClick}
+            onReorder={(ordered) => reorderAttributesInForm("PRODUCT", ordered)}
           />
         ) : type === "VARIANT" ? (
           <CardAttributeTable
@@ -461,6 +493,7 @@ const CardAtributesVariants = ({
             title={title}
             attributes={attributes.variantAttributes}
             handleDeleteClick={handleDeleteClick}
+            onReorder={(ordered) => reorderAttributesInForm("VARIANT", ordered)}
           />
         ) : (
           <CardAttributeTable
@@ -468,6 +501,7 @@ const CardAtributesVariants = ({
             title={title}
             attributes={attributes.applicationAttributes}
             handleDeleteClick={handleDeleteClick}
+            onReorder={(ordered) => reorderAttributesInForm("APPLICATION", ordered)}
           />
         )}
       </CardContent>

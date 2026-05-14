@@ -9,7 +9,10 @@ export const useS3FileManager = () => {
   const uploadFile = async (
     file: File,
     onSuccess: (key: string, location: string) => void,
-    options?: { destination?: "image" | "document" }
+    options?: {
+      destination?: "image" | "document";
+      successToast?: { title: string; description?: string };
+    }
   ) => {
     if (!file || !file.type) {
       console.warn("[useS3FileManager] Invalid file provided");
@@ -52,6 +55,13 @@ export const useS3FileManager = () => {
       }
       
       if (data && data.key && data.location) {
+        if (options?.successToast) {
+          toast({
+            title: options.successToast.title,
+            description: options.successToast.description,
+            variant: "success",
+          });
+        }
         onSuccess(data.key, data.location);
       } else {
         throw new Error("Upload failed: invalid response");

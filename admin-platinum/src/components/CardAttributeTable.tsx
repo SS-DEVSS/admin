@@ -1,4 +1,22 @@
-import { AlertTriangle, MoreVertical, Pencil, Trash } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { AlertTriangle, GripVertical, MoreVertical, Pencil, Trash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,126 +36,247 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CategoryAtributes, CategoryAttributesTypes } from "@/models/category";
+import { CategoryAtributes, CategoryAttributeApi, CategoryAttributesTypes } from "@/models/category";
 import NoData from "./NoData";
 import { translateAttributeName } from "@/utils/attributeTranslations";
 
-// Mapeo de tipos técnicos a nombres amigables para el usuario
 const typeDisplayNames: Record<string, string> = {
   [CategoryAttributesTypes.STRING]: "Texto",
   [CategoryAttributesTypes.NUMERIC]: "Número",
   [CategoryAttributesTypes.DATE]: "Fecha",
   [CategoryAttributesTypes.BOOLEAN]: "Verdadero/Falso",
-  // También manejar valores en mayúsculas que pueden venir del backend
-  "STRING": "Texto",
-  "NUMBER": "Número",
-  "NUMERIC": "Número",
-  "DATE": "Fecha",
-  "BOOLEAN": "Verdadero/Falso",
+  STRING: "Texto",
+  NUMBER: "Número",
+  NUMERIC: "Número",
+  DATE: "Fecha",
+  BOOLEAN: "Verdadero/Falso",
 };
 
-// Función helper para obtener el nombre traducido del tipo
 const getTypeDisplayName = (type: string): string => {
   const normalizedType = type?.toLowerCase() || "";
-  return typeDisplayNames[type] ||
+  return (
+    typeDisplayNames[type] ||
     typeDisplayNames[normalizedType] ||
     typeDisplayNames[type.toUpperCase()] ||
-    type;
+    type
+  );
 };
+
+const sortableIdForAttribute = (attribute: CategoryAtributes): string => {
+  if (attribute.id) return attribute.id;
+  const api = attribute as CategoryAttributeApi;
+  const csv = attribute.csv_name ?? api.csvName ?? "";
+  const label = attribute.display_name ?? attribute.name ?? "";
+  return `${attribute.scope}:${csv}:${label}`;
+};
+
+const sortByOrder = (items: CategoryAtributes[]) =>
+  [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+const rowKey = (attribute: CategoryAtributes, index: number) =>
+  attribute.id ?? `${attribute.scope}-${attribute.order}-${index}-${attribute.name}`;
 
 interface CardAttributeTableProps {
   title: string;
   attributes: CategoryAtributes[];
   handleEditClick: (attribute: CategoryAtributes) => void;
   handleDeleteClick: (name: string) => void;
+  onReorder?: (orderedAttributes: CategoryAtributes[]) => void;
 }
 
-const sortByOrder = (items: CategoryAtributes[]) =>
-  [...items].sort(
-    (a, b) => (a.order ?? 0) - (b.order ?? 0)
-  );
+type SortableRowProps = {
+  attribute: CategoryAtributes;
+  displayIndex: number;
+  dragEnabled: boolean;
+  handleEditClick: (attribute: CategoryAtributes) => void;
+  handleDeleteClick: (name: string) => void;
+};
 
-const rowKey = (attribute: CategoryAtributes, index: number) =>
-  attribute.id ?? `${attribute.scope}-${attribute.order}-${index}-${attribute.name}`;
+const SortableAttributeRow = ({
+  attribute,
+  displayIndex,
+  dragEnabled,
+  handleEditClick,
+  handleDeleteClick,
+}: SortableRowProps) => {
+  const id = sortableIdForAttribute(attribute);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !dragEnabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.65 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} data-dragging={isDragging || undefined}>
+      {dragEnabled ? (
+        <TableCell className="w-10 px-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 cursor-grab text-muted-foreground active:cursor-grabbing"
+            aria-label="Arrastrar para reordenar"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      ) : null}
+      <TableCell className="text-center text-muted-foreground">{displayIndex + 1}</TableCell>
+      <TableCell className="font-semibold">
+        {translateAttributeName(attribute.display_name || attribute.name, false)}
+      </TableCell>
+      <TableCell>{getTypeDisplayName(attribute.type)}</TableCell>
+      <TableCell>
+        <Badge>{attribute.required ? "Si" : "No"}</Badge>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56">
+            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => handleEditClick(attribute)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                <span>Editar Atributo</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeleteClick(attribute.name)}>
+                <Trash className="mr-2 h-4 w-4" />
+                <span>Eliminar Atributo</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+};
 
 const CardAttributeTable = ({
+  title: _title,
   attributes,
   handleEditClick,
   handleDeleteClick,
+  onReorder,
 }: CardAttributeTableProps) => {
-  const sortedAttributes = sortByOrder(attributes);
+  const sortedAttributes = useMemo(() => sortByOrder(attributes), [attributes]);
+
+  const sortableIds = useMemo(
+    () => sortedAttributes.map((a) => sortableIdForAttribute(a)),
+    [sortedAttributes]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const dragEnabled = Boolean(onReorder) && sortedAttributes.length > 1;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!onReorder) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = sortableIds.indexOf(String(active.id));
+    const newIndex = sortableIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(sortedAttributes, oldIndex, newIndex));
+  };
+
+  const headerRow = (
+    <TableRow>
+      {onReorder && sortedAttributes.length > 1 ? <TableHead className="w-10 px-2" /> : null}
+      <TableHead className="w-[50px] text-center">#</TableHead>
+      <TableHead>Nombre</TableHead>
+      <TableHead>Tipo de Dato</TableHead>
+      <TableHead>Requerido</TableHead>
+      <TableHead className="w-[20px]" />
+    </TableRow>
+  );
+
+  const staticRows = sortedAttributes.map((attribute: CategoryAtributes, index: number) => (
+    <TableRow key={rowKey(attribute, index)}>
+      {onReorder && sortedAttributes.length > 1 ? <TableCell className="w-10 px-2" /> : null}
+      <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+      <TableCell className="font-semibold">
+        {translateAttributeName(attribute.display_name || attribute.name, false)}
+      </TableCell>
+      <TableCell>{getTypeDisplayName(attribute.type)}</TableCell>
+      <TableCell>
+        <Badge>{attribute.required ? "Si" : "No"}</Badge>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56">
+            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => handleEditClick(attribute)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                <span>Editar Atributo</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeleteClick(attribute.name)}>
+                <Trash className="mr-2 h-4 w-4" />
+                <span>Eliminar Atributo</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  ));
+
+  const sortableRows = sortedAttributes.map((attribute: CategoryAtributes, index: number) => (
+    <SortableAttributeRow
+      key={rowKey(attribute, index)}
+      attribute={attribute}
+      displayIndex={index}
+      dragEnabled={dragEnabled}
+      handleEditClick={handleEditClick}
+      handleDeleteClick={handleDeleteClick}
+    />
+  ));
+
+  const tableContent = (bodyRows: ReactNode) => (
+    <Table>
+      <TableHeader>{headerRow}</TableHeader>
+      <TableBody>{bodyRows}</TableBody>
+    </Table>
+  );
 
   return (
     <>
       {sortedAttributes.length ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px] text-center">#</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Tipo de Dato</TableHead>
-              <TableHead>Requerido</TableHead>
-              <TableHead className="w-[20px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedAttributes.map((attribute: CategoryAtributes, index: number) => (
-              <TableRow key={rowKey(attribute, index)}>
-                <TableCell className="text-center text-muted-foreground">
-                  {index + 1}
-                </TableCell>
-                <TableCell className="font-semibold">
-                  {translateAttributeName(
-                    attribute.display_name || attribute.name,
-                    false
-                  )}
-                </TableCell>
-                <TableCell>
-                  {getTypeDisplayName(attribute.type)}
-                </TableCell>
-                <TableCell>
-                  <Badge>{attribute.required ? "Si" : "No"}</Badge>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56">
-                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem
-                          onClick={() => handleEditClick(attribute)}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          <span>Editar Atributo</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteClick(attribute.name)}
-                        >
-                          <Trash className="mr-2 h-4 w-4" />
-                          <span>Eliminar Atributo</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        dragEnabled ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              {tableContent(sortableRows)}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          tableContent(staticRows)
+        )
       ) : (
         <NoData>
           <AlertTriangle className="text-[#4E5154]" />
-          <p className="text-[#4E5154]">
-            No existen atributos asociados
-          </p>
-          <p className="text-[#94A3B8] font-semibold text-sm">
-            Agrega uno en la parte posterior
-          </p>
+          <p className="text-[#4E5154]">No existen atributos asociados</p>
+          <p className="text-[#94A3B8] font-semibold text-sm">Agrega uno en la parte posterior</p>
         </NoData>
       )}
     </>
