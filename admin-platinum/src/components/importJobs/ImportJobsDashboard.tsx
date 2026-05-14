@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useImportJobs } from "@/hooks/useImportJobs";
-import { ImportJobType, ImportJobStatus } from "@/models/importJob";
+import { ImportJob, ImportJobType, ImportJobStatus } from "@/models/importJob";
 import {
   Table,
   TableBody,
@@ -40,6 +40,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { ImportJobError } from "@/models/importJob";
 
@@ -85,8 +95,7 @@ const getStatusBadge = (
     badgeClassName = "bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200";
     mainLabel = "Detenido";
     Icon = StopCircle;
-    tooltipText =
-      "Estado establecido manualmente en la base de datos. La aplicación no ofrece acción para detener jobs.";
+    tooltipText = "La importación se detuvo (manualmente o desde la acción Detener). Puedes reintentar el job.";
   } else if (status === "processing") {
     if (hasErrors) {
       badgeClassName = "bg-red-50 text-red-700 border-red-200 hover:bg-red-100";
@@ -201,9 +210,11 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
   const [statusFilter, setStatusFilter] = useState<ImportJobStatus | "all">("all");
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [stopTarget, setStopTarget] = useState<ImportJob | null>(null);
+  const [stopBusy, setStopBusy] = useState(false);
   const limit = 10;
 
-  const { jobs, loading, error, pagination } = useImportJobs({
+  const { jobs, loading, error, pagination, stopImportJob } = useImportJobs({
     type: typeFilter !== "all" ? typeFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
     page,
@@ -265,7 +276,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                   <SelectItem value="processing">En Progreso</SelectItem>
                   <SelectItem value="completed">Completado</SelectItem>
                   <SelectItem value="failed">Fallido</SelectItem>
-                  <SelectItem value="stopped">Detenido (manual DB)</SelectItem>
+                  <SelectItem value="stopped">Detenido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -361,11 +372,28 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleJobClick(job.id); }}>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleJobClick(job.id);
+                                }}
+                              >
                                 <Eye className="h-4 w-4 mr-2" />
                                 Ver Detalles
                               </DropdownMenuItem>
+                              {(job.status === "pending" || job.status === "processing") && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStopTarget(job);
+                                  }}
+                                >
+                                  <StopCircle className="h-4 w-4 mr-2" />
+                                  Detener
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -600,6 +628,55 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={stopTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !stopBusy) {
+            setStopTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Detener esta importación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El job pasará a estado detenido y el servidor dejará de procesar filas en cuanto sea posible. Los datos ya importados se conservan.
+              {stopTarget ? (
+                <>
+                  {" "}
+                  Archivo:{" "}
+                  <span className="font-medium text-foreground">
+                    {stopTarget.originalFileName || stopTarget.fileName}
+                  </span>
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stopBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={stopBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!stopTarget) return;
+                setStopBusy(true);
+                try {
+                  await stopImportJob(stopTarget.id);
+                  setStopTarget(null);
+                } catch (err) {
+                  console.error("stopImportJob failed:", err);
+                } finally {
+                  setStopBusy(false);
+                }
+              }}
+            >
+              {stopBusy ? "Deteniendo…" : "Sí, detener"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
