@@ -1,7 +1,22 @@
 import { TechnicalSheet } from "@/models/technicalSheet";
 import axiosClient from "@/services/axiosInstance";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useToast } from "./use-toast";
+
+type CreateTechnicalSheetPayload = Omit<TechnicalSheet, "id"> & {
+  productIds?: string[];
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as {
+      message?: string;
+      response?: { data?: { error?: string } };
+    };
+    return maybeError.response?.data?.error || maybeError.message || fallback;
+  }
+  return fallback;
+};
 
 export const useTs = () => {
   const client = axiosClient();
@@ -12,13 +27,8 @@ export const useTs = () => {
     {} as TechnicalSheet
   );
   const [loading, setLoading] = useState<boolean>(true); // Start with true to show loader initially
-  const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    getTechnicalSheets();
-  }, []);
-
-  const addTechnicalSheet = async (ts: Omit<TechnicalSheet, "id">) => {
+  const addTechnicalSheet = async (ts: CreateTechnicalSheetPayload) => {
     try {
       const headers = {
         "Content-Type": "application/json",
@@ -30,23 +40,27 @@ export const useTs = () => {
         title: "Boletín creado correctamente.",
         variant: "success",
       });
-    } catch (error: any) {
-      setErrorMsg(error.response.data.error);
+    } catch (error: unknown) {
       toast({
         title: "Error al crear boletín",
         variant: "destructive",
-        description: errorMsg,
+        description: getErrorMessage(error, "No se pudo crear el boletín"),
       });
     } finally {
       setLoading(false);
-      setErrorMsg("");
     }
   };
 
-  const getTechnicalSheets = async (): Promise<TechnicalSheet[] | null> => {
+  const getTechnicalSheets = async (search?: string): Promise<TechnicalSheet[] | null> => {
     try {
       setLoading(true);
-      const data = await client.get("/ts?page=1&pageSize=100");
+      const data = await client.get("/ts", {
+        params: {
+          page: 1,
+          pageSize: 100,
+          ...(search?.trim() ? { search: search.trim() } : {}),
+        },
+      });
       setTechnicalSheets(data.data.technicalSheets || []);
       return data.data.technicalSheets;
     } catch (error) {
@@ -82,16 +96,14 @@ export const useTs = () => {
         title: "Boletín eliminado correctamente.",
         variant: "success",
       });
-    } catch (error: any) {
-      setErrorMsg(error.response?.data?.error);
+    } catch (error: unknown) {
       toast({
         title: "Error al eliminar boletín",
         variant: "destructive",
-        description: errorMsg,
+        description: getErrorMessage(error, "No se pudo eliminar el boletín"),
       });
     } finally {
       setLoading(false);
-      setErrorMsg("");
     }
   };
 
@@ -105,11 +117,11 @@ export const useTs = () => {
       await client.post(`/ts/${id}/products`, { productIds }, { headers: { "Content-Type": "application/json" } });
       await getTechnicalSheets();
       toast({ title: "Productos agregados al boletín.", variant: "success" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error al agregar productos",
         variant: "destructive",
-        description: error.response?.data?.error || error.message,
+        description: getErrorMessage(error, "No se pudieron agregar productos"),
       });
     } finally {
       setLoading(false);
@@ -126,11 +138,36 @@ export const useTs = () => {
       await client.delete(`/ts/${id}/products`, { data: { productIds } });
       await getTechnicalSheets();
       toast({ title: "Productos quitados del boletín.", variant: "success" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error al quitar productos",
         variant: "destructive",
-        description: error.response?.data?.error || error.message,
+        description: getErrorMessage(error, "No se pudieron quitar productos"),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateReferencesForTechSheet = async (
+    id: TechnicalSheet["id"],
+    references: string[]
+  ) => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      await client.patch(
+        `/ts/${id}/references`,
+        { references },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      await getTechnicalSheets();
+      toast({ title: "Referencias actualizadas.", variant: "success" });
+    } catch (error: unknown) {
+      toast({
+        title: "Error al actualizar referencias",
+        variant: "destructive",
+        description: getErrorMessage(error, "No se pudieron actualizar referencias"),
       });
     } finally {
       setLoading(false);
@@ -174,5 +211,6 @@ export const useTs = () => {
     deleteTechnicalSheet,
     addProductsToTechSheet,
     removeProductsFromTechSheet,
+    updateReferencesForTechSheet,
   };
 };

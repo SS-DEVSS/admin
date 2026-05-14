@@ -8,7 +8,8 @@ export const useS3FileManager = () => {
 
   const uploadFile = async (
     file: File,
-    onSuccess: (key: string, location: string) => void
+    onSuccess: (key: string, location: string) => void,
+    options?: { destination?: "image" | "document" }
   ) => {
     if (!file || !file.type) {
       console.warn("[useS3FileManager] Invalid file provided");
@@ -44,7 +45,7 @@ export const useS3FileManager = () => {
     try {
       const extension = file.type.split("/")[1];
       let data: any;
-      if (extension === "pdf") {
+      if (options?.destination === "document" || extension === "pdf") {
         data = await uploadFileToS3(file, "uploads/documents/");
       } else {
         data = await uploadFileToS3(file);
