@@ -1,5 +1,11 @@
 export type ImportJobType = 'products' | 'references' | 'applications';
-export type ImportJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ImportJobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stopped';
+
+export interface ImportJobEta {
+  estimatedRemainingSeconds: number | null;
+  estimatedCompletionAt: string | null;
+  rowsPerSecond: number | null;
+}
 
 // Error can be a string or an object with category, message, row, etc.
 export type ImportJobError = string | {
@@ -40,6 +46,8 @@ export interface ImportJob {
     isStale: boolean;
     staleAfterSeconds: number;
   };
+  /** Present when API returns an in-progress estimate (large jobs). */
+  eta?: ImportJobEta | null;
 }
 
 export interface ImportJobsResponse {

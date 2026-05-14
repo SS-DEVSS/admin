@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, RefreshCw, Ban, AlertTriangle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, RefreshCw, Ban, AlertTriangle, StopCircle } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -42,6 +42,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ImportJobError } from "@/models/importJob";
+
+const formatEtaSeconds = (totalSeconds: number): string => {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  if (s < 90) return `~${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 120) return `~${m} min`;
+  const h = Math.floor(s / 3600);
+  const remM = Math.floor((s % 3600) / 60);
+  if (h < 48) return `~${h} h ${remM} min`;
+  const d = Math.floor(s / 86400);
+  const remH = Math.floor((s % 86400) / 3600);
+  return `~${d} d ${remH} h`;
+};
 
 const getStatusBadge = (
   status: ImportJobStatus,
@@ -68,6 +81,12 @@ const getStatusBadge = (
     } else {
       tooltipText = "El job falló. Consulta detalles para más información.";
     }
+  } else if (status === "stopped") {
+    badgeClassName = "bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200";
+    mainLabel = "Detenido";
+    Icon = StopCircle;
+    tooltipText =
+      "Estado establecido manualmente en la base de datos. La aplicación no ofrece acción para detener jobs.";
   } else if (status === "processing") {
     if (hasErrors) {
       badgeClassName = "bg-red-50 text-red-700 border-red-200 hover:bg-red-100";
@@ -246,6 +265,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                   <SelectItem value="processing">En Progreso</SelectItem>
                   <SelectItem value="completed">Completado</SelectItem>
                   <SelectItem value="failed">Fallido</SelectItem>
+                  <SelectItem value="stopped">Detenido (manual DB)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -448,6 +468,33 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                   <label className="text-sm font-medium text-muted-foreground">Progreso</label>
                   <p className="text-sm">{selectedJobData.progress}%</p>
                 </div>
+                {selectedJobData.status === "processing" && selectedJobData.totalRows >= 500 && (
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Tiempo estimado</label>
+                    {selectedJobData.eta?.estimatedRemainingSeconds != null &&
+                    selectedJobData.eta.estimatedCompletionAt != null ? (
+                      <div className="text-sm space-y-1 mt-1">
+                        <p className="font-medium">
+                          Restante: {formatEtaSeconds(selectedJobData.eta.estimatedRemainingSeconds)}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Fin estimado:{" "}
+                          {formatDate(selectedJobData.eta.estimatedCompletionAt)}
+                        </p>
+                        {selectedJobData.eta.rowsPerSecond != null && (
+                          <p className="text-muted-foreground">
+                            Ritmo: {selectedJobData.eta.rowsPerSecond} filas/s
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Se mostrará cuando haya suficientes filas procesadas y transcurrido unos segundos desde el
+                        inicio (importaciones grandes, ≥500 filas).
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Fecha de Creación</label>
                   <p className="text-sm">{formatDate(selectedJobData.createdAt)}</p>
