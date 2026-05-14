@@ -33,8 +33,7 @@ import {
   Info,
   FolderOpen,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CardAtributesVariants from "./CardAtributesVariants";
 import {
@@ -43,6 +42,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import Loader from "@/components/Loader";
 import FilePickerModal from "@/components/files/FilePickerModal";
@@ -86,6 +96,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savingStartTime, setSavingStartTime] = useState<number | null>(null);
+  const [attributeConfirmOpen, setAttributeConfirmOpen] = useState(false);
+  const pendingSubmitFormRef = useRef<formTypes | null>(null);
   const [brandSearchQuery, setBrandSearchQuery] = useState("");
 
   useEffect(() => {
@@ -261,7 +273,11 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
     [form, category, imageUrl]
   );
 
-  const handleSubmit = async (form: formTypes) => {
+  const handleSubmit = async (
+    form: formTypes,
+    options?: { skipAttributeConfirm?: boolean }
+  ) => {
+    let abortedForAttributeConfirm = false;
     try {
       setIsSubmitting(true);
       setSavingStartTime(Date.now());
@@ -328,8 +344,11 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
             ) {
               return null;
             }
+            const label =
+              (attr.display_name || attr.name || orig.name || "").trim() || orig.name;
             return {
               id: attr.id,
+              name: label,
               csvName: attr.csv_name || orig.csv_name,
               displayName: attr.display_name || orig.display_name,
               type: attr.type,
@@ -374,6 +393,18 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           if (attributesToDelete.length > 0) {
             (updatePayload.attributes as { delete: string[] }).delete = attributesToDelete;
           }
+        }
+
+        const hasAttributeChanges =
+          attributesToAdd.length > 0 ||
+          attributesToDelete.length > 0 ||
+          attributesToUpdate.length > 0;
+
+        if (hasAttributeChanges && !options?.skipAttributeConfirm) {
+          pendingSubmitFormRef.current = form;
+          setAttributeConfirmOpen(true);
+          abortedForAttributeConfirm = true;
+          return;
         }
 
         // Si hay una nueva imagen (File object), subirla primero
@@ -444,15 +475,29 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
     } catch (error: any) {
       // Error handling - el error ya se maneja en updateCategory/addCategory
     } finally {
-      // Ensure loader is shown for at least 800ms for better UX
-      const elapsed = savingStartTime ? Date.now() - savingStartTime : 0;
-      const minDisplayTime = 800;
-      const remainingTime = Math.max(0, minDisplayTime - elapsed);
-
-      setTimeout(() => {
+      if (abortedForAttributeConfirm) {
         setIsSubmitting(false);
         setSavingStartTime(null);
-      }, remainingTime);
+      } else {
+        // Ensure loader is shown for at least 800ms for better UX
+        const elapsed = savingStartTime ? Date.now() - savingStartTime : 0;
+        const minDisplayTime = 800;
+        const remainingTime = Math.max(0, minDisplayTime - elapsed);
+
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setSavingStartTime(null);
+        }, remainingTime);
+      }
+    }
+  };
+
+  const handleConfirmAttributeSave = async () => {
+    const pending = pendingSubmitFormRef.current;
+    pendingSubmitFormRef.current = null;
+    setAttributeConfirmOpen(false);
+    if (pending) {
+      await handleSubmit(pending, { skipAttributeConfirm: true });
     }
   };
 
@@ -461,6 +506,37 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
       {isSubmitting && (
         <Loader fullScreen message="Guardando cambios..." />
       )}
+      <AlertDialog
+        open={attributeConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            pendingSubmitFormRef.current = null;
+            setAttributeConfirmOpen(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar cambios en atributos</AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              Los cambios en atributos (producto o aplicación) no se pueden deshacer. Si eliminas un
+              atributo, se borrarán todos los valores guardados en productos y aplicaciones de esta
+              categoría. Cambiar tipo u orden puede afectar datos ya cargados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                void handleConfirmAttributeSave();
+              }}
+            >
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <main className="max-w-4xl mx-auto px-4 md:px-6">
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
@@ -661,6 +737,16 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           </section>
         </section>
         <section className="mt-4 flex flex-col gap-3 w-full pb-24">
+          {category?.id ? (
+            <Alert variant="warning">
+              <AlertDescription>
+                Al guardar, los cambios en atributos de producto o aplicación no se pueden deshacer.
+                Quitar un atributo elimina todos los valores guardados en productos y aplicaciones de
+                esta categoría. Los atributos nuevos aparecen vacíos hasta completarlos en cada
+                registro.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <CardAtributesVariants
             form={form}
             setForm={setForm}
@@ -704,7 +790,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           </Link>
           <Button
             size="sm"
-            disabled={!validateForm || isSubmitting}
+            disabled={!validateForm || isSubmitting || attributeConfirmOpen}
             className="h-10 px-6 gap-1"
             onClick={() => handleSubmit(form)}
           >
