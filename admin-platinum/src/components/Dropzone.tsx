@@ -1,6 +1,6 @@
 import { Dispatch, useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { CheckCircle2, FileText } from "lucide-react";
+import { CheckCircle2, FileText, X } from "lucide-react";
 
 interface MyDropzoneProps {
   file?: File | null;
@@ -10,9 +10,20 @@ interface MyDropzoneProps {
   currentImageUrl?: string; // URL de la imagen actual (si existe)
   onImageClick?: () => void; // Callback para cuando se hace click en la imagen actual
   emptyTextStyle?: "default" | "reference"; // reference = dos líneas, segunda en azul subrayado
+  /** Botón pequeño encima de la vista previa para quitar el archivo sin filas de botones debajo */
+  imageOverlayRemove?: boolean;
 }
 
-const MyDropzone = ({ file, fileSetter, type, className, currentImageUrl, onImageClick, emptyTextStyle = "default" }: MyDropzoneProps) => {
+const MyDropzone = ({
+  file,
+  fileSetter,
+  type,
+  className,
+  currentImageUrl,
+  onImageClick,
+  emptyTextStyle = "default",
+  imageOverlayRemove = false,
+}: MyDropzoneProps) => {
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -155,11 +166,26 @@ const MyDropzone = ({ file, fileSetter, type, className, currentImageUrl, onImag
               <p className="text-sm font-semibold text-[#4E5154] mb-2">
                 Archivo cargado correctamente
               </p>
-              <img
-                src={previewUrl}
-                alt="Vista previa"
-                className="max-w-full max-h-[300px] object-contain rounded-lg mb-2"
-              />
+              <div className="relative mb-2 inline-block max-w-full">
+                <img
+                  src={previewUrl}
+                  alt="Vista previa"
+                  className="max-w-full max-h-[300px] object-contain rounded-lg"
+                />
+                {imageOverlayRemove ? (
+                  <button
+                    type="button"
+                    aria-label="Quitar archivo"
+                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileSetter(null);
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
               <div className="inline-flex items-center gap-2 rounded-md bg-white/80 border px-3 py-2 max-w-full">
                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm text-[#4E5154] truncate max-w-[260px]">
