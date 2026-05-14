@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useImportJobs } from "@/hooks/useImportJobs";
-import { ImportJob, ImportJobType, ImportJobStatus } from "@/models/importJob";
+import { ImportJob, ImportJobError, ImportJobType, ImportJobStatus } from "@/models/importJob";
 import {
   Table,
   TableBody,
@@ -51,7 +51,77 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { ImportJobError } from "@/models/importJob";
+interface ImportErrorRowView {
+  key: string;
+  row: number | null;
+  sku: string;
+  category: string;
+  message: string;
+}
+
+const extractSkuFromMessage = (text: string): string | null => {
+  const a = text.match(/\(SKU=([^)]+)\)/i);
+  if (a) return a[1].trim();
+  const b = text.match(/Product with SKU\s+([^\s]+)\s+not found/i);
+  if (b) return b[1].trim();
+  const c = text.match(/\bSKU\s+([^\s,]+)/i);
+  if (c) return c[1].trim();
+  return null;
+};
+
+const collectErrorsFromJob = (job: ImportJob): ImportJobError[] => {
+  if (job.errors && job.errors.length > 0) return job.errors;
+  const raw = job.result as { errors?: ImportJobError[] } | null | undefined;
+  if (raw?.errors && Array.isArray(raw.errors)) return raw.errors;
+  return [];
+};
+
+const toErrorTableRows = (errors: ImportJobError[]): ImportErrorRowView[] => {
+  const rows: ImportErrorRowView[] = errors.map((e, i) => {
+    if (typeof e === "string") {
+      const prefix = e.match(/^(?:Row|Fila)\s+(\d+):\s*(?:\(SKU=([^)]+)\)\s*)?(.*)$/is);
+      if (prefix) {
+        const rest = (prefix[3] || "").trim();
+        return {
+          key: `str-${i}`,
+          row: parseInt(prefix[1], 10),
+          sku: (prefix[2]?.trim() || extractSkuFromMessage(rest)) || "—",
+          category: "—",
+          message: rest || e,
+        };
+      }
+      return {
+        key: `str-${i}`,
+        row: null,
+        sku: extractSkuFromMessage(e) || "—",
+        category: "—",
+        message: e,
+      };
+    }
+    const msg = e.message || "";
+    const sku = (typeof e.sku === "string" && e.sku) || extractSkuFromMessage(msg) || "—";
+    return {
+      key: `obj-${i}`,
+      row: typeof e.row === "number" ? e.row : null,
+      sku,
+      category: typeof e.category === "string" ? e.category : "—",
+      message: msg,
+    };
+  });
+  return [...rows].sort((a, b) => {
+    const ar = a.row ?? 1_000_000;
+    const br = b.row ?? 1_000_000;
+    return ar - br;
+  });
+};
+
+const formatImportErrorLine = (row: ImportErrorRowView): string => {
+  const esc = row.message.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const fila = row.row != null ? String(row.row) : "n/a";
+  const sku = row.sku !== "—" ? row.sku : "n/a";
+  const tipo = row.category !== "—" ? row.category : "n/a";
+  return `Error="${esc}", Fila=${fila}, SKU=${sku}, Tipo=${tipo}`;
+};
 
 const formatEtaSeconds = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -223,6 +293,15 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
 
   const selectedJobData = jobs.find((j) => j.id === selectedJob);
 
+  const selectedJobErrors = useMemo(
+    () => (selectedJobData ? collectErrorsFromJob(selectedJobData) : []),
+    [selectedJobData]
+  );
+  const selectedJobErrorRows = useMemo(
+    () => toErrorTableRows(selectedJobErrors),
+    [selectedJobErrors]
+  );
+
   const handleJobClick = (jobId: string) => {
     setSelectedJob(jobId);
     if (onJobClick) {
@@ -317,13 +396,15 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {jobs.map((job) => (
+                    {jobs.map((job) => {
+                      const jobErrors = collectErrorsFromJob(job);
+                      return (
                       <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleJobClick(job.id)}>
                         <TableCell className="font-medium">
                           {getTypeLabel(job.type)}
                         </TableCell>
                         <TableCell>
-                          {getStatusBadge(job.status, job.errors, job.warnings)}
+                          {getStatusBadge(job.status, jobErrors, job.warnings)}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate" title={job.originalFileName || job.fileName}>
                           {job.originalFileName || job.fileName}
@@ -354,10 +435,10 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                                 Fallidos: {job.failed}
                               </div>
                             )}
-                            {job.errors.length > 0 && (
+                            {jobErrors.length > 0 && (
                               <div className="flex items-center gap-1.5 text-red-600">
                                 <AlertTriangle className="h-3.5 w-3.5" />
-                                Errores: {job.errors.length}
+                                Errores: {jobErrors.length}
                               </div>
                             )}
                           </div>
@@ -398,7 +479,8 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -486,7 +568,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                  <div className="mt-1">{getStatusBadge(selectedJobData.status, selectedJobData.errors, selectedJobData.warnings)}</div>
+                  <div className="mt-1">{getStatusBadge(selectedJobData.status, selectedJobErrors, selectedJobData.warnings)}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Archivo</label>
@@ -577,26 +659,23 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                 </div>
               </div>
 
-              {selectedJobData.errors.length > 0 && (
+              {selectedJobErrors.length > 0 && (
                 <div className="border-t pt-4">
                   <label className="text-sm font-medium text-destructive mb-2 block">
-                    Errores ({selectedJobData.errors.length})
+                    Errores por fila del CSV ({selectedJobErrors.length})
                   </label>
-                  <div className="bg-destructive/10 rounded-md p-3 max-h-48 overflow-y-auto">
-                    <ul className="space-y-1 text-sm">
-                      {selectedJobData.errors.map((error, index) => {
-                        // Handle both string errors and object errors with {category, message, row}
-                        const errorText = typeof error === 'string'
-                          ? error
-                          : error?.message || error?.category || JSON.stringify(error);
-                        const errorRow = typeof error === 'object' && error?.row ? ` (Fila ${error.row})` : '';
-                        return (
-                          <li key={index} className="text-destructive">
-                            • {errorText}{errorRow}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Cada línea: Error=&quot;…&quot;, Fila=número de fila en el CSV (1 = encabezados), SKU, Tipo. Ordenadas por fila.
+                  </p>
+                  <div className="rounded-md border max-h-72 overflow-auto divide-y bg-muted/30">
+                    {selectedJobErrorRows.map((row) => (
+                      <div
+                        key={row.key}
+                        className="px-3 py-2 font-mono text-[11px] leading-relaxed text-destructive whitespace-pre-wrap break-words"
+                      >
+                        {formatImportErrorLine(row)}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

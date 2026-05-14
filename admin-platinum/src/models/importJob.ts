@@ -14,6 +14,7 @@ export type ImportJobError = string | {
   row?: number;
   field?: string;
   value?: string;
+  sku?: string;
 };
 
 export interface ImportJob {
