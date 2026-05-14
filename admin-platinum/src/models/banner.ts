@@ -1,5 +1,9 @@
 export interface Banner {
-  id?: string;
+  id: string;
   desktopUrl: string;
-  order: number;
+  mobileUrl: string;
+  title?: string | null;
+  altText?: string | null;
+  sortOrder?: number;
+  order?: number;
 }
