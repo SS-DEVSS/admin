@@ -5,8 +5,9 @@ import { useState } from "react";
 import { toast } from "./use-toast";
 
 export type AddBannerPayload = {
-  mobilePath: string;
   desktopPath: string;
+  /** Si no se envía, el backend usa la misma imagen que `desktopPath` para móvil. */
+  mobilePath?: string;
   title?: string;
   altText?: string;
 };

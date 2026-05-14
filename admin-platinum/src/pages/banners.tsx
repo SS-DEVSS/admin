@@ -70,8 +70,6 @@ const Banners = () => {
   const [editAlt, setEditAlt] = useState("");
   const [editDesktopFile, setEditDesktopFile] = useState<File | null>(null);
   const [editMobileFile, setEditMobileFile] = useState<File | null>(null);
-  const [editDesktopKey, setEditDesktopKey] = useState<string | null>(null);
-  const [editMobileKey, setEditMobileKey] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -98,8 +96,6 @@ const Banners = () => {
     setEditAlt(banner.altText ?? "");
     setEditDesktopFile(null);
     setEditMobileFile(null);
-    setEditDesktopKey(null);
-    setEditMobileKey(null);
     setEditOpen(true);
   };
 
@@ -110,65 +106,15 @@ const Banners = () => {
     setEditAlt("");
     setEditDesktopFile(null);
     setEditMobileFile(null);
-    setEditDesktopKey(null);
-    setEditMobileKey(null);
-  };
-
-  const handleUploadDesktop = () => {
-    if (!desktopFile) {
-      toast({
-        title: "Selecciona un archivo",
-        description: "Elige la imagen de escritorio antes de subirla.",
-        variant: "destructive",
-      });
-      return;
-    }
-    void s3Desktop.uploadFile(
-      desktopFile,
-      (key) => {
-        setDesktopKey(key);
-        setDesktopFile(null);
-      },
-      {
-        successToast: {
-          title: "Imagen de escritorio lista",
-          description: "La imagen se subió correctamente al almacenamiento.",
-        },
-      }
-    );
-  };
-
-  const handleUploadMobile = () => {
-    if (!mobileFile) {
-      toast({
-        title: "Selecciona un archivo",
-        description: "Elige la imagen móvil antes de subirla.",
-        variant: "destructive",
-      });
-      return;
-    }
-    void s3Mobile.uploadFile(
-      mobileFile,
-      (key) => {
-        setMobileKey(key);
-        setMobileFile(null);
-      },
-      {
-        successToast: {
-          title: "Imagen móvil lista",
-          description: "La imagen se subió correctamente al almacenamiento.",
-        },
-      }
-    );
   };
 
   const handleCreateBanner = async () => {
     const hasDesktop = Boolean(desktopKey || desktopFile);
     const hasMobile = Boolean(mobileKey || mobileFile);
-    if (!hasDesktop || !hasMobile) {
+    if (!hasDesktop) {
       toast({
-        title: "Faltan imágenes",
-        description: "Necesitas una imagen de escritorio y una de móvil.",
+        title: "Falta la imagen Web",
+        description: "Necesitas al menos la imagen Web (escritorio). La de Móvil es opcional.",
         variant: "destructive",
       });
       return;
@@ -181,16 +127,19 @@ const Banners = () => {
         if (!desktopFile) throw new Error("desktop");
         return uploadToKey(s3Desktop.uploadFile, desktopFile);
       })();
-      const mPromise = (async (): Promise<string> => {
-        if (mobileKey) return mobileKey;
-        if (!mobileFile) throw new Error("mobile");
-        return uploadToKey(s3Mobile.uploadFile, mobileFile);
-      })();
+      const mPromise = hasMobile
+        ? (async (): Promise<string> => {
+            if (mobileKey) return mobileKey;
+            if (!mobileFile) throw new Error("mobile");
+            return uploadToKey(s3Mobile.uploadFile, mobileFile);
+          })()
+        : null;
 
       let dKey: string;
       let mKey: string;
       try {
-        [dKey, mKey] = await Promise.all([dPromise, mPromise]);
+        dKey = await dPromise;
+        mKey = mPromise ? await mPromise : dKey;
       } catch {
         toast({
           title: "Error al subir",
@@ -201,13 +150,13 @@ const Banners = () => {
       }
 
       setDesktopKey(dKey);
-      setMobileKey(mKey);
+      setMobileKey(hasMobile ? mKey : null);
       setDesktopFile(null);
       setMobileFile(null);
 
       const ok = await addBanner({
         desktopPath: dKey,
-        mobilePath: mKey,
+        ...(mKey !== dKey ? { mobilePath: mKey } : {}),
         title: title.trim() || undefined,
         altText: altText.trim() || undefined,
       });
@@ -217,65 +166,19 @@ const Banners = () => {
     }
   };
 
-  const handleUploadEditDesktop = () => {
-    if (!editDesktopFile) {
-      toast({ title: "Selecciona un archivo", variant: "destructive" });
-      return;
-    }
-    void s3EditDesktop.uploadFile(
-      editDesktopFile,
-      (key) => {
-        setEditDesktopKey(key);
-        setEditDesktopFile(null);
-      },
-      {
-        successToast: {
-          title: "Nueva imagen escritorio lista",
-          description: "Se usará al guardar cambios.",
-        },
-      }
-    );
-  };
-
-  const handleUploadEditMobile = () => {
-    if (!editMobileFile) {
-      toast({ title: "Selecciona un archivo", variant: "destructive" });
-      return;
-    }
-    void s3EditMobile.uploadFile(
-      editMobileFile,
-      (key) => {
-        setEditMobileKey(key);
-        setEditMobileFile(null);
-      },
-      {
-        successToast: {
-          title: "Nueva imagen móvil lista",
-          description: "Se usará al guardar cambios.",
-        },
-      }
-    );
-  };
-
   const handleSaveEdit = async () => {
     if (!editingBanner) return;
     setEditSaving(true);
-    const prevDesktop = editingBanner.desktopUrl;
-    const prevMobile = editingBanner.mobileUrl;
     try {
       let desktopPath: string | undefined;
       let mobilePath: string | undefined;
 
-      if (editDesktopKey) {
-        desktopPath = editDesktopKey;
-      } else if (editDesktopFile) {
+      if (editDesktopFile) {
         desktopPath = await uploadToKey(s3EditDesktop.uploadFile, editDesktopFile);
         setEditDesktopFile(null);
       }
 
-      if (editMobileKey) {
-        mobilePath = editMobileKey;
-      } else if (editMobileFile) {
+      if (editMobileFile) {
         mobilePath = await uploadToKey(s3EditMobile.uploadFile, editMobileFile);
         setEditMobileFile(null);
       }
@@ -288,14 +191,6 @@ const Banners = () => {
       });
 
       if (ok) {
-        const urls: string[] = [];
-        if (desktopPath) urls.push(prevDesktop);
-        if (mobilePath) urls.push(prevMobile);
-        for (const url of [...new Set(urls)]) {
-          await new Promise<void>((resolve) => {
-            s3Desktop.deleteFile(url, () => resolve());
-          });
-        }
         closeEdit();
       }
     } catch (e) {
@@ -310,19 +205,15 @@ const Banners = () => {
     }
   };
 
-  const runDeleteS3ThenApi = (banner: Banner) => {
-    const urls = [...new Set([banner.desktopUrl, banner.mobileUrl].filter(Boolean))];
-    let i = 0;
-    const next = () => {
-      if (i >= urls.length) {
-        void deleteBanner(banner.id);
-        return;
-      }
-      const u = urls[i];
-      i += 1;
-      s3Desktop.deleteFile(u, next);
-    };
-    next();
+  /**
+   * Elimina el banner en la API. No encadenamos borrado vía `deleteFileFromS3` con las URLs del listado:
+   * el endpoint `DELETE /files/images/:id` espera el UUID del archivo en la tabla `files`, no la URL/CDN
+   * ni la clave `uploads/images/...`. Si ese paso fallaba, el callback de éxito nunca corría y el banner
+   * no se borraba (modal cerrado pero sin efecto). La limpieza de S3/registro de files para banners puede
+   * añadirse en backend si hace falta.
+   */
+  const confirmDeleteBanner = (banner: Banner) => {
+    void deleteBanner(banner.id);
   };
 
   const moveBanner = (index: number, delta: number) => {
@@ -336,9 +227,8 @@ const Banners = () => {
   };
 
   const hasDesktopSlot = Boolean(desktopKey || desktopFile);
-  const hasMobileSlot = Boolean(mobileKey || mobileFile);
   const uploadsBusy = s3Desktop.uploading || s3Mobile.uploading;
-  const canSave = hasDesktopSlot && hasMobileSlot && !loading && !saving && !uploadsBusy;
+  const canSave = hasDesktopSlot && !loading && !saving && !uploadsBusy;
 
   const displayName = (b: Banner) =>
     (b.title && b.title.trim()) || b.desktopUrl.split("/").pop() || "Banner";
@@ -353,9 +243,9 @@ const Banners = () => {
           <CardHeader>
             <CardTitle>Agregar nuevo banner</CardTitle>
             <CardDescription>
-              Sube una imagen para escritorio y otra para móvil (pueden ser distintas). Puedes usar «Subir imagen» en
-              cada bloque o pulsar «Crear banner»: si aún no subiste alguna, se subirá automáticamente al guardar.
-              Opcionalmente indica nombre y texto alternativo para el sitio público.
+              Sube la imagen Web (obligatoria) y, si quieres, otra para Móvil (opcional; si no, en móvil se usa la
+              misma que Web). Las imágenes se suben al pulsar «Crear banner». Opcionalmente indica nombre y texto
+              alternativo para el sitio público.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -386,7 +276,7 @@ const Banners = () => {
               <div className="space-y-2" aria-required="true">
                 <div className="flex items-center justify-between gap-2">
                   <Label className="inline-flex items-center gap-1">
-                    Imagen escritorio {requiredMark}
+                    Web {requiredMark}
                   </Label>
                   {desktopKey ? (
                     <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
@@ -401,30 +291,24 @@ const Banners = () => {
                   ) : desktopFile?.name ? (
                     <span
                       className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                      title="Se subirá al pulsar «Subir imagen» o «Crear banner»"
+                      title="Se subirá al pulsar «Crear banner»"
                     >
                       <Upload className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                     </span>
                   ) : null}
                 </div>
-                <MyDropzone className="p-8" type="image" file={desktopFile} fileSetter={setDesktopFile} />
-                {desktopFile?.name ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" type="button" onClick={() => setDesktopFile(null)}>
-                      Quitar archivo
-                    </Button>
-                    <Button size="sm" type="button" disabled={s3Desktop.uploading} onClick={handleUploadDesktop}>
-                      {s3Desktop.uploading ? "Subiendo…" : "Subir imagen"}
-                    </Button>
-                  </div>
-                ) : null}
+                <MyDropzone
+                  className="p-8"
+                  type="image"
+                  file={desktopFile}
+                  fileSetter={setDesktopFile}
+                  imageOverlayRemove
+                />
               </div>
 
-              <div className="space-y-2" aria-required="true">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="inline-flex items-center gap-1">
-                    Imagen móvil {requiredMark}
-                  </Label>
+                  <Label className="inline-flex items-center gap-1">Móvil (opcional)</Label>
                   {mobileKey ? (
                     <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -438,35 +322,26 @@ const Banners = () => {
                   ) : mobileFile?.name ? (
                     <span
                       className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                      title="Se subirá al pulsar «Subir imagen» o «Crear banner»"
+                      title="Se subirá al pulsar «Crear banner»"
                     >
                       <Upload className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                     </span>
                   ) : null}
                 </div>
-                <MyDropzone className="p-8" type="image" file={mobileFile} fileSetter={setMobileFile} />
-                {mobileFile?.name ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" type="button" onClick={() => setMobileFile(null)}>
-                      Quitar archivo
-                    </Button>
-                    <Button size="sm" type="button" disabled={s3Mobile.uploading} onClick={handleUploadMobile}>
-                      {s3Mobile.uploading ? "Subiendo…" : "Subir imagen"}
-                    </Button>
-                  </div>
-                ) : null}
+                <MyDropzone
+                  className="p-8"
+                  type="image"
+                  file={mobileFile}
+                  fileSetter={setMobileFile}
+                  imageOverlayRemove
+                />
               </div>
             </div>
 
             <div className="space-y-2 pt-2 border-t">
-              <p className="text-sm text-muted-foreground">
-                Los campos con <span className="text-destructive font-semibold">*</span> son obligatorios (imagen
-                escritorio e imagen móvil). El botón «Crear banner» se activa cuando hay archivo o imagen ya subida en
-                ambos. El nombre y la etiqueta son opcionales.
-              </p>
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="outline" type="button" onClick={resetForm} disabled={saving}>
-                  Limpiar formulario
+                  Cancelar
                 </Button>
                 <Button type="button" disabled={!canSave} onClick={() => void handleCreateBanner()}>
                   {saving ? "Guardando…" : "Crear banner"}
@@ -523,9 +398,6 @@ const Banners = () => {
                       ) : (
                         <p className="text-sm text-muted-foreground mt-1 italic">Sin texto alternativo</p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-2 truncate">
-                        {banner.desktopUrl.split("/").pop()}
-                      </p>
                     </div>
                   </div>
                   <CardFooter className="flex flex-row flex-nowrap items-center justify-center gap-1 p-2 sm:p-3 border-t sm:border-t-0 sm:border-l border-border/60 bg-[#EEEEEE] shrink-0 self-stretch">
@@ -592,7 +464,7 @@ const Banners = () => {
             <DialogHeader>
               <DialogTitle>Editar banner</DialogTitle>
               <DialogDescription>
-                Cambia nombre, texto alternativo o, si quieres, sustituye las imágenes (opcional).
+                Cambia nombre, texto alternativo o elige nuevas imágenes; se subirán al pulsar «Guardar cambios».
               </DialogDescription>
             </DialogHeader>
             {editingBanner ? (
@@ -607,48 +479,24 @@ const Banners = () => {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Nueva imagen escritorio (opcional)</Label>
-                    <MyDropzone className="p-6" type="image" file={editDesktopFile} fileSetter={setEditDesktopFile} />
-                    {editDesktopFile?.name ? (
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={() => setEditDesktopFile(null)}>
-                          Quitar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={s3EditDesktop.uploading}
-                          onClick={handleUploadEditDesktop}
-                        >
-                          {s3EditDesktop.uploading ? "Subiendo…" : "Subir"}
-                        </Button>
-                      </div>
-                    ) : null}
-                    {editDesktopKey ? (
-                      <p className="text-xs text-emerald-600">Nueva imagen lista para guardar</p>
-                    ) : null}
+                    <Label>Nueva imagen Web (opcional)</Label>
+                    <MyDropzone
+                      className="p-6"
+                      type="image"
+                      file={editDesktopFile}
+                      fileSetter={setEditDesktopFile}
+                      imageOverlayRemove
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nueva imagen móvil (opcional)</Label>
-                    <MyDropzone className="p-6" type="image" file={editMobileFile} fileSetter={setEditMobileFile} />
-                    {editMobileFile?.name ? (
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={() => setEditMobileFile(null)}>
-                          Quitar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={s3EditMobile.uploading}
-                          onClick={handleUploadEditMobile}
-                        >
-                          {s3EditMobile.uploading ? "Subiendo…" : "Subir"}
-                        </Button>
-                      </div>
-                    ) : null}
-                    {editMobileKey ? (
-                      <p className="text-xs text-emerald-600">Nueva imagen lista para guardar</p>
-                    ) : null}
+                    <Label>Nueva imagen Móvil (opcional)</Label>
+                    <MyDropzone
+                      className="p-6"
+                      type="image"
+                      file={editMobileFile}
+                      fileSetter={setEditMobileFile}
+                      imageOverlayRemove
+                    />
                   </div>
                 </div>
               </div>
@@ -669,7 +517,8 @@ const Banners = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Eliminar este banner?</AlertDialogTitle>
               <AlertDialogDescription>
-                Se borrarán las imágenes del almacenamiento y el registro. Esta acción no se puede deshacer.
+                Se eliminará el banner del sitio (registro en base de datos). Las imágenes en almacenamiento
+                pueden quedar huérfanas hasta que exista limpieza en servidor; esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -684,7 +533,7 @@ const Banners = () => {
                 className="bg-red-600 hover:bg-red-700"
                 onClick={() => {
                   if (deleteTarget) {
-                    runDeleteS3ThenApi(deleteTarget);
+                    confirmDeleteBanner(deleteTarget);
                   }
                   setDeleteTarget(null);
                   setDeleteOpen(false);
