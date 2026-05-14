@@ -242,11 +242,6 @@ const Banners = () => {
         <Card>
           <CardHeader>
             <CardTitle>Agregar nuevo banner</CardTitle>
-            <CardDescription>
-              Sube la imagen Web (obligatoria) y, si quieres, otra para Móvil (opcional; si no, en móvil se usa la
-              misma que Web). Las imágenes se suben al pulsar «Crear banner». Opcionalmente indica nombre y texto
-              alternativo para el sitio público.
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
