@@ -29,6 +29,7 @@ interface UseImportPreviewResult {
   loading: boolean;
   error: string | null;
   fetchPreview: (file: File, importType: string, categoryId: string) => Promise<void>;
+  clearPreview: () => void;
 }
 
 export const useImportPreview = (): UseImportPreviewResult => {
@@ -67,5 +68,10 @@ export const useImportPreview = (): UseImportPreviewResult => {
     }
   }, []);
 
-  return { preview, loading, error, fetchPreview };
+  const clearPreview = useCallback(() => {
+    setPreview(null);
+    setError(null);
+  }, []);
+
+  return { preview, loading, error, fetchPreview, clearPreview };
 };

@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Brand } from "@/models/brand";
 import { useLocation } from "react-router-dom";
 import { useBrandContext } from "@/context/brand-context";
@@ -125,9 +126,33 @@ const CardTemplate = ({
     );
   };
 
+  const isCategoryListCard = pathname === "/dashboard/categorias" && Boolean(category?.id);
+
   return (
     <>
-      <Card className="w-full">
+      <Card
+        className={cn(
+          "w-full",
+          isCategoryListCard && "cursor-pointer hover:shadow-md transition-shadow"
+        )}
+        onClick={
+          isCategoryListCard
+            ? () => navigate(`/dashboard/categorias/editar/${category!.id}`)
+            : undefined
+        }
+        role={isCategoryListCard ? "link" : undefined}
+        tabIndex={isCategoryListCard ? 0 : undefined}
+        onKeyDown={
+          isCategoryListCard
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(`/dashboard/categorias/editar/${category!.id}`);
+                }
+              }
+            : undefined
+        }
+      >
         {renderImage()}
         <div className="hidden h-[300px] w-full flex items-center justify-center bg-gray-200 rounded-t-lg mx-auto">
           <svg
@@ -149,29 +174,29 @@ const CardTemplate = ({
             <CardTitle className="!text-xl capitalize">
               {(brand ? brand?.name : category?.name)?.toLowerCase()}
             </CardTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <MoreVertical className="hover:cursor-pointer w-5 h-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-40">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {pathname === "/dashboard/categorias" && category?.id && (
-                  <DropdownMenuGroup>
-                    <Link to={`/dashboard/categorias/editar/${category.id}`}>
-                      <DropdownMenuItem>Editar Categoría</DropdownMenuItem>
-                    </Link>
-                  </DropdownMenuGroup>
-                )}
-                {pathname === "/dashboard/marcas" && (
+            {pathname === "/dashboard/marcas" && brand && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-md p-1 outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Acciones"
+                  >
+                    <MoreVertical className="hover:cursor-pointer w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-40" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem onClick={handleEditBrand}>
                       Editar Marca
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           <CardDescription className="leading-7">
             {brand ? brand?.description : category?.description}

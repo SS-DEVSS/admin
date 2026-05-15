@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useImportJobs } from "@/hooks/useImportJobs";
 import { ImportJob, ImportJobError, ImportJobType, ImportJobStatus } from "@/models/importJob";
+import { useCategoryContext } from "@/context/categories-context";
 import {
   Table,
   TableBody,
@@ -276,8 +277,18 @@ interface ImportJobsDashboardProps {
 }
 
 const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardProps) => {
+  const { categories } = useCategoryContext();
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    categories.forEach((c) => {
+      if (c.id) m.set(c.id, c.name);
+    });
+    return m;
+  }, [categories]);
+
   const [typeFilter, setTypeFilter] = useState<ImportJobType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<ImportJobStatus | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [stopTarget, setStopTarget] = useState<ImportJob | null>(null);
@@ -287,9 +298,15 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
   const { jobs, loading, error, pagination, stopImportJob } = useImportJobs({
     type: typeFilter !== "all" ? typeFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
+    categoryId: categoryFilter !== "all" ? categoryFilter : undefined,
     page,
     limit,
   });
+
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name, "es")),
+    [categories]
+  );
 
   const selectedJobData = jobs.find((j) => j.id === selectedJob);
 
@@ -321,7 +338,28 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
         <CardHeader className="flex flex-row items-end p-0 m-0 pb-6 w-full">
           <div className="flex flex-col gap-3">
             <CardTitle>Importaciones</CardTitle>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
+              <Select
+                value={categoryFilter}
+                onValueChange={(value) => {
+                  setCategoryFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {sortedCategories.map((c) =>
+                    c.id ? (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ) : null
+                  )}
+                </SelectContent>
+              </Select>
               <Select
                 value={typeFilter}
                 onValueChange={(value) => {
@@ -387,6 +425,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Categoría</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Archivo</TableHead>
@@ -398,8 +437,15 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                   <TableBody>
                     {jobs.map((job) => {
                       const jobErrors = collectErrorsFromJob(job);
+                      const categoryLabel =
+                        job.categoryId != null && job.categoryId !== ""
+                          ? categoryNameById.get(job.categoryId) ?? "—"
+                          : "—";
                       return (
                       <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleJobClick(job.id)}>
+                        <TableCell className="max-w-[160px] truncate font-medium" title={categoryLabel}>
+                          {categoryLabel}
+                        </TableCell>
                         <TableCell className="font-medium">
                           {getTypeLabel(job.type)}
                         </TableCell>
@@ -562,6 +608,14 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
           {selectedJobData && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Categoría</label>
+                  <p className="text-sm font-medium">
+                    {selectedJobData.categoryId
+                      ? categoryNameById.get(selectedJobData.categoryId) ?? selectedJobData.categoryId
+                      : "—"}
+                  </p>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Tipo</label>
                   <p className="text-sm font-medium">{getTypeLabel(selectedJobData.type)}</p>

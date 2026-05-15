@@ -35,14 +35,20 @@ const ImportProduct = () => {
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [columnMapping, setColumnMapping] = useState<{ [csvColumn: string]: string | null } | null>(null);
 
-  const { preview, loading: previewLoading, fetchPreview } = useImportPreview();
+  const { preview, loading: previewLoading, fetchPreview, clearPreview } = useImportPreview();
+
+  useEffect(() => {
+    setFile(null);
+    setColumnMapping(null);
+    clearPreview();
+  }, [categoryId, importType, clearPreview]);
 
   const onDrop = async (acceptedFiles: File[]) => {
     // Don't allow file drop if import type or category is not selected
     if (!importType || !categoryId) {
       toast({
         title: "Error",
-        description: "Por favor, selecciona el tipo de importación y la categoría primero.",
+        description: "Selecciona la categoría y el tipo de importación primero.",
         variant: "destructive",
       });
       return;
@@ -170,38 +176,15 @@ const ImportProduct = () => {
           <CardHeader>
             <CardTitle>Importar desde CSV</CardTitle>
             <CardDescription>
-              Selecciona el tipo de importación, la categoría y sube tu archivo CSV.
+              Selecciona la categoría, el tipo de importación y sube tu archivo CSV.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-3">
-              <Label htmlFor="importType">
-                Tipo de Importación<span className="text-red-500">*</span>
-              </Label>
-              <Select value={importType} onValueChange={(value) => setImportType(value as ImportType)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona el tipo de importación" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Tipos de Importación</SelectLabel>
-                    <SelectItem value="products">Productos</SelectItem>
-                    <SelectItem value="references">Referencias</SelectItem>
-                    <SelectItem value="applications">Aplicaciones</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-3">
               <Label htmlFor="category">
                 Categoría<span className="text-red-500">*</span>
               </Label>
-              <Select
-                value={categoryId}
-                onValueChange={setCategoryId}
-                disabled={!importType}
-              >
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
@@ -213,6 +196,29 @@ const ImportProduct = () => {
                         {category.name}
                       </SelectItem>
                     ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3">
+              <Label htmlFor="importType">
+                Tipo de Importación<span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={importType}
+                onValueChange={(value) => setImportType(value as ImportType)}
+                disabled={!categoryId}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona el tipo de importación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Tipos de Importación</SelectLabel>
+                    <SelectItem value="products">Productos</SelectItem>
+                    <SelectItem value="references">Referencias</SelectItem>
+                    <SelectItem value="applications">Aplicaciones</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -248,7 +254,7 @@ const ImportProduct = () => {
                     {!importType || !categoryId ? (
                       <>
                         <p className="text-muted-foreground">
-                          Selecciona el tipo de importación y la categoría primero
+                          Selecciona la categoría y el tipo de importación primero
                         </p>
                         <p className="text-sm text-muted-foreground">
                           El área de carga se habilitará después
