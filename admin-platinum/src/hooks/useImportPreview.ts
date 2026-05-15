@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import axiosClient from "@/services/axiosInstance";
 
+const PREVIEW_UPLOAD_MAX_BYTES = 17 * 1024 * 1024;
+
 interface Attribute {
   id: string;
   name: string;
@@ -45,7 +47,11 @@ export const useImportPreview = (): UseImportPreviewResult => {
     try {
       const client = axiosClient();
       const formData = new FormData();
-      formData.append("file", file);
+      const previewPayload =
+        file.size > PREVIEW_UPLOAD_MAX_BYTES
+          ? file.slice(0, PREVIEW_UPLOAD_MAX_BYTES, file.type || undefined)
+          : file;
+      formData.append("file", previewPayload, file.name);
       formData.append("importType", importType);
       formData.append("categoryId", categoryId);
 
@@ -53,6 +59,7 @@ export const useImportPreview = (): UseImportPreviewResult => {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 30 * 60 * 1000,
       });
 
       setPreview(response.data);
