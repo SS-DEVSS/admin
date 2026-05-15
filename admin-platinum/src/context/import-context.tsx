@@ -227,7 +227,9 @@ export const ImportProvider = ({
           formData.append("columnMapping", JSON.stringify(columnMapping));
         }
 
-        const response = await client.post("/import", formData);
+        const response = await client.post("/import", formData, {
+          timeout: 30 * 60 * 1000,
+        });
         const { jobId, status } = response.data;
 
         setImportState((prev) => ({
