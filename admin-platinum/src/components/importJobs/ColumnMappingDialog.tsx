@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,14 @@ interface CoreAttribute {
   id: string;
   name: string;
   csvName: string;
-  type: 'core';
+  type: "core";
+}
+
+interface MappingTargetRow {
+  targetId: string;
+  label: string;
+  required: boolean;
+  section: "core" | "category";
 }
 
 interface ColumnMappingDialogProps {
@@ -52,6 +59,39 @@ interface ColumnMappingDialogProps {
   initialMapping?: { [csvColumn: string]: string | null };
 }
 
+function invertCsvToTargetMapping(
+  csvToTarget: { [csvColumn: string]: string | null | undefined },
+  targetIds: Set<string>
+): Record<string, string | null> {
+  const targetToCsv: Record<string, string | null> = {};
+  targetIds.forEach((id) => {
+    targetToCsv[id] = null;
+  });
+  for (const [csvCol, targetId] of Object.entries(csvToTarget)) {
+    if (!targetId || !targetIds.has(targetId)) continue;
+    const prev = Object.keys(targetToCsv).find((tid) => tid !== targetId && targetToCsv[tid] === csvCol);
+    if (prev) targetToCsv[prev] = null;
+    targetToCsv[targetId] = csvCol;
+  }
+  return targetToCsv;
+}
+
+function targetMappingToCsvShape(
+  headers: string[],
+  targetToCsv: Record<string, string | null>
+): { [csvColumn: string]: string | null } {
+  const out: { [csvColumn: string]: string | null } = {};
+  headers.forEach((h) => {
+    out[h] = null;
+  });
+  for (const [targetId, csvCol] of Object.entries(targetToCsv)) {
+    if (csvCol && headers.includes(csvCol)) {
+      out[csvCol] = targetId;
+    }
+  }
+  return out;
+}
+
 const ColumnMappingDialog = ({
   open,
   onOpenChange,
@@ -61,61 +101,64 @@ const ColumnMappingDialog = ({
   suggestedMappings,
   requiredAttributes,
   onConfirm,
-  initialMapping
+  initialMapping,
 }: ColumnMappingDialogProps) => {
-  const [mapping, setMapping] = useState<{ [csvColumn: string]: string | null }>({});
+  const targetRows = useMemo((): MappingTargetRow[] => {
+    const core: MappingTargetRow[] = coreAttributes.map((c) => {
+      const targetId = `core:${c.id}`;
+      return {
+        targetId,
+        label: translateAttributeName(c.name, true),
+        required: requiredAttributes.includes(targetId),
+        section: "core",
+      };
+    });
+    const cat: MappingTargetRow[] = attributes.map((attr) => ({
+      targetId: attr.id,
+      label: translateAttributeName(attr.name, false),
+      required: requiredAttributes.includes(attr.id),
+      section: "category",
+    }));
+    return [...core, ...cat];
+  }, [coreAttributes, attributes, requiredAttributes]);
+
+  const targetIdSet = useMemo(
+    () => new Set(targetRows.map((r) => r.targetId)),
+    [targetRows]
+  );
+
+  const [targetToCsv, setTargetToCsv] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
-    if (open) {
-      // Use initial mapping if provided, otherwise use suggested mappings
-      if (initialMapping) {
-        setMapping({ ...initialMapping });
-      } else {
-        const newMapping: { [csvColumn: string]: string | null } = {};
-        headers.forEach((header) => {
-          newMapping[header] = suggestedMappings[header] || null;
-        });
-        setMapping(newMapping);
-      }
-    }
-  }, [open, headers, suggestedMappings, initialMapping]);
+    if (!open) return;
+    const source =
+      initialMapping && Object.keys(initialMapping).length > 0 ? initialMapping : suggestedMappings;
+    const asNullable: { [k: string]: string | null } = {};
+    Object.entries(source).forEach(([k, v]) => {
+      asNullable[k] = v ?? null;
+    });
+    setTargetToCsv(invertCsvToTargetMapping(asNullable, targetIdSet));
+  }, [open, headers, suggestedMappings, initialMapping, targetIdSet]);
 
-  const handleMappingChange = (csvColumn: string, attributeId: string | null) => {
-    setMapping((prev) => {
-      const newMapping = { ...prev };
-      
-      // If selecting an attribute that's already mapped to another column, remove that mapping
-      if (attributeId) {
-        // Find the column that currently has this attribute mapped
-        const previousColumn = Object.keys(newMapping).find(
-          (col) => col !== csvColumn && newMapping[col] === attributeId
-        );
-        if (previousColumn) {
-          // Clear the previous mapping
-          newMapping[previousColumn] = null;
+  const handleTargetCsvChange = (targetId: string, csvColumn: string | null) => {
+    setTargetToCsv((prev) => {
+      const next = { ...prev };
+      if (csvColumn) {
+        for (const tid of Object.keys(next)) {
+          if (next[tid] === csvColumn) next[tid] = null;
         }
       }
-      
-      // Set the new mapping for the current column
-      newMapping[csvColumn] = attributeId;
-      
-      return newMapping;
+      next[targetId] = csvColumn;
+      return next;
     });
   };
 
   const handleConfirm = () => {
-    onConfirm(mapping);
+    onConfirm(targetMappingToCsvShape(headers, targetToCsv));
     onOpenChange(false);
   };
 
-  const isRequiredMapped = (attributeId: string | null) => {
-    if (!attributeId) return false;
-    return requiredAttributes.includes(attributeId);
-  };
-
-  const allRequiredMapped = requiredAttributes.every((reqAttrId) =>
-    Object.values(mapping).includes(reqAttrId)
-  );
+  const allRequiredMapped = requiredAttributes.every((reqId) => Boolean(targetToCsv[reqId]));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,8 +166,8 @@ const ColumnMappingDialog = ({
         <DialogHeader>
           <DialogTitle>Mapeo de Columnas</DialogTitle>
           <DialogDescription>
-            Asigna cada columna del CSV a un atributo. Puedes mapear a atributos de categoría o a campos base
-            (SKU, Nombre, Descripción, etc.). Las columnas marcadas con asterisco (*) son requeridas.
+            Para cada campo esperado (campos base y atributos de categoría), elige la columna del CSV que lo
+            representa. Los marcados con asterisco (*) son obligatorios.
           </DialogDescription>
         </DialogHeader>
 
@@ -133,7 +176,7 @@ const ColumnMappingDialog = ({
             <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
               <AlertCircle className="h-4 w-4 text-amber-600" />
               <span className="text-sm text-amber-800">
-                Por favor, asigna todos los atributos requeridos antes de continuar.
+                Asigna una columna CSV a todos los campos requeridos antes de continuar.
               </span>
             </div>
           )}
@@ -142,106 +185,50 @@ const ColumnMappingDialog = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">Columna CSV</TableHead>
-                  <TableHead className="w-[60%]">Atributo de Categoría</TableHead>
+                  <TableHead className="w-[45%]">Campo esperado</TableHead>
+                  <TableHead className="w-[55%]">Columna del CSV</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {headers.map((header) => {
-                  const currentAttributeId = mapping[header] || null;
-                  const isRequired = isRequiredMapped(currentAttributeId);
+                {targetRows.map((row) => {
+                  const currentCsv = targetToCsv[row.targetId] ?? null;
+                  const sectionLabel = row.section === "core" ? "Campo base" : "Atributo";
 
                   return (
-                    <TableRow key={header}>
+                    <TableRow key={row.targetId}>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{header}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={currentAttributeId || ""}
-                          onValueChange={(value) =>
-                            handleMappingChange(header, value === "none" ? null : value)
-                          }
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">-- No mapear --</SelectItem>
-
-                            {/* Core Attributes Section */}
-                            {coreAttributes.length > 0 && (
-                              <>
-                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                                  Campos Base
-                                </div>
-                                {coreAttributes.map((coreAttr) => {
-                                  const coreId = `core:${coreAttr.id}`;
-                                  const isMapped = Object.values(mapping).includes(coreId);
-                                  const isCurrent = mapping[header] === coreId;
-                                  const translatedName = translateAttributeName(coreAttr.name, true);
-
-                                  return (
-                                    <SelectItem
-                                      key={coreId}
-                                      value={coreId}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span>{translatedName}</span>
-                                        {isMapped && !isCurrent && (
-                                          <span className="text-xs text-muted-foreground">
-                                            (se reemplazará el mapeo anterior)
-                                          </span>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })}
-                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">
-                                  Atributos de Categoría
-                                </div>
-                              </>
-                            )}
-
-                            {/* Category Attributes Section */}
-                            {attributes.map((attr) => {
-                              const isMapped = Object.values(mapping).includes(attr.id);
-                              const isCurrent = mapping[header] === attr.id;
-                              const isRequiredAttr = requiredAttributes.includes(attr.id);
-                              const translatedName = translateAttributeName(attr.name, false);
-
-                              return (
-                                <SelectItem
-                                  key={attr.id}
-                                  value={attr.id}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span>{translatedName}</span>
-                                    {isRequiredAttr && (
-                                      <span className="text-red-500">*</span>
-                                    )}
-                                    {isMapped && !isCurrent && (
-                                      <span className="text-xs text-muted-foreground">
-                                        (se reemplazará el mapeo anterior)
-                                      </span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        {currentAttributeId && (
-                          <div className="mt-1 flex items-center gap-1">
-                            {isRequired && (
-                              <Badge variant="default" className="text-xs">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">{sectionLabel}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{row.label}</span>
+                            {row.required && <span className="text-red-500">*</span>}
+                            {row.required && (
+                              <Badge variant="outline" className="text-xs">
                                 Requerido
                               </Badge>
                             )}
                           </div>
-                        )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={currentCsv || ""}
+                          onValueChange={(value) =>
+                            handleTargetCsvChange(row.targetId, value === "none" ? null : value)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="— Sin columna —" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— Sin columna —</SelectItem>
+                            {headers.map((h) => (
+                              <SelectItem key={h} value={h}>
+                                {h}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                     </TableRow>
                   );

@@ -5,6 +5,7 @@ import { ImportJob, ImportJobType, ImportJobStatus, ImportJobsResponse } from "@
 interface UseImportJobsOptions {
   type?: ImportJobType;
   status?: ImportJobStatus;
+  categoryId?: string;
   page?: number;
   limit?: number;
 }
@@ -33,6 +34,7 @@ export const useImportJobs = (options: UseImportJobsOptions = {}) => {
       const params = new URLSearchParams();
       if (currentOptions.type) params.append('type', currentOptions.type);
       if (currentOptions.status) params.append('status', currentOptions.status);
+      if (currentOptions.categoryId) params.append('categoryId', currentOptions.categoryId);
       if (currentOptions.page) params.append('page', currentOptions.page.toString());
       if (currentOptions.limit) params.append('limit', currentOptions.limit.toString());
 
@@ -57,7 +59,7 @@ export const useImportJobs = (options: UseImportJobsOptions = {}) => {
 
   useEffect(() => {
     fetchJobs(options);
-  }, [options.type, options.status, options.page, options.limit, fetchJobs]);
+  }, [options.type, options.status, options.categoryId, options.page, options.limit, fetchJobs]);
 
   const jobsRef = useRef<ImportJob[]>([]);
   jobsRef.current = jobs;
