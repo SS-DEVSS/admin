@@ -654,7 +654,7 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
                 e.stopPropagation(); // Prevent row click
                 navigate(`/dashboard/producto/${productId}`);
               }}
-              className="text-gray-600 hover:underline cursor-pointer"
+              className="text-sm text-blue-600 underline cursor-pointer"
             >
               {productName}
             </div>
@@ -727,10 +727,11 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
         const found = attributeCollection
           .flat()
           .filter((attrValue: AttributeValue | undefined) => attrValue != null)
-          .find(
-            (attrValue: AttributeValue) =>
-              attrValue?.idAttribute === attribute.id
-          );
+          .find((attrValue: AttributeValue) => {
+            const av = attrValue as AttributeValue & { id_attribute?: string };
+            const attrId = av.idAttribute ?? av.id_attribute;
+            return attrId === attribute.id;
+          });
 
         // Special case: if attribute is "Descripción" and not found, use product description
         if (!found && (attribute.name === "Descripción" || attribute.name === "descripción" || attribute.name.toLowerCase() === "descripcion")) {
