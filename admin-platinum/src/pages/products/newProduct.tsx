@@ -89,6 +89,10 @@ const NewProduct = () => {
             sku: product.sku || "",
             brand: brandId,
             imgUrl: firstImage,
+            visibleInCatalog:
+              (product as { visibleInCatalog?: boolean }).visibleInCatalog ??
+              (product as { visible_in_catalog?: boolean }).visible_in_catalog ??
+              true,
           });
 
           // 2. Populate Attributes
@@ -410,6 +414,7 @@ const NewProduct = () => {
           name: detailsState.name || "",
           description: detailsState.description || null,
           idSubcategory,
+          visibleInCatalog: detailsState.visibleInCatalog,
         };
 
         // Compare references with existing product to only send changes

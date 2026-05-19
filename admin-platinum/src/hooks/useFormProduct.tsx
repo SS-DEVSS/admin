@@ -14,6 +14,7 @@ export interface detailsType {
   subcategory: { id: string; name: string } | null;
   references: string[];
   imgUrl?: string;
+  visibleInCatalog: boolean;
 }
 
 export const stateSkeleton = {
@@ -26,6 +27,7 @@ export const stateSkeleton = {
   subcategory: null,
   references: [],
   imgUrl: "",
+  visibleInCatalog: true,
 };
 
 export const useFormState = () => {

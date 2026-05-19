@@ -8,7 +8,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { productService } from "@/services/productService";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +23,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link, useNavigate } from "react-router-dom";
-import { AttributeValue, Item, Variant } from "@/models/product";
+import { Item, Variant } from "@/models/product";
 import { useProducts } from "@/hooks/useProducts";
 import { Category } from "@/models/category";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +34,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCategories } from "@/hooks/useCategories";
 import {
   Dialog,
   DialogContent,
@@ -79,9 +80,7 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  let { attributes } = category || {};
   const { getProductById } = useProducts();
-  const { categories } = useCategories();
 
   const [products, setProducts] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -91,10 +90,10 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
   const [totalItems, setTotalItems] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState(searchFilter || '');
   const [goToPageValue, setGoToPageValue] = useState('');
-
-  if (!attributes && categories.length > 0) {
-    attributes = categories[0].attributes;
-  }
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [catalogVisibilityPending, setCatalogVisibilityPending] = useState(false);
+  const [catalogVisibilityTargetIds, setCatalogVisibilityTargetIds] = useState<string[]>([]);
+  const catalogVisibilityPendingRef = useRef(false);
 
   // Debounce search query
   useEffect(() => {
@@ -128,6 +127,7 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
         if (subcategoryId && subcategoryId.trim()) {
           params.idSubcategory = subcategoryId.trim();
         }
+        params.includeHidden = true;
 
         const response = await client.get(`/products/category/${category.id}`, { params });
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
@@ -146,7 +146,56 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, refreshKey]);
+
+  const getProductIdFromRow = (row: Variant & { _originalItem?: Item | null }) =>
+    row._originalItem?.id || row.idProduct || row.id;
+
+  const handleCatalogVisibility = useCallback(async (
+    productIds: string[],
+    visibleInCatalog: boolean
+  ) => {
+    const uniqueIds = [...new Set(productIds)];
+    if (uniqueIds.length === 0 || catalogVisibilityPendingRef.current) return;
+
+    catalogVisibilityPendingRef.current = true;
+    setCatalogVisibilityPending(true);
+    setCatalogVisibilityTargetIds(uniqueIds);
+
+    try {
+      const { updatedCount } = await productService.bulkUpdateCatalogVisibility(
+        uniqueIds,
+        visibleInCatalog
+      );
+      if (updatedCount === 0) {
+        throw new Error("No se actualizó ningún producto");
+      }
+      toast({
+        title: "Éxito",
+        description: visibleInCatalog
+          ? "Productos visibles en el catálogo."
+          : "Productos ocultos del catálogo.",
+        variant: "success",
+      });
+      setRowSelection({});
+      setRefreshKey((key) => key + 1);
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (error instanceof Error ? error.message : null) ||
+        "No se pudo actualizar la visibilidad en catálogo.";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      catalogVisibilityPendingRef.current = false;
+      setCatalogVisibilityPending(false);
+      setCatalogVisibilityTargetIds([]);
+    }
+  }, [toast]);
 
   const handleImageClick = (variant: Variant) => {
     setSelectedVariant(variant);
@@ -541,39 +590,30 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     return [];
   };
 
-  // Check if there's a "Descripción" attribute with scope PRODUCT and visibleInCatalog: false
-  const shouldHideDescription = useMemo(() => {
-    if (!attributes) {
-      return false;
-    }
-
-    // Handle both array and object formats
-    let productAttributes: any[] = [];
-    if (Array.isArray(attributes)) {
-      productAttributes = attributes.filter((attr: any) => attr.scope === "PRODUCT");
-    } else if (typeof attributes === 'object' && 'product' in attributes) {
-      productAttributes = (attributes as { product: any[] }).product || [];
-    }
-
-    const descripcionAttribute = productAttributes.find(
-      (attr: any) =>
-        (attr.name === "Descripción" || attr.name === "descripción" || attr.name.toLowerCase() === "descripcion") &&
-        attr.scope === "PRODUCT"
-    );
-
-    if (descripcionAttribute) {
-      // Check both camelCase and snake_case versions
-      const visibleInCatalog = descripcionAttribute.visibleInCatalog ?? descripcionAttribute.visible_in_catalog;
-      return visibleInCatalog === false;
-    }
-
-    return false;
-  }, [attributes]);
-
   const columns = useMemo(() => {
 
     // Build base columns
     const baseColumns = [
+      {
+        id: "select",
+        header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Seleccionar todos"
+          />
+        ),
+        cell: ({ row }: { row: { getIsSelected: () => boolean; toggleSelected: (value: boolean) => void } }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Seleccionar fila"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
       {
         accessorKey: "featured",
         header: "",
@@ -636,35 +676,28 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
         accessorKey: "sku",
         header: "SKU",
         cell: ({ row }: { row: any }) => {
+          const productId = getProductIdFromRow(row.original);
           const skuValue = row.getValue("sku") || row.original?.sku || "";
-          return <div className='text-sm font-medium'>{skuValue || "-"}</div>;
-        },
-      },
-      {
-        accessorKey: "name",
-        header: "Nombre",
-        cell: ({ row }: { row: any }) => {
-          // Get product ID from variant - use idProduct if available, otherwise use variant id
-          const productId = (row.original as any)?._originalItem?.id || (row.original as any)?.idProduct || row.original.id;
-          const productName = row.getValue("name");
+
+          if (!skuValue) {
+            return <div className="text-sm font-medium">-</div>;
+          }
 
           return (
             <div
               onClick={(e) => {
-                e.stopPropagation(); // Prevent row click
+                e.stopPropagation();
                 navigate(`/dashboard/producto/${productId}`);
               }}
-              className="text-sm text-blue-600 underline cursor-pointer"
+              className="text-sm font-medium text-blue-600 underline cursor-pointer"
             >
-              {productName}
+              {skuValue}
             </div>
           );
         },
       },
     ];
 
-    // Don't add a fixed description column - let the dynamic columns handle it
-    // The dynamic columns will show/hide based on visibleInCatalog
     const initialColumns = baseColumns;
 
     // Add type column
@@ -680,11 +713,51 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
       },
     });
 
+    const catalogVisibilityColumn = [
+      {
+        id: "catalogVisibility",
+        header: "Catálogo",
+        cell: ({ row }: { row: { original: Variant & { _originalItem?: Item | null } } }) => {
+          const productId = getProductIdFromRow(row.original);
+          const isUpdating = catalogVisibilityTargetIds.includes(productId);
+          const product =
+            row.original._originalItem ||
+            products.find((p) => p.id === productId);
+          const visible =
+            product?.visibleInCatalog ??
+            (product as { visible_in_catalog?: boolean })?.visible_in_catalog ??
+            true;
+          if (isUpdating) {
+            return (
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Actualizando...
+              </span>
+            );
+          }
+          return (
+            <span className={visible ? "text-green-700" : "text-muted-foreground"}>
+              {visible ? "Visible" : "Oculto"}
+            </span>
+          );
+        },
+      },
+    ];
+
     const actionColumn = [
       {
         id: "actions",
         enableHiding: false,
-        cell: ({ row }: { row: any }) => {
+        cell: ({ row }: { row: { original: Variant & { _originalItem?: Item | null } } }) => {
+          const productId = getProductIdFromRow(row.original);
+          const product =
+            row.original._originalItem ||
+            products.find((p) => p.id === productId);
+          const visible =
+            product?.visibleInCatalog ??
+            (product as { visible_in_catalog?: boolean })?.visible_in_catalog ??
+            true;
+
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -695,9 +768,34 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <Link to={`/dashboard/producto/${row.original.id}`}>
+                <Link to={`/dashboard/producto/${productId}`}>
                   <DropdownMenuItem data-prevent-navigation>Editar</DropdownMenuItem>
                 </Link>
+                <DropdownMenuItem
+                  disabled={catalogVisibilityPending}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (catalogVisibilityPending) return;
+                    void handleCatalogVisibility([productId], !visible);
+                  }}
+                >
+                  {catalogVisibilityTargetIds.includes(productId) ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : visible ? (
+                    <>
+                      <EyeOff className="mr-2 h-4 w-4" />
+                      Ocultar del catálogo
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="mr-2 h-4 w-4" />
+                      Mostrar en catálogo
+                    </>
+                  )}
+                </DropdownMenuItem>
                 {/* <DropdownMenuItem
                   onClick={() => {
                     openModal({
@@ -717,95 +815,18 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
       },
     ];
 
-    const getColumns = (attributeType: string) => {
-      const getAttributeValues = (row: any, attribute: any) => {
-        let attributeCollection = [];
-        const productAttributeValues = row.original?.productAttributeValues || [];
-        const attributeValues = row.original?.attributeValues || [];
-
-        attributeCollection = [productAttributeValues, attributeValues];
-        const found = attributeCollection
-          .flat()
-          .filter((attrValue: AttributeValue | undefined) => attrValue != null)
-          .find((attrValue: AttributeValue) => {
-            const av = attrValue as AttributeValue & { id_attribute?: string };
-            const attrId = av.idAttribute ?? av.id_attribute;
-            return attrId === attribute.id;
-          });
-
-        // Special case: if attribute is "Descripción" and not found, use product description
-        if (!found && (attribute.name === "Descripción" || attribute.name === "descripción" || attribute.name.toLowerCase() === "descripcion")) {
-          const productDescription = row.original?.description || "";
-          if (productDescription) {
-            // Return a mock AttributeValue with the description
-            return {
-              id: "description-fallback",
-              valueString: productDescription,
-              valueNumber: null,
-              valueBoolean: null,
-              valueDate: null,
-              idAttribute: attribute.id
-            } as AttributeValue;
-          }
-        }
-
-        return found;
-      };
-
-      const getDisplayValue = (value: AttributeValue | undefined) => {
-        if (!value) return "-";
-        // Try all possible value types
-        if (value.valueString !== null && value.valueString !== undefined && value.valueString !== "") {
-          return value.valueString.toLowerCase();
-        }
-        if (value.valueNumber !== null && value.valueNumber !== undefined) {
-          return value.valueNumber.toString();
-        }
-        if (value.valueBoolean !== null && value.valueBoolean !== undefined) {
-          return value.valueBoolean.toString();
-        }
-        if (value.valueDate) {
-          return new Date(value.valueDate).toLocaleDateString();
-        }
-        return "-";
-      };
-
-      return (
-        (attributes as any)?.[attributeType]?.filter((attribute: any) => {
-          // Filter out "Descripción" attribute if it should be hidden
-          if (attributeType === "product" && shouldHideDescription) {
-            const isDescripcion = attribute.name === "Descripción" ||
-              attribute.name === "descripción" ||
-              attribute.name.toLowerCase() === "descripcion";
-            if (isDescripcion) {
-              return false;
-            }
-          }
-          return true;
-        }).map((attribute: any) => {
-          return {
-            accessorKey: attribute.id,
-            header: attribute.name,
-            cell: ({ row }: { row: any }) => {
-              const value = getAttributeValues(row, attribute);
-              const displayValue = getDisplayValue(value);
-              return <div className="capitalize">{displayValue}</div>;
-            },
-          };
-        }) || []
-      );
-    };
-
-    const dynamicColumnsProduct = getColumns("product");
-    const dynamicColumnsVariant = getColumns("variant");
-
     return [
       ...initialColumns,
-      ...dynamicColumnsProduct,
-      ...dynamicColumnsVariant,
+      ...catalogVisibilityColumn,
       ...actionColumn,
     ];
-  }, [attributes, shouldHideDescription, navigate, products]);
+  }, [
+    navigate,
+    products,
+    handleCatalogVisibility,
+    catalogVisibilityPending,
+    catalogVisibilityTargetIds,
+  ]);
 
   useEffect(() => {
     // Products are already filtered by category from backend, no need to filter again
@@ -842,6 +863,8 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
+    getRowId: (_row, index) => String(index),
     state: {
       sorting,
       columnFilters,
@@ -854,8 +877,53 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     },
   });
 
+  const selectedProductIds = useMemo(() => {
+    return Object.keys(rowSelection)
+      .map((rowId) => {
+        const index = Number(rowId);
+        const row = mappedData[index];
+        return row
+          ? getProductIdFromRow(row as Variant & { _originalItem?: Item | null })
+          : null;
+      })
+      .filter((id): id is string => !!id);
+  }, [rowSelection, mappedData]);
+
   return (
     <div className="mt-6">
+      {selectedProductIds.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
+          <span className="text-sm font-medium">
+            {selectedProductIds.length} seleccionado(s)
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={catalogVisibilityPending}
+            onClick={() => void handleCatalogVisibility(selectedProductIds, true)}
+          >
+            {catalogVisibilityPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Eye className="mr-2 h-4 w-4" />
+            )}
+            Mostrar en catálogo
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={catalogVisibilityPending}
+            onClick={() => void handleCatalogVisibility(selectedProductIds, false)}
+          >
+            {catalogVisibilityPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <EyeOff className="mr-2 h-4 w-4" />
+            )}
+            Ocultar del catálogo
+          </Button>
+        </div>
+      )}
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent>
           <DialogHeader>

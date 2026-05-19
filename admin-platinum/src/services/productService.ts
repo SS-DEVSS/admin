@@ -60,4 +60,16 @@ export const productService = {
     });
     return response.data;
   },
+
+  bulkUpdateCatalogVisibility: async (
+    productIds: string[],
+    visibleInCatalog: boolean
+  ): Promise<{ updatedCount: number }> => {
+    const client = axiosClient();
+    const response = await client.patch<{ updatedCount: number }>(
+      '/products/bulk/catalog-visibility',
+      { productIds, visibleInCatalog }
+    );
+    return response.data;
+  },
 };
