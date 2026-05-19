@@ -20,6 +20,7 @@ export type Item = {
   isFeatured?: boolean;
   featuredApplicationId?: string | null;
   applications?: any[];
+  visibleInCatalog?: boolean;
 };
 
 export type Variant = {

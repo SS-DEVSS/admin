@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import axiosClient from "@/services/axiosInstance";
 import FeatureProductModal from "./FeatureProductModal";
 import { Star, FolderOpen, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import FilePickerModal from "@/components/files/FilePickerModal";
 
 type DetailsCardProps = {
@@ -309,6 +310,21 @@ const DetailsCard = ({ state, setState, product }: DetailsCardProps) => {
               value={state.description}
               onChange={handleFormChange}
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="visibleInCatalog"
+              checked={state.visibleInCatalog}
+              onCheckedChange={(checked) =>
+                setState((prev) => ({
+                  ...prev,
+                  visibleInCatalog: checked === true,
+                }))
+              }
+            />
+            <Label htmlFor="visibleInCatalog" className="cursor-pointer">
+              Visible en catálogo
+            </Label>
           </div>
           <section className="flex flex-wrap gap-4">
             <div className="flex flex-col gap-3 min-w-[200px] flex-1">
