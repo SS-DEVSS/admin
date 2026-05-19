@@ -864,7 +864,7 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     enableRowSelection: true,
-    getRowId: (row, index) => String(index),
+    getRowId: (_row, index) => String(index),
     state: {
       sorting,
       columnFilters,
