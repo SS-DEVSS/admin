@@ -8,7 +8,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { productService } from "@/services/productService";
 
@@ -769,7 +769,10 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                 <Link to={`/dashboard/producto/${productId}`}>
-                  <DropdownMenuItem data-prevent-navigation>Editar</DropdownMenuItem>
+                  <DropdownMenuItem data-prevent-navigation>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
                 </Link>
                 <DropdownMenuItem
                   disabled={catalogVisibilityPending}
