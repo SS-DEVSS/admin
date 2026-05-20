@@ -50,12 +50,14 @@ export type CategoryAtributes = {
   scope: "PRODUCT" | "VARIANT" | "REFERENCE" | "APPLICATION";
   id_category?: string;
   visibleInCatalog?: boolean;
+  visibleInProductDetail?: boolean;
 };
 
 export type CategoryAttributeApi = CategoryAtributes & {
   csvName?: string | null;
   displayName?: string | null;
   visible_in_catalog?: boolean;
+  visible_in_product_detail?: boolean;
 };
 
 export function normalizeCategoryAttributeFromApi(
@@ -73,5 +75,7 @@ export function normalizeCategoryAttributeFromApi(
     id_category: attr.id_category,
     visibleInCatalog:
       attr.visibleInCatalog ?? attr.visible_in_catalog ?? true,
+    visibleInProductDetail:
+      attr.visibleInProductDetail ?? attr.visible_in_product_detail ?? true,
   };
 }

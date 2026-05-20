@@ -37,6 +37,7 @@ import {
   typesArray,
 } from "@/models/category";
 import { PlusCircle, Info } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Mapeo de tipos técnicos a nombres amigables para el usuario
 const typeDisplayNames: Record<CategoryAttributesTypes, string> = {
@@ -80,6 +81,8 @@ interface AttributeFormType {
   required: boolean | null;
   order?: number;
   scope?: AttributeScope;
+  visibleInCatalog?: boolean;
+  visibleInProductDetail?: boolean;
 }
 
 const AttributeFormInitialState = {
@@ -245,6 +248,8 @@ const CardAtributesVariants = ({
       type: fieldType as CategoryAttributesTypes,
       scope: type as AttributeScope,
       order: order,
+      visibleInCatalog: true,
+      visibleInProductDetail: true,
     };
 
     setForm((prev) => ({
@@ -291,6 +296,8 @@ const CardAtributesVariants = ({
       required: attribute.required ?? false,
       order: attribute.order ?? 0,
       scope: attribute.scope as AttributeScope | undefined,
+      visibleInCatalog: attribute.visibleInCatalog ?? true,
+      visibleInProductDetail: attribute.visibleInProductDetail ?? true,
     });
   };
 
@@ -386,6 +393,8 @@ const CardAtributesVariants = ({
       type: attributeForm.type as CategoryAttributesTypes,
       scope: (dialogMode === "add" ? type : (attributeForm.scope ?? currentAttribute?.scope ?? type)) as "PRODUCT" | "VARIANT" | "APPLICATION",
       order: dialogMode === "add" ? order : (attributeForm.order ?? currentAttribute?.order ?? 0),
+      visibleInCatalog: attributeForm.visibleInCatalog ?? true,
+      visibleInProductDetail: attributeForm.visibleInProductDetail ?? true,
       ...(dialogMode === "edit" && currentAttribute?.id ? { id: currentAttribute.id } : {}),
     };
 
@@ -808,6 +817,42 @@ const CardAtributesVariants = ({
                 <Label htmlFor="r2">No</Label>
               </div>
             </RadioGroup>
+
+            {title === "Atributos de Producto" && (
+              <div className="space-y-3 rounded-md border p-3">
+                <p className="text-sm font-medium">Visibilidad en catálogo</p>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="visibleInCatalog"
+                    checked={attributeForm.visibleInCatalog ?? true}
+                    onCheckedChange={(checked) =>
+                      setAttributeForm({
+                        ...attributeForm,
+                        visibleInCatalog: checked === true,
+                      })
+                    }
+                  />
+                  <Label htmlFor="visibleInCatalog" className="cursor-pointer font-normal">
+                    Mostrar en grid del catálogo
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="visibleInProductDetail"
+                    checked={attributeForm.visibleInProductDetail ?? true}
+                    onCheckedChange={(checked) =>
+                      setAttributeForm({
+                        ...attributeForm,
+                        visibleInProductDetail: checked === true,
+                      })
+                    }
+                  />
+                  <Label htmlFor="visibleInProductDetail" className="cursor-pointer font-normal">
+                    Mostrar en detalle de producto
+                  </Label>
+                </div>
+              </div>
+            )}
 
             <DialogFooter>
               <Button
