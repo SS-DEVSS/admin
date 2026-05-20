@@ -85,6 +85,7 @@ interface CardAttributeTableProps {
 }
 
 type SortableRowProps = {
+  title: string;
   attribute: CategoryAtributes;
   displayIndex: number;
   dragEnabled: boolean;
@@ -93,6 +94,7 @@ type SortableRowProps = {
 };
 
 const SortableAttributeRow = ({
+  title,
   attribute,
   displayIndex,
   dragEnabled,
@@ -136,6 +138,20 @@ const SortableAttributeRow = ({
       <TableCell>
         <Badge>{attribute.required ? "Si" : "No"}</Badge>
       </TableCell>
+      {title === "Atributos de Producto" ? (
+        <>
+          <TableCell>
+            <Badge variant={attribute.visibleInCatalog !== false ? "default" : "secondary"}>
+              {attribute.visibleInCatalog !== false ? "Sí" : "No"}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <Badge variant={attribute.visibleInProductDetail !== false ? "default" : "secondary"}>
+              {attribute.visibleInProductDetail !== false ? "Sí" : "No"}
+            </Badge>
+          </TableCell>
+        </>
+      ) : null}
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -201,6 +217,12 @@ const CardAttributeTable = ({
       <TableHead>Nombre</TableHead>
       <TableHead>Tipo de Dato</TableHead>
       <TableHead>Requerido</TableHead>
+      {_title === "Atributos de Producto" ? (
+        <>
+          <TableHead>Visible en Catálogo</TableHead>
+          <TableHead>Visible en Detalle</TableHead>
+        </>
+      ) : null}
       <TableHead className="w-[20px]" />
     </TableRow>
   );
@@ -216,6 +238,20 @@ const CardAttributeTable = ({
       <TableCell>
         <Badge>{attribute.required ? "Si" : "No"}</Badge>
       </TableCell>
+      {_title === "Atributos de Producto" ? (
+        <>
+          <TableCell>
+            <Badge variant={attribute.visibleInCatalog !== false ? "default" : "secondary"}>
+              {attribute.visibleInCatalog !== false ? "Sí" : "No"}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <Badge variant={attribute.visibleInProductDetail !== false ? "default" : "secondary"}>
+              {attribute.visibleInProductDetail !== false ? "Sí" : "No"}
+            </Badge>
+          </TableCell>
+        </>
+      ) : null}
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -245,6 +281,7 @@ const CardAttributeTable = ({
   const sortableRows = sortedAttributes.map((attribute: CategoryAtributes, index: number) => (
     <SortableAttributeRow
       key={rowKey(attribute, index)}
+      title={_title}
       attribute={attribute}
       displayIndex={index}
       dragEnabled={dragEnabled}

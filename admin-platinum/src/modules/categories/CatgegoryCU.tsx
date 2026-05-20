@@ -317,6 +317,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
             required: attr.required,
             order: attr.order,
             scope: attr.scope.toLowerCase(),
+            visibleInCatalog: attr.visibleInCatalog ?? true,
+            visibleInProductDetail: attr.visibleInProductDetail ?? true,
           }));
         const attributesToDelete = originalAttributeIds.filter(id => !currentAttributeIds.includes(id));
 
@@ -334,13 +336,19 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
             const origCsv = (orig.csv_name || "").trim();
             const typeMatch =
               String(attr.type).toLowerCase() === String(orig.type).toLowerCase();
+            const catalogMatch =
+              (attr.visibleInCatalog ?? true) === (orig.visibleInCatalog ?? true);
+            const detailMatch =
+              (attr.visibleInProductDetail ?? true) === (orig.visibleInProductDetail ?? true);
             if (
               formDisplay === origDisplay &&
               formCsv === origCsv &&
               attr.required === orig.required &&
               typeMatch &&
               attr.order === orig.order &&
-              attr.scope === orig.scope
+              attr.scope === orig.scope &&
+              catalogMatch &&
+              detailMatch
             ) {
               return null;
             }
@@ -355,6 +363,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               required: attr.required,
               order: attr.order,
               scope: attr.scope.toLowerCase(),
+              visibleInCatalog: attr.visibleInCatalog ?? true,
+              visibleInProductDetail: attr.visibleInProductDetail ?? true,
             };
           })
           .filter(
@@ -457,7 +467,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                   type: attr.type,
                   required: attr.required,
                   order: attr.order,
-                  scope: attr.scope, // "PRODUCT", "APPLICATION" (mayúsculas)
+                  scope: attr.scope,
+                  visibleInCatalog: attr.visibleInCatalog ?? true,
+                  visibleInProductDetail: attr.visibleInProductDetail ?? true,
                 })),
               };
 
