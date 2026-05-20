@@ -26,6 +26,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Item, Variant } from "@/models/product";
 import { useProducts } from "@/hooks/useProducts";
 import { Category } from "@/models/category";
+import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   DropdownMenu,
@@ -56,9 +57,15 @@ interface DataTableProps {
   category?: Category | null;
   searchFilter?: string;
   subcategoryId?: string | null;
+  catalogVisibilityFilter?: CatalogVisibilityFilter;
 }
 
-const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) => {
+const DataTable = ({
+  category,
+  searchFilter,
+  subcategoryId,
+  catalogVisibilityFilter = "all",
+}: DataTableProps) => {
   const navigate = useNavigate();
   const [mappedData, setMappedData] = useState<Variant[]>([]);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -128,6 +135,9 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
           params.idSubcategory = subcategoryId.trim();
         }
         params.includeHidden = true;
+        if (catalogVisibilityFilter !== "all") {
+          params.catalogVisibility = catalogVisibilityFilter;
+        }
 
         const response = await client.get(`/products/category/${category.id}`, { params });
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
@@ -146,7 +156,11 @@ const DataTable = ({ category, searchFilter, subcategoryId }: DataTableProps) =>
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, refreshKey]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [catalogVisibilityFilter]);
 
   const getProductIdFromRow = (row: Variant & { _originalItem?: Item | null }) =>
     row._originalItem?.id || row.idProduct || row.id;
