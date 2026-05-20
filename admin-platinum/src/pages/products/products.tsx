@@ -27,6 +27,14 @@ import { useCategories } from "@/hooks/useCategories";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import DataTable from "@/modules/products/ProductsTable";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 
 type DrillLevel =
   | { type: "category"; category: Category }
@@ -78,6 +86,8 @@ const Products = () => {
   const [filterMenuSearch, setFilterMenuSearch] = useState("");
   const filterMenuSearchDeferred = useDeferredValue(filterMenuSearch);
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([]);
+  const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
+    useState<CatalogVisibilityFilter>("all");
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -480,6 +490,21 @@ const Products = () => {
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Select
+                  value={catalogVisibilityFilter}
+                  onValueChange={(value) =>
+                    setCatalogVisibilityFilter(value as CatalogVisibilityFilter)
+                  }
+                >
+                  <SelectTrigger className="w-full lg:w-[220px]">
+                    <SelectValue placeholder="Visibilidad en catálogo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos (visibles y ocultos)</SelectItem>
+                    <SelectItem value="visible">Visibles en catálogo</SelectItem>
+                    <SelectItem value="hidden">Ocultos en catálogo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
@@ -508,7 +533,12 @@ const Products = () => {
             </div>
           </CardHeader>
           <div>
-            <DataTable category={category} searchFilter={searchFilter} subcategoryId={subcategoryId} />
+            <DataTable
+              category={category}
+              searchFilter={searchFilter}
+              subcategoryId={subcategoryId}
+              catalogVisibilityFilter={catalogVisibilityFilter}
+            />
           </div>
         </Card>
       </div>
