@@ -240,7 +240,7 @@ const EditReferenceDialog = ({
 
             <div className="space-y-2">
               <Label htmlFor="type">
-                {REFERENCE_FIELD_LABELS.type} <span className="text-red-500">*</span>
+                {REFERENCE_FIELD_LABELS.referenceType} <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.type}

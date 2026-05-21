@@ -24,6 +24,7 @@ export const coreAttributeTranslations: Record<string, string> = {
   'Tipo de Parte': REFERENCE_FIELD_LABELS.typeOfPart,
   'Tipo de parte': REFERENCE_FIELD_LABELS.typeOfPart,
   'Tipo de Referencia': REFERENCE_FIELD_LABELS.referenceType,
+  /** Reference CSV column "Tipo" (OEM/Aftermarket); only when isCoreAttribute is true */
   'Tipo': REFERENCE_FIELD_LABELS.referenceType,
   'Marca de Referencia': REFERENCE_FIELD_LABELS.referenceBrand,
   'Número de Referencia': REFERENCE_FIELD_LABELS.referenceNumber,
@@ -48,6 +49,7 @@ export const categoryAttributeTranslations: Record<string, string> = {
   // Common product/reference/application attributes
   'System': 'Sistema',
   'Type': 'Tipo',
+  'Tipo': 'Tipo',
   'Model': 'Modelo',
   'Submodel': 'Submodelo',
   'Year': 'Año',
@@ -116,9 +118,11 @@ export const translateAttributeName = (
     }
   }
 
-  for (const [key, value] of Object.entries(coreAttributeTranslations)) {
-    if (key.toLowerCase() === lowerName) {
-      return value;
+  if (isCoreAttribute) {
+    for (const [key, value] of Object.entries(coreAttributeTranslations)) {
+      if (key.toLowerCase() === lowerName) {
+        return value;
+      }
     }
   }
 
