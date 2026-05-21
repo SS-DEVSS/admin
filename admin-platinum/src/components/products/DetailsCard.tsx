@@ -271,20 +271,6 @@ const DetailsCard = ({ state, setState, product }: DetailsCardProps) => {
       <CardContent className="flex-1">
         <div className="grid gap-6">
           <div className="grid gap-3">
-            <Label htmlFor="name">
-              Nombre<span className="text-redLabel">*</span>
-            </Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              className="w-full"
-              placeholder="Nombre del producto"
-              onChange={handleFormChange}
-              value={state.name}
-            />
-          </div>
-          <div className="grid gap-3">
             <Label htmlFor="sku">
               SKU<span className="text-redLabel">*</span>
             </Label>

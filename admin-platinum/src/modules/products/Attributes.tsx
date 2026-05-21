@@ -36,18 +36,18 @@ const Attributes = ({
   // Helper to get product attributes from category
   const getProductAttributes = useMemo(() => {
     if (!selectedCategory?.attributes) return [];
-    
-    // Check if attributes is an array
+
+    let attrs: CategoryAtributes[] = [];
     if (Array.isArray(selectedCategory.attributes)) {
-      return selectedCategory.attributes.filter(attr => attr.scope === "PRODUCT");
+      attrs = selectedCategory.attributes.filter((attr) => attr.scope === "PRODUCT");
+    } else if (
+      typeof selectedCategory.attributes === "object" &&
+      "product" in selectedCategory.attributes
+    ) {
+      attrs = (selectedCategory.attributes as { product: CategoryAtributes[] }).product || [];
     }
-    
-    // Check if attributes is an object with product/variant structure
-    if (typeof selectedCategory.attributes === 'object' && 'product' in selectedCategory.attributes) {
-      return (selectedCategory.attributes as { product: CategoryAtributes[] }).product || [];
-    }
-    
-    return [];
+
+    return attrs;
   }, [selectedCategory]);
 
   const handleAttributeChange = (name: string, value: any) => {

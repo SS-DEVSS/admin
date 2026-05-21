@@ -10,6 +10,7 @@ import { ChevronLeft } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/context/categories-context";
 import { useToast } from "@/hooks/use-toast";
+import { resolveProductNameForSave } from "@/utils/adminFieldVisibility";
 import Loader from "@/components/Loader";
 import { useRef } from "react";
 
@@ -285,9 +286,6 @@ const NewProduct = () => {
     try {
       // Validate required fields
       const missingFields: string[] = [];
-      if (!detailsState.name || detailsState.name.trim() === "") {
-        missingFields.push("Nombre");
-      }
       if (!detailsState.sku || detailsState.sku.trim() === "") {
         missingFields.push("SKU");
       }
@@ -405,13 +403,15 @@ const NewProduct = () => {
         });
       }
 
+      const productName = resolveProductNameForSave(detailsState.name, detailsState.sku);
+
       // Format references - compare with existing to only send changes
       const currentReferenceIds = referencesState.references.map(ref => ref.id).filter((id): id is string => !!id);
 
       if (isEditMode && id) {
         const idSubcategory = detailsState.subcategory?.id ?? null;
         const productPayload: any = {
-          name: detailsState.name || "",
+          name: productName,
           description: detailsState.description || null,
           idSubcategory,
           visibleInCatalog: detailsState.visibleInCatalog,
@@ -483,7 +483,7 @@ const NewProduct = () => {
         // Since type defaults to SINGLE, we should always create a variant
         if (productType === "SINGLE" || !detailsState.type) {
           variants.push({
-            name: detailsState.name,
+            name: productName,
             sku: detailsState.sku || null,
             price: null,
             stockQuantity: null,
@@ -493,7 +493,7 @@ const NewProduct = () => {
         }
 
         const productPayload: any = {
-          name: detailsState.name,
+          name: productName,
           sku: detailsState.sku || null,
           description: detailsState.description || null,
           type: productType,

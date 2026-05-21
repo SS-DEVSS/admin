@@ -547,7 +547,6 @@ const EditApplicationDialog = ({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Basic Fields */}
           <div className="space-y-2">
             <Label htmlFor="origin">
               Origen <span className="text-red-500">*</span>
