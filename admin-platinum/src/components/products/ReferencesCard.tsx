@@ -180,14 +180,14 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
               <Input
                 type="text"
                 className="w-1/3"
-                placeholder="Marca (Ej. LUK)"
+                placeholder="Marca de Intercambio (Ej. LUK)"
                 value={referenceBrand}
                 onChange={(e) => setReferenceBrand(e.target.value)}
               />
               <Input
                 type="text"
                 className="w-2/3"
-                placeholder="Número de referencia"
+                placeholder="Intercambio"
                 value={referenceNumber || ""}
                 onChange={(e) => setReferenceNumber(e.target.value)}
               />

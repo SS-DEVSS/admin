@@ -3,6 +3,8 @@
  * Used to display attributes in Spanish throughout the UI
  */
 
+import { REFERENCE_FIELD_LABELS } from '@/constants/referenceFieldLabels';
+
 // Core attribute translations (for products, references, applications)
 export const coreAttributeTranslations: Record<string, string> = {
   // Products
@@ -10,27 +12,34 @@ export const coreAttributeTranslations: Record<string, string> = {
   'Name': 'Nombre',
   'Description': 'Descripción',
 
-  // References
-  'Reference Brand': 'Marca de Intercambio',
-  'ReferenceNumber': 'Número de Intercambio',
-  'Reference Number': 'Número de Intercambio',
-  'Part Type': 'Tipo de Parte',
-  'PartType': 'Tipo de Parte',
-  'Reference Type': 'Tipo de Referencia',
-  'ReferenceType': 'Tipo de Referencia',
+  // References (UI labels)
+  'Reference Brand': REFERENCE_FIELD_LABELS.referenceBrand,
+  'ReferenceNumber': REFERENCE_FIELD_LABELS.referenceNumber,
+  'Reference Number': REFERENCE_FIELD_LABELS.referenceNumber,
+  'Part Type': REFERENCE_FIELD_LABELS.typeOfPart,
+  'PartType': REFERENCE_FIELD_LABELS.typeOfPart,
+  'Reference Type': REFERENCE_FIELD_LABELS.referenceType,
+  'ReferenceType': REFERENCE_FIELD_LABELS.referenceType,
+  'Número de Intercambio': REFERENCE_FIELD_LABELS.referenceNumber,
+  'Tipo de Parte': REFERENCE_FIELD_LABELS.typeOfPart,
+  'Tipo de parte': REFERENCE_FIELD_LABELS.typeOfPart,
+  'Tipo de Referencia': REFERENCE_FIELD_LABELS.referenceType,
+  'Tipo': REFERENCE_FIELD_LABELS.referenceType,
+  'Marca de Referencia': REFERENCE_FIELD_LABELS.referenceBrand,
+  'Número de Referencia': REFERENCE_FIELD_LABELS.referenceNumber,
 
   // Applications
   'Origin': 'Origen',
 
   // Common variations
-  'referenceBrand': 'Marca de Intercambio',
-  'referenceNumber': 'Número de Intercambio',
-  'partType': 'Tipo de Parte',
-  'referenceType': 'Tipo de Referencia',
+  'referenceBrand': REFERENCE_FIELD_LABELS.referenceBrand,
+  'referenceNumber': REFERENCE_FIELD_LABELS.referenceNumber,
+  'partType': REFERENCE_FIELD_LABELS.typeOfPart,
+  'referenceType': REFERENCE_FIELD_LABELS.referenceType,
   'productName': 'Nombre de Producto',
   'name': 'Nombre',
-  'description': 'Descripción',
-  'sku': 'SKU',
+  'description': REFERENCE_FIELD_LABELS.description,
+  'sku': REFERENCE_FIELD_LABELS.sku,
   'origin': 'Origen',
 };
 

@@ -23,6 +23,7 @@ import DynamicComponent from "@/components/DynamicComponent";
 import { useMemo, useState, useEffect } from "react";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
+import { REFERENCE_FIELD_LABELS } from "@/constants/referenceFieldLabels";
 import { translateAttributeName } from "@/utils/attributeTranslations";
 
 type EditReferenceDialogProps = {
@@ -192,7 +193,8 @@ const EditReferenceDialog = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="referenceBrand">
-                Marca de Referencia <span className="text-muted-foreground">(Opcional)</span>
+                {REFERENCE_FIELD_LABELS.referenceBrand}{" "}
+                <span className="text-muted-foreground">(Opcional)</span>
               </Label>
               <Input
                 id="referenceBrand"
@@ -206,7 +208,7 @@ const EditReferenceDialog = ({
 
             <div className="space-y-2">
               <Label htmlFor="referenceNumber">
-                Número de Referencia <span className="text-red-500">*</span>
+                {REFERENCE_FIELD_LABELS.referenceNumber} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="referenceNumber"
@@ -223,7 +225,8 @@ const EditReferenceDialog = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="typeOfPart">
-                Tipo de Parte <span className="text-muted-foreground">(Opcional)</span>
+                {REFERENCE_FIELD_LABELS.typeOfPart}{" "}
+                <span className="text-muted-foreground">(Opcional)</span>
               </Label>
               <Input
                 id="typeOfPart"
@@ -237,7 +240,7 @@ const EditReferenceDialog = ({
 
             <div className="space-y-2">
               <Label htmlFor="type">
-                Tipo <span className="text-red-500">*</span>
+                {REFERENCE_FIELD_LABELS.type} <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.type}
@@ -258,7 +261,8 @@ const EditReferenceDialog = ({
 
           <div className="space-y-2">
             <Label htmlFor="description">
-              Descripción <span className="text-muted-foreground">(Opcional)</span>
+              {REFERENCE_FIELD_LABELS.description}{" "}
+              <span className="text-muted-foreground">(Opcional)</span>
             </Label>
             <Textarea
               id="description"
