@@ -4,8 +4,8 @@ export const REFERENCE_FIELD_LABELS = {
   referenceBrand: "Marca de Intercambio",
   referenceNumber: "Intercambio",
   typeOfPart: "Producto",
+  /** OEM / Aftermarket on reference records only */
   referenceType: "Origen",
-  type: "Origen",
   description: "Descripción",
 } as const;
 
