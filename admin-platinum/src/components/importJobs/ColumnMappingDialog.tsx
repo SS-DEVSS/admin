@@ -108,7 +108,7 @@ const ColumnMappingDialog = ({
       const targetId = `core:${c.id}`;
       return {
         targetId,
-        label: translateAttributeName(c.name, true),
+        label: translateAttributeName(c.id, true) || translateAttributeName(c.name, true),
         required: requiredAttributes.includes(targetId),
         section: "core",
       };
