@@ -205,13 +205,6 @@ const Banners = () => {
     }
   };
 
-  /**
-   * Elimina el banner en la API. No encadenamos borrado vía `deleteFileFromS3` con las URLs del listado:
-   * el endpoint `DELETE /files/images/:id` espera el UUID del archivo en la tabla `files`, no la URL/CDN
-   * ni la clave `uploads/images/...`. Si ese paso fallaba, el callback de éxito nunca corría y el banner
-   * no se borraba (modal cerrado pero sin efecto). La limpieza de S3/registro de files para banners puede
-   * añadirse en backend si hace falta.
-   */
   const confirmDeleteBanner = (banner: Banner) => {
     void deleteBanner(banner.id);
   };
@@ -512,8 +505,8 @@ const Banners = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Eliminar este banner?</AlertDialogTitle>
               <AlertDialogDescription>
-                Se eliminará el banner del sitio (registro en base de datos). Las imágenes en almacenamiento
-                pueden quedar huérfanas hasta que exista limpieza en servidor; esta acción no se puede deshacer.
+                Se eliminará el banner del sitio y sus imágenes en almacenamiento. Esta acción no se puede
+                deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
