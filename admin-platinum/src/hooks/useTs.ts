@@ -5,6 +5,7 @@ import { useToast } from "./use-toast";
 
 type CreateTechnicalSheetPayload = Omit<TechnicalSheet, "id"> & {
   productIds?: string[];
+  applications?: string[];
 };
 
 type UpdateTechnicalSheetPayload = {
@@ -192,6 +193,35 @@ export const useTs = () => {
     }
   };
 
+  const updateApplicationsForTechSheet = async (
+    id: TechnicalSheet["id"],
+    applications: string[],
+    options?: { silent?: boolean }
+  ) => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      await client.patch(
+        `/ts/${id}/applications`,
+        { applications },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      await getTechnicalSheets();
+      if (!options?.silent) {
+        toast({ title: "Aplicaciones actualizadas.", variant: "success" });
+      }
+    } catch (error: unknown) {
+      toast({
+        title: "Error al actualizar aplicaciones",
+        variant: "destructive",
+        description: getErrorMessage(error, "No se pudieron actualizar aplicaciones"),
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateTechnicalSheet = async (
     id: TechnicalSheet["id"],
     payload: UpdateTechnicalSheetPayload
@@ -227,6 +257,7 @@ export const useTs = () => {
     addProductsToTechSheet,
     removeProductsFromTechSheet,
     updateReferencesForTechSheet,
+    updateApplicationsForTechSheet,
     updateTechnicalSheet,
   };
 };

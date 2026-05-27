@@ -20,6 +20,7 @@ import {
   MenuSelectHeading,
   RichTextEditor,
   MenuButtonImageUpload,
+  type RichTextEditorRef,
 } from "mui-tiptap";
 import { Label } from "@/components/ui/label";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
@@ -31,6 +32,7 @@ type MarkdownEditorProps = {
   placeholder?: string;
   minHeight?: string;
   label?: string;
+  required?: boolean;
 };
 
 export default function MarkdownEditor({
@@ -39,8 +41,9 @@ export default function MarkdownEditor({
   placeholder = "Escribe aquí...",
   minHeight = "200px",
   label = "Contenido",
+  required = false,
 }: MarkdownEditorProps) {
-  const rteRef = useRef<any>(null);
+  const rteRef = useRef<RichTextEditorRef>(null);
   const lastValueRef = useRef(value);
   const { uploadFile, uploading } = useS3FileManager();
   const { toast } = useToast();
@@ -64,7 +67,7 @@ export default function MarkdownEditor({
     if (!editor.isFocused) {
       queueMicrotask(() => {
         if (!editor || editor.isDestroyed) return;
-        editor.commands.setContent(value || "", false);
+        editor.commands.setContent(value || "", { emitUpdate: false });
       });
     }
   }, [value]);
@@ -94,10 +97,11 @@ export default function MarkdownEditor({
       });
 
       return [{ src: location }];
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo subir la imagen.";
       toast({
         title: "Error al subir la imagen",
-        description: error?.message || "No se pudo subir la imagen.",
+        description: message,
         variant: "destructive",
       });
       return [];
@@ -106,7 +110,11 @@ export default function MarkdownEditor({
 
   return (
     <div className="space-y-3">
-      {label ? <Label>{label}</Label> : null}
+      {label ? (
+        <Label>
+          {required ? <span className="text-red-500">*</span> : null} {label}
+        </Label>
+      ) : null}
 
       <RichTextEditor
         ref={rteRef}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,17 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { ChevronLeft } from "lucide-react";
 import { newsContext } from "@/context/news-context";
+import { useS3FileManager } from "@/hooks/useS3FileManager";
+import MyDropzone from "@/components/Dropzone";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
 import BlogPreview from "@/components/blogs/BlogPreview";
 import BlogRelatedLinksEditor from "@/components/blogs/BlogRelatedLinksEditor";
-import { useProducts } from "@/hooks/useProducts";
+import { useProductsPicker } from "@/hooks/useProductsPicker";
 import {
   BlogRelatedLinks,
   emptyRelatedLinks,
@@ -24,20 +25,23 @@ import {
   resolveRelatedLinks,
   serializeContentWithRelatedLinks,
 } from "@/utils/blogRelatedLinks";
-
-const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+import { hasRichTextContent } from "@/utils/richTextContent";
+import { resolvePublicImageUrl } from "@/utils/imageUrl";
 
 const EditBlog = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { blogPost, getBlogPostById, updateBlogPost } = newsContext();
+  const { uploadFile } = useS3FileManager();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [relatedLinks, setRelatedLinks] = useState<BlogRelatedLinks>(emptyRelatedLinks());
-  const { products, loading: productsLoading } = useProducts();
+  const { products, loading: productsLoading } = useProductsPicker();
 
   useEffect(() => {
     let mounted = true;
@@ -63,21 +67,70 @@ const EditBlog = () => {
       const parsed = parseContentWithRelatedLinks(blogPost.content ?? "");
       setContent(parsed.cleanContent);
       setRelatedLinks(parsed.relatedLinks);
+      setCoverImage(null);
     }
   }, [blogPost]);
 
-  const hasDescriptionContent = stripHtmlTags(description) !== "";
-  const hasMainContent = stripHtmlTags(content) !== "";
+  const existingCoverUrl = useMemo(
+    () => resolvePublicImageUrl(blogPost?.coverImagePath),
+    [blogPost?.coverImagePath]
+  );
+
+  const coverImagePreview = useMemo(() => {
+    if (coverImage instanceof File && coverImage.size > 0) {
+      return URL.createObjectURL(coverImage);
+    }
+    return undefined;
+  }, [coverImage]);
+
+  useEffect(() => {
+    return () => {
+      if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+    };
+  }, [coverImagePreview]);
+
+  const hasDescriptionContent = hasRichTextContent(description);
+  const hasMainContent = hasRichTextContent(content);
   const canSave = title.trim() !== "" && hasDescriptionContent && hasMainContent;
+
+  const missingFields = [
+    !title.trim() && "título",
+    !hasDescriptionContent && "descripción",
+    !hasMainContent && "contenido del blog",
+  ].filter(Boolean) as string[];
 
   const handleSave = async () => {
     if (!id || !canSave) return;
-    const saved = await updateBlogPost(id, {
-      title,
-      description,
-      content: serializeContentWithRelatedLinks(content, relatedLinks),
-    });
-    if (saved) navigate("/dashboard/blogs");
+    setSubmitting(true);
+    try {
+      const payload = {
+        title,
+        description,
+        content: serializeContentWithRelatedLinks(content, relatedLinks),
+      };
+
+      let saved = false;
+      if (coverImage instanceof File && coverImage.size > 0) {
+        await new Promise<void>((resolve, reject) => {
+          uploadFile(coverImage, async (key) => {
+            try {
+              saved = await updateBlogPost(id, { ...payload, coverImagePath: key });
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          }).catch(reject);
+        });
+      } else {
+        saved = await updateBlogPost(id, payload);
+      }
+
+      if (saved) navigate("/dashboard/blogs");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading || !blogPost) {
@@ -103,9 +156,6 @@ const EditBlog = () => {
           </Link>
           <div>
             <CardTitle>Editar blog</CardTitle>
-            <CardDescription>
-              Edita el contenido con el editor enriquecido de TipTap.
-            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -122,6 +172,7 @@ const EditBlog = () => {
 
           <MarkdownEditor
             label="Descripción"
+            required
             value={description}
             onChange={setDescription}
             placeholder="Escribe una descripción corta del blog."
@@ -130,20 +181,28 @@ const EditBlog = () => {
 
           <div className="space-y-2">
             <Label>Imagen de portada</Label>
-            {blogPost?.coverImagePath && (
-              <img
-                src={blogPost.coverImagePath}
-                alt="Portada"
-                className="rounded-lg border max-h-40 object-cover"
-              />
-            )}
-            <p className="text-xs text-muted-foreground">
-              Cambiar imagen de portada estará disponible próximamente.
-            </p>
+            {existingCoverUrl && !coverImage ? (
+              <p className="text-sm text-muted-foreground">
+                Este blog ya tiene imagen de portada. Puedes mantenerla o subir otra.
+              </p>
+            ) : !existingCoverUrl ? (
+              <p className="text-sm text-muted-foreground">
+                Este blog no tiene portada. Sube una imagen (JPG, PNG o WebP).
+              </p>
+            ) : null}
+            <MyDropzone
+              className="p-8"
+              file={coverImage}
+              fileSetter={setCoverImage}
+              type="image"
+              currentImageUrl={existingCoverUrl && !coverImage ? existingCoverUrl : undefined}
+              currentImageLabel="Portada actual del blog"
+            />
           </div>
 
           <MarkdownEditor
             label="Contenido del blog"
+            required
             value={content}
             onChange={setContent}
             minHeight="280px"
@@ -163,19 +222,26 @@ const EditBlog = () => {
             title={title}
             description={description}
             content={content}
-            coverImageUrl={blogPost.coverImagePath}
+            coverImageUrl={coverImagePreview ?? existingCoverUrl}
             relatedLinks={resolveRelatedLinks(relatedLinks, products)}
           />
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col gap-2 pt-4">
+            {!canSave && missingFields.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Para guardar, completa: {missingFields.join(", ")}.
+              </p>
+            ) : null}
+            <div className="flex gap-3">
             <Link to="/dashboard/blogs">
               <Button type="button" variant="outline">
                 Cancelar
               </Button>
             </Link>
-            <Button type="button" onClick={handleSave} disabled={!canSave}>
-              Guardar cambios
+            <Button type="button" onClick={handleSave} disabled={!canSave || submitting}>
+              {submitting ? "Guardando..." : "Guardar cambios"}
             </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

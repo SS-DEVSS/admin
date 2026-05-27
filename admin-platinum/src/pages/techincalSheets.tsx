@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,14 +26,12 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import { useTs } from "@/hooks/useTs";
-import { useProducts } from "@/hooks/useProducts";
+import { useProductsPicker } from "@/hooks/useProductsPicker";
 import { useToast } from "@/hooks/use-toast";
-import { Item } from "@/models/product";
-import { Reference } from "@/models/reference";
+import RelatedLinksEditor from "@/components/products/RelatedLinksEditor";
 import { TechnicalSheet } from "@/models/technicalSheet";
 import { AlertTriangle, FileText, Loader2, PlusCircle, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import axiosClient from "@/services/axiosInstance";
 
 export interface TSFormType {
   title: string;
@@ -43,6 +40,7 @@ export interface TSFormType {
   description: string;
   productIds: string[];
   references: string[];
+  applications: string[];
 }
 
 const TsFormInitialState: TSFormType = {
@@ -52,16 +50,30 @@ const TsFormInitialState: TSFormType = {
   description: "",
   productIds: [],
   references: [],
+  applications: [],
 };
 
-const isAbortLikeError = (error: unknown): boolean => {
-  if (!error || typeof error !== "object") return false;
-  const maybeError = error as { name?: string; code?: string };
-  return (
-    maybeError.name === "CanceledError" ||
-    maybeError.code === "ERR_CANCELED" ||
-    maybeError.name === "AbortError"
-  );
+const getExistingDocumentName = (form: TSFormType): string | undefined => {
+  const path = form.path?.trim();
+  if (path && !path.startsWith("http")) {
+    const segment = path.split("/").pop();
+    if (segment) return segment;
+  }
+
+  const url = form.url?.trim();
+  if (url) {
+    try {
+      const pathname = new URL(url).pathname;
+      const name = pathname.split("/").pop();
+      if (name) return decodeURIComponent(name);
+    } catch {
+      const last = url.split("/").pop()?.split("?")[0];
+      if (last) return decodeURIComponent(last);
+    }
+  }
+
+  if (form.title?.trim()) return `${form.title.trim()}.pdf`;
+  return undefined;
 };
 
 const TechincalSheets = () => {
@@ -74,10 +86,11 @@ const TechincalSheets = () => {
     addProductsToTechSheet,
     removeProductsFromTechSheet,
     updateReferencesForTechSheet,
+    updateApplicationsForTechSheet,
     updateTechnicalSheet,
   } = useTs();
   const getTechnicalSheetsRef = useRef(getTechnicalSheets);
-  const { products } = useProducts();
+  const { products, loading: productsLoading } = useProductsPicker();
   const { uploadFile, uploading } = useS3FileManager();
   const { toast } = useToast();
 
@@ -87,9 +100,6 @@ const TechincalSheets = () => {
   const [editingTsId, setEditingTsId] = useState<string | undefined>(undefined);
   const [tsForm, setTsForm] = useState<TSFormType>(TsFormInitialState);
   const [file, setFile] = useState<File | null>(null);
-  const [referenceDraft, setReferenceDraft] = useState("");
-  const [availableReferences, setAvailableReferences] = useState<string[]>([]);
-  const [loadingReferences, setLoadingReferences] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -107,54 +117,6 @@ const TechincalSheets = () => {
     }
   }, [loading, hasLoadedOnce]);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    const client = axiosClient();
-
-    const fetchReferencesFromProducts = async () => {
-      if (tsForm.productIds.length === 0) {
-        setAvailableReferences([]);
-        return;
-      }
-
-      setLoadingReferences(true);
-      try {
-        const responses = await Promise.all(
-          tsForm.productIds.map((productId) =>
-            client.get(`/references/product/${productId}`, {
-              signal: abortController.signal,
-            })
-          )
-        );
-
-        const unique = new Set<string>();
-        responses.forEach((response) => {
-          const references: Reference[] = response.data?.references || [];
-          references.forEach((ref) => {
-            const value = [ref.referenceBrand?.trim(), ref.referenceNumber?.trim()]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
-            if (value) unique.add(value);
-          });
-        });
-        setAvailableReferences(Array.from(unique).sort((a, b) => a.localeCompare(b)));
-      } catch (error: unknown) {
-        if (!isAbortLikeError(error)) {
-          console.error("Error loading references by products:", error);
-          setAvailableReferences([]);
-        }
-      } finally {
-        setLoadingReferences(false);
-      }
-    };
-
-    fetchReferencesFromProducts();
-    return () => {
-      abortController.abort();
-    };
-  }, [tsForm.productIds]);
-
   const toggleModal = () => {
     setIsOpen(!isOpen);
     if (!isOpen && !isEditMode) {
@@ -164,10 +126,10 @@ const TechincalSheets = () => {
   };
 
   useEffect(() => {
-    if (file?.name && tsForm.path !== file.name) {
+    if (!isEditMode && file?.name && tsForm.path !== file.name) {
       setTsForm((prev) => ({ ...prev, path: file.name }));
     }
-  }, [file, tsForm.path]);
+  }, [file, tsForm.path, isEditMode]);
 
   const validateForm = useMemo(
     () =>
@@ -221,6 +183,9 @@ const TechincalSheets = () => {
       const normalizedReferences = Array.from(
         new Set((tsForm.references ?? []).map((value) => value.trim()).filter(Boolean))
       );
+      const normalizedApplications = Array.from(
+        new Set((tsForm.applications ?? []).map((value) => value.trim()).filter(Boolean))
+      );
 
       if (!isEditMode) {
         const fileKey = await handleFileUpload(file);
@@ -238,6 +203,7 @@ const TechincalSheets = () => {
           description: (tsForm.description ?? "").trim(),
           productIds: tsForm.productIds.length > 0 ? tsForm.productIds : undefined,
           references: normalizedReferences.length > 0 ? normalizedReferences : undefined,
+          applications: normalizedApplications.length > 0 ? normalizedApplications : undefined,
         };
         await addTechnicalSheet(payload);
         setTsForm(TsFormInitialState);
@@ -260,6 +226,7 @@ const TechincalSheets = () => {
               description: "No se pudo subir el archivo. Intenta de nuevo.",
               variant: "destructive",
             });
+            setIsSubmitting(false);
             return;
           }
           updatePayload.path = fileKey;
@@ -273,7 +240,9 @@ const TechincalSheets = () => {
 
         if (titleChanged || descriptionChanged || pathChanged) {
           const updated = await updateTechnicalSheet(editingTsId, updatePayload);
-          if (!updated) return;
+          if (!updated) {
+            throw new Error("No se pudo actualizar el boletín");
+          }
         }
 
         const currentIds = new Set((current?.products || []).map((p) => p.id));
@@ -287,6 +256,12 @@ const TechincalSheets = () => {
         const nextReferences = normalizedReferences.slice().sort();
         if (JSON.stringify(currentReferences) !== JSON.stringify(nextReferences)) {
           await updateReferencesForTechSheet(editingTsId, normalizedReferences, { silent: true });
+        }
+
+        const currentApplications = Array.from(new Set((current?.applications ?? []).map((v) => v.trim()))).sort();
+        const nextApplications = normalizedApplications.slice().sort();
+        if (JSON.stringify(currentApplications) !== JSON.stringify(nextApplications)) {
+          await updateApplicationsForTechSheet(editingTsId, normalizedApplications, { silent: true });
         }
 
         toast({ title: "Boletín actualizado.", variant: "success" });
@@ -315,44 +290,17 @@ const TechincalSheets = () => {
     setTsForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const toggleProduct = (productId: string) => {
-    setTsForm((prev) =>
-      prev.productIds.includes(productId)
-        ? { ...prev, productIds: prev.productIds.filter((id) => id !== productId) }
-        : { ...prev, productIds: [...prev.productIds, productId] }
-    );
-  };
-
-  const addReference = () => {
-    const value = referenceDraft.trim();
-    if (!value) return;
-    setTsForm((prev) =>
-      prev.references.includes(value)
-        ? prev
-        : { ...prev, references: [...prev.references, value] }
-    );
-    setReferenceDraft("");
-  };
-
-  const removeReference = (reference: string) => {
+  const handleRelatedLinksChange = (next: {
+    productIds: string[];
+    references: string[];
+    applications: string[];
+  }) => {
     setTsForm((prev) => ({
       ...prev,
-      references: prev.references.filter((item) => item !== reference),
+      productIds: next.productIds,
+      references: next.references,
+      applications: next.applications,
     }));
-  };
-
-  const toggleReference = (reference: string) => {
-    setTsForm((prev) =>
-      prev.references.includes(reference)
-        ? { ...prev, references: prev.references.filter((item) => item !== reference) }
-        : { ...prev, references: [...prev.references, reference] }
-    );
-  };
-
-  // Al abrir edición desde la card se usa directamente los datos del ts (setTsForm + setIsOpen en TsCard)
-
-  const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchFilter(e.target.value);
   };
 
   const listToShow = useMemo(() => {
@@ -362,6 +310,7 @@ const TechincalSheets = () => {
       const title = (ts.title || "").toLowerCase();
       const description = (ts.description || "").toLowerCase();
       const references = (ts.references || []).join(" ").toLowerCase();
+      const applications = (ts.applications || []).join(" ").toLowerCase();
       const products = (ts.products || [])
         .map((product) => `${product.name || ""} ${product.sku || ""}`)
         .join(" ")
@@ -370,6 +319,7 @@ const TechincalSheets = () => {
         title.includes(query) ||
         description.includes(query) ||
         references.includes(query) ||
+        applications.includes(query) ||
         products.includes(query)
       );
     });
@@ -377,6 +327,10 @@ const TechincalSheets = () => {
 
   const showInitialLoading = loading && !hasLoadedOnce;
   const showRefreshingOverlay = loading && hasLoadedOnce;
+
+  const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchFilter(e.target.value);
+  };
 
   return (
     <Layout>
@@ -428,7 +382,7 @@ const TechincalSheets = () => {
                   </span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-x-hidden overflow-y-auto sm:w-full">
                 <DialogHeader>
                   <DialogTitle>
                     {isEditMode ? "Editar boletín" : "Nuevo boletín"}
@@ -488,6 +442,9 @@ const TechincalSheets = () => {
                       file={file}
                       fileSetter={setFile}
                       type="document"
+                      currentDocumentName={
+                        isEditMode && !file ? getExistingDocumentName(tsForm) : undefined
+                      }
                     />
                     {(uploading || isSubmitting) && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -502,113 +459,21 @@ const TechincalSheets = () => {
 
                 <Separator />
 
-                {/* 2. Productos relacionados */}
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    Productos relacionados
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Selecciona los productos a los que aplica este boletín.
-                  </p>
-                  <div className="max-h-48 overflow-y-auto border rounded-lg p-3 space-y-2">
-                    {products.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No hay productos cargados.
-                      </p>
-                    ) : (
-                      products.map((product: Item) => (
-                        <label
-                          key={product.id}
-                          className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={tsForm.productIds.includes(product.id)}
-                            onCheckedChange={() => toggleProduct(product.id)}
-                          />
-                          <span className="text-sm font-medium">{product.name}</span>
-                          {product.variants?.[0]?.sku != null && (
-                            <span className="text-xs text-muted-foreground">
-                              SKU: {product.variants[0].sku}
-                            </span>
-                          )}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </section>
-
-                <Separator />
-
-                {/* 3. Referencias relacionadas */}
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    Referencias relacionadas
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Selecciona referencias sugeridas en base a los productos elegidos.
-                  </p>
-                  <div className="relative max-h-44 overflow-y-auto border rounded-lg p-3 space-y-2 min-h-24">
-                    {tsForm.productIds.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-2">
-                        Selecciona al menos un producto para ver referencias sugeridas.
-                      </p>
-                    ) : availableReferences.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-2">
-                        No se encontraron referencias para los productos seleccionados.
-                      </p>
-                    ) : (
-                      availableReferences.map((reference) => (
-                        <label
-                          key={reference}
-                          className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={tsForm.references.includes(reference)}
-                            onCheckedChange={() => toggleReference(reference)}
-                          />
-                          <span className="text-sm">{reference}</span>
-                        </label>
-                      ))
-                    )}
-                    {loadingReferences && tsForm.productIds.length > 0 && (
-                      <div className="absolute inset-0 bg-background/70 backdrop-blur-[1px] flex items-center justify-center">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Cargando referencias...
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Tambien puedes agregar una referencia manualmente.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Ej. LuK 620309900"
-                      value={referenceDraft}
-                      onChange={(e) => setReferenceDraft(e.target.value)}
-                    />
-                    <Button type="button" variant="outline" onClick={addReference}>
-                      Agregar
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {tsForm.references.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sin referencias.</p>
-                    ) : (
-                      tsForm.references.map((reference) => (
-                        <button
-                          key={reference}
-                          type="button"
-                          className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
-                          onClick={() => removeReference(reference)}
-                        >
-                          {reference} ×
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </section>
+                <RelatedLinksEditor
+                  products={products}
+                  productsLoading={productsLoading}
+                  relatedLinks={{
+                    productIds: tsForm.productIds,
+                    references: tsForm.references,
+                    applications: tsForm.applications,
+                  }}
+                  onChange={handleRelatedLinksChange}
+                  productPickerLabel="Productos relacionados"
+                  productPickerEmptyMessage="Sin productos asociados."
+                  sectionCards
+                  productSearchVariant="combobox"
+                  referenceSearchVariant="combobox"
+                />
 
                 <DialogFooter>
                   <Button
