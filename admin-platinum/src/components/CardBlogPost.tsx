@@ -13,7 +13,6 @@ import { Link } from "react-router-dom";
 import { useDeleteModal } from "@/context/delete-context";
 import { BlogPost } from "@/models/news";
 import { newsContext } from "@/context/news-context";
-import { useS3FileManager } from "@/hooks/useS3FileManager";
 
 type CardTemplateProps = {
   blogPost?: BlogPost;
@@ -29,17 +28,14 @@ const stripHtmlTags = (html: string) =>
 const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/editar" }: CardTemplateProps) => {
   const { openModal } = useDeleteModal();
   const { getBlogPostById } = newsContext();
-  const { deleteFile } = useS3FileManager();
 
   const handleEditBlogPost = async (id: BlogPost["id"]) => {
     await getBlogPostById(id);
   };
 
   const handleDeleteBlogPost = () => {
-    if (deleteItem) {
-      deleteFile(blogPost!.coverImagePath, () => {
-        deleteItem(blogPost?.id!);
-      });
+    if (deleteItem && blogPost?.id) {
+      void deleteItem(blogPost.id);
     }
   };
 
@@ -78,7 +74,7 @@ const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/ed
                       openModal({
                         title: "Blog",
                         description:
-                          "¿Estás seguro de que deseas eliminar este blog?",
+                          "¿Estás seguro de que deseas eliminar este blog? Esta acción no se puede deshacer.",
                         handleDelete: handleDeleteBlogPost,
                       })
                     }

@@ -1,16 +1,6 @@
 import MyDropzone from "@/components/Dropzone";
 import Layout from "@/components/Layouts/Layout";
 import NoData from "@/components/NoData";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDeleteModal } from "@/context/delete-context";
 import { useBanners } from "@/hooks/useBanners";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import { toast } from "@/hooks/use-toast";
@@ -72,9 +63,7 @@ const Banners = () => {
   const [editMobileFile, setEditMobileFile] = useState<File | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
-
+  const { openModal } = useDeleteModal();
   const { loading, banners, addBanner, updateBanner, reorderBanners, deleteBanner } = useBanners();
   const s3Desktop = useS3FileManager();
   const s3Mobile = useS3FileManager();
@@ -203,10 +192,6 @@ const Banners = () => {
     } finally {
       setEditSaving(false);
     }
-  };
-
-  const confirmDeleteBanner = (banner: Banner) => {
-    void deleteBanner(banner.id);
   };
 
   const moveBanner = (index: number, delta: number) => {
@@ -427,10 +412,16 @@ const Banners = () => {
                       size="icon"
                       className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
                       aria-label="Eliminar banner"
-                      onClick={() => {
-                        setDeleteTarget(banner);
-                        setDeleteOpen(true);
-                      }}
+                      onClick={() =>
+                        openModal({
+                          title: "banner",
+                          description:
+                            "Se eliminará el banner del sitio y sus imágenes en almacenamiento. Esta acción no se puede deshacer.",
+                          handleDelete: () => {
+                            void deleteBanner(banner.id);
+                          },
+                        })
+                      }
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -499,39 +490,6 @@ const Banners = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar este banner?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Se eliminará el banner del sitio y sus imágenes en almacenamiento. Esta acción no se puede
-                deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  setDeleteTarget(null);
-                }}
-              >
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-red-600 hover:bg-red-700"
-                onClick={() => {
-                  if (deleteTarget) {
-                    confirmDeleteBanner(deleteTarget);
-                  }
-                  setDeleteTarget(null);
-                  setDeleteOpen(false);
-                }}
-              >
-                Eliminar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </section>
     </Layout>
   );

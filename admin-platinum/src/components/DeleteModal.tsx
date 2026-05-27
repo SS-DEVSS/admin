@@ -7,13 +7,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "./ui/button";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
 import { useDeleteModal } from "@/context/delete-context";
 
 const DeleteModal = () => {
   const { modalState, closeModal } = useDeleteModal();
-  const { isOpen, title, description, pathname, handleDelete } = modalState;
+  const { isOpen, title, description, handleDelete } = modalState;
 
   return (
     <Dialog
@@ -25,17 +23,6 @@ const DeleteModal = () => {
           <DialogTitle className="mb-2">Eliminar {title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {pathname !== "/categorias" ? (
-          <Alert variant="warning">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Esta acción es irreversible</AlertTitle>
-          </Alert>
-        ) : (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Esta acción es irreversible</AlertTitle>
-          </Alert>
-        )}
         <DialogFooter>
           <Button onClick={closeModal} variant="outline">
             Cancelar
