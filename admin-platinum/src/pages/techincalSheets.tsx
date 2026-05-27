@@ -74,6 +74,7 @@ const TechincalSheets = () => {
     addProductsToTechSheet,
     removeProductsFromTechSheet,
     updateReferencesForTechSheet,
+    updateTechnicalSheet,
   } = useTs();
   const getTechnicalSheetsRef = useRef(getTechnicalSheets);
   const { products } = useProducts();
@@ -195,6 +196,7 @@ const TechincalSheets = () => {
           description: "Título, descripción y documento (PDF) son requeridos.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
       if (!file || !(file instanceof File) || !file.name) {
@@ -203,8 +205,17 @@ const TechincalSheets = () => {
           description: "Selecciona un archivo PDF para el boletín.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
+    } else if (!tsForm.title.trim() || !tsForm.description.trim()) {
+      toast({
+        title: "Completa los campos obligatorios",
+        description: "Título y descripción son requeridos.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
     }
     try {
       const normalizedReferences = Array.from(
@@ -235,29 +246,60 @@ const TechincalSheets = () => {
         setIsOpen(false);
       } else if (isEditMode && editingTsId) {
         const current = technicalSheets.find((t) => t.id === editingTsId);
+        const updatePayload: Parameters<typeof updateTechnicalSheet>[1] = {
+          title: tsForm.title.trim(),
+          description: (tsForm.description ?? "").trim(),
+        };
+
+        const hasNewDocument = file instanceof File && file.size > 0;
+        if (hasNewDocument) {
+          const fileKey = await handleFileUpload(file);
+          if (!fileKey || fileKey.trim() === "") {
+            toast({
+              title: "Error al subir el documento",
+              description: "No se pudo subir el archivo. Intenta de nuevo.",
+              variant: "destructive",
+            });
+            return;
+          }
+          updatePayload.path = fileKey;
+        }
+
+        const titleChanged = updatePayload.title !== (current?.title ?? "").trim();
+        const descriptionChanged =
+          updatePayload.description !== (current?.description ?? "").trim();
+        const pathChanged =
+          updatePayload.path !== undefined && updatePayload.path !== (current?.path ?? "");
+
+        if (titleChanged || descriptionChanged || pathChanged) {
+          const updated = await updateTechnicalSheet(editingTsId, updatePayload);
+          if (!updated) return;
+        }
+
         const currentIds = new Set((current?.products || []).map((p) => p.id));
         const newIds = new Set(tsForm.productIds);
         const toAdd = tsForm.productIds.filter((id) => !currentIds.has(id));
         const toRemove = (current?.products || []).map((p) => p.id).filter((id) => !newIds.has(id));
-        if (toAdd.length > 0) await addProductsToTechSheet(editingTsId, toAdd);
-        if (toRemove.length > 0) await removeProductsFromTechSheet(editingTsId, toRemove);
+        if (toAdd.length > 0) await addProductsToTechSheet(editingTsId, toAdd, { silent: true });
+        if (toRemove.length > 0) await removeProductsFromTechSheet(editingTsId, toRemove, { silent: true });
+
         const currentReferences = Array.from(new Set((current?.references ?? []).map((v) => v.trim()))).sort();
         const nextReferences = normalizedReferences.slice().sort();
         if (JSON.stringify(currentReferences) !== JSON.stringify(nextReferences)) {
-          await updateReferencesForTechSheet(editingTsId, normalizedReferences);
+          await updateReferencesForTechSheet(editingTsId, normalizedReferences, { silent: true });
         }
-        if (toAdd.length > 0 || toRemove.length > 0) {
-          toast({ title: "Boletín actualizado.", variant: "success" });
-        }
+
+        toast({ title: "Boletín actualizado.", variant: "success" });
         setTsForm(TsFormInitialState);
         setEditingTsId(undefined);
+        setFile(null);
         setIsEditMode(false);
         setIsOpen(false);
       }
     } catch (error) {
       console.error("Error during file upload or submit:", error);
       toast({
-        title: "Error al crear el boletín",
+        title: isEditMode ? "Error al actualizar el boletín" : "Error al crear el boletín",
         description: "Revisa los datos e intenta de nuevo.",
         variant: "destructive",
       });
@@ -437,6 +479,9 @@ const TechincalSheets = () => {
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       Formatos permitidos: PDF, JPG y PNG. Tamaño maximo recomendado: 5 MB.
+                      {isEditMode
+                        ? " Deja vacío para conservar el documento actual; elige un archivo solo si deseas reemplazarlo."
+                        : null}
                     </p>
                     <MyDropzone
                       className="p-8"
@@ -622,6 +667,7 @@ const TechincalSheets = () => {
                     setTsForm={setTsForm}
                     setIsOpen={setIsOpen}
                     setEditingTsId={setEditingTsId}
+                    setFile={setFile}
                   />
                 ))}
               </CardSectionLayout>

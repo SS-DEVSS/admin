@@ -20,7 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TSFormType } from "@/pages/techincalSheets";
-import { useS3FileManager } from "@/hooks/useS3FileManager";
 
 type TsCardProps = {
   ts: TechnicalSheet;
@@ -29,6 +28,7 @@ type TsCardProps = {
   setTsForm: React.Dispatch<React.SetStateAction<TSFormType>>;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setEditingTsId: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setFile: React.Dispatch<React.SetStateAction<File | null>>;
 };
 
 const TsCard = ({
@@ -38,9 +38,9 @@ const TsCard = ({
   setTsForm,
   setIsOpen,
   setEditingTsId,
+  setFile,
 }: TsCardProps) => {
   const { openModal } = useDeleteModal();
-  const { deleteFile } = useS3FileManager();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
@@ -89,19 +89,18 @@ const TsCard = ({
     setIsEditMode(true);
     setTsForm({
       title: ts.title ?? "",
-      path: ts.url ?? "",
+      path: ts.path ?? "",
       url: ts.url ?? "",
       description: ts.description ?? "",
       productIds: (ts.products || []).map((p) => p.id),
       references: ts.references ?? [],
     });
+    setFile(null);
     setIsOpen(true);
   };
 
-  const handleDeleteTS = async () => {
-    deleteFile(ts.url!, async () => {
-      await deleteTechnicalSheet(ts.id);
-    });
+  const handleDeleteTS = () => {
+    void deleteTechnicalSheet(ts.id);
   };
 
   const handleOpenDocument = () => {
@@ -170,8 +169,9 @@ const TsCard = ({
                 <DropdownMenuItem
                   onClick={() =>
                     openModal({
-                      title: "Eliminar boletín",
-                      description: "¿Estás seguro de que deseas eliminar este boletín?",
+                      title: "boletín",
+                      description:
+                        "¿Estás seguro de que deseas eliminar este boletín? Esta acción no se puede deshacer.",
                       handleDelete: handleDeleteTS,
                     })
                   }
