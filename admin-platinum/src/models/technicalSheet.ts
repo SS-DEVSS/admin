@@ -12,6 +12,8 @@ export interface TechnicalSheet {
   products?: Array<{ id: string; name: string; sku?: string | null }> | null;
   /** Referencias vinculadas (texto libre). */
   references?: string[] | null;
+  /** Aplicaciones vinculadas (texto libre). */
+  applications?: string[] | null;
 }
 
 /** **/
