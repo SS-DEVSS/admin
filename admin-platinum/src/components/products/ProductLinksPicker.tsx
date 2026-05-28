@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Item } from "@/models/product";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, X } from "lucide-react";
 import SearchCombobox from "@/components/products/SearchCombobox";
+import { useCategoryContext } from "@/context/categories-context";
+import { useSubcategories } from "@/hooks/useSubcategories";
+import type { SubcategoryTreeNode } from "@/models/subcategory";
 
 type ProductLinksPickerProps = {
   products: Item[];
@@ -17,6 +20,20 @@ type ProductLinksPickerProps = {
 };
 
 const getProductSku = (product: Item) => product.variants?.[0]?.sku?.trim() || "";
+
+const flattenSubcategoryOptions = (nodes: SubcategoryTreeNode[]): [string, string][] => {
+  const result: [string, string][] = [];
+  const walk = (items: SubcategoryTreeNode[]) => {
+    for (const node of items) {
+      const id = node.id?.trim();
+      const name = node.name?.trim();
+      if (id && name) result.push([id, name]);
+      if (node.children?.length) walk(node.children);
+    }
+  };
+  walk(nodes);
+  return result.sort((a, b) => a[1].localeCompare(b[1]));
+};
 
 const formatProductOption = (product: Item) => {
   const sku = getProductSku(product);
@@ -36,6 +53,9 @@ export default function ProductLinksPicker({
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("all");
+  const { categories } = useCategoryContext();
+  const { getTree } = useSubcategories();
+  const [subcategoryTree, setSubcategoryTree] = useState<SubcategoryTreeNode[]>([]);
 
   const selectedProducts = useMemo(
     () => products.filter((product) => productIds.includes(product.id)),
@@ -43,26 +63,32 @@ export default function ProductLinksPicker({
   );
 
   const categoryOptions = useMemo(() => {
-    const categories = new Map<string, string>();
-    products.forEach((product) => {
-      const id = product.category?.id?.trim();
-      const name = product.category?.name?.trim();
-      if (id && name) categories.set(id, name);
-    });
-    return Array.from(categories.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [products]);
+    return categories
+      .filter((category) => category.id && category.name)
+      .map((category) => [category.id!, category.name!] as [string, string])
+      .sort((a, b) => a[1].localeCompare(b[1]));
+  }, [categories]);
 
-  const subcategoryOptions = useMemo(() => {
-    if (selectedCategoryId === "all") return [];
-    const subcategories = new Map<string, string>();
-    products.forEach((product) => {
-      if (product.category?.id !== selectedCategoryId) return;
-      const id = product.subcategory?.id?.trim();
-      const name = product.subcategory?.name?.trim();
-      if (id && name) subcategories.set(id, name);
+  useEffect(() => {
+    if (selectedCategoryId === "all") {
+      setSubcategoryTree([]);
+      return;
+    }
+
+    let cancelled = false;
+    void getTree(selectedCategoryId).then((tree) => {
+      if (!cancelled) setSubcategoryTree(tree);
     });
-    return Array.from(subcategories.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [products, selectedCategoryId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategoryId, getTree]);
+
+  const subcategoryOptions = useMemo(
+    () => flattenSubcategoryOptions(subcategoryTree),
+    [subcategoryTree]
+  );
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {

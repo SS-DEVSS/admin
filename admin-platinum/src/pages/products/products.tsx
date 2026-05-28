@@ -23,7 +23,7 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useDeferredValue } from "react";
 import { Category } from "@/models/category";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategoryContext } from "@/context/categories-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import DataTable from "@/modules/products/ProductsTable";
@@ -70,7 +70,7 @@ function flattenSearchHits(
 const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { categories = [] } = useCategories();
+  const { categories = [] } = useCategoryContext();
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem('products-search-filter');
