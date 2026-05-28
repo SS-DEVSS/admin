@@ -142,7 +142,7 @@ const Products = () => {
     if (cat?.id) {
       localStorage.setItem("products-selected-category", cat.id);
     } else {
-      localStorage.removeItem("products-selected-category");
+      localStorage.setItem("products-selected-category", "all");
     }
     setFilterMenuOpen(false);
   };
@@ -184,6 +184,12 @@ const Products = () => {
     }
 
     const savedCategoryId = localStorage.getItem("products-selected-category");
+    if (savedCategoryId === "all") {
+      setCategory(null);
+      setSubcategoryId(null);
+      return;
+    }
+
     const savedCategory = savedCategoryId
       ? categories.find((cat) => cat.id === savedCategoryId)
       : null;

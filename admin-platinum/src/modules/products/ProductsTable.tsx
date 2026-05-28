@@ -110,37 +110,44 @@ const DataTable = ({
     return () => clearTimeout(timer);
   }, [searchFilter]);
 
-  // Fetch products by category with pagination and search
+  // Fetch products (by category or all when no category selected)
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!category?.id) {
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
-        const params: Record<string, any> = {
+        const params: Record<string, string | number | boolean> = {
           page,
           pageSize,
+          includeHidden: true,
         };
 
         if (debouncedSearch && debouncedSearch.trim()) {
           params.search = debouncedSearch.trim();
         }
-        if (subcategoryId && subcategoryId.trim()) {
-          params.idSubcategory = subcategoryId.trim();
-        }
-        params.includeHidden = true;
         if (catalogVisibilityFilter !== "all") {
           params.catalogVisibility = catalogVisibilityFilter;
         }
 
-        const response = await client.get(`/products/category/${category.id}`, {
-          params,
-          timeout: 120000,
-        });
+        let response;
+        if (category?.id) {
+          if (subcategoryId && subcategoryId.trim()) {
+            params.idSubcategory = subcategoryId.trim();
+          }
+          response = await client.get(`/products/category/${category.id}`, {
+            params,
+            timeout: 120000,
+          });
+        } else {
+          response = await client.get("/products", {
+            params: {
+              page: params.page,
+              pageSize: params.pageSize,
+              ...(params.search ? { search: params.search } : {}),
+            },
+            timeout: 120000,
+          });
+        }
+
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
 
         setProducts(fetchedProducts || []);
@@ -154,7 +161,9 @@ const DataTable = ({
           title: isTimeout ? "Tiempo de espera agotado" : "Error al cargar productos",
           description: isTimeout
             ? "El servidor tardó demasiado. Intenta de nuevo o elige otra categoría."
-            : "No se pudieron cargar los productos de esta categoría.",
+            : category?.id
+              ? "No se pudieron cargar los productos de esta categoría."
+              : "No se pudieron cargar los productos.",
           variant: "destructive",
         });
         setProducts([]);
@@ -170,7 +179,7 @@ const DataTable = ({
 
   useEffect(() => {
     setPage(1);
-  }, [catalogVisibilityFilter]);
+  }, [category?.id, subcategoryId, catalogVisibilityFilter]);
 
   const getProductIdFromRow = (row: Variant & { _originalItem?: Item | null }) =>
     row._originalItem?.id || row.idProduct || row.id;

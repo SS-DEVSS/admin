@@ -1,5 +1,6 @@
 import axiosClient from './axiosInstance';
 import { Item } from '@/models/product';
+import type { CatalogVisibilityFilter } from '@/models/catalogVisibility';
 
 const LIST_REQUEST_TIMEOUT_MS = 120000;
 
@@ -144,6 +145,7 @@ export const productService = {
       pageSize?: number;
       search?: string;
       idSubcategory?: string;
+      catalogVisibility?: CatalogVisibilityFilter;
     }
   ): Promise<CategoryProductsResponse> => {
     const client = axiosClient();
@@ -154,11 +156,33 @@ export const productService = {
     };
     if (options?.search?.trim()) params.search = options.search.trim();
     if (options?.idSubcategory?.trim()) params.idSubcategory = options.idSubcategory.trim();
+    if (options?.catalogVisibility && options.catalogVisibility !== "all") {
+      params.catalogVisibility = options.catalogVisibility;
+    }
 
     const response = await client.get<CategoryProductsResponse>(
       `/products/category/${categoryId}`,
       { params, timeout: LIST_REQUEST_TIMEOUT_MS }
     );
+    return response.data;
+  },
+
+  getAllProducts: async (options?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  }): Promise<CategoryProductsResponse> => {
+    const client = axiosClient();
+    const params: Record<string, string | number> = {
+      page: options?.page ?? 1,
+      pageSize: options?.pageSize ?? 100,
+    };
+    if (options?.search?.trim()) params.search = options.search.trim();
+
+    const response = await client.get<CategoryProductsResponse>("/products", {
+      params,
+      timeout: LIST_REQUEST_TIMEOUT_MS,
+    });
     return response.data;
   },
 };
