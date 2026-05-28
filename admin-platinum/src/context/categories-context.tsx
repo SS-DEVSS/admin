@@ -1,15 +1,16 @@
 import { useToast } from "@/hooks/use-toast";
 import { Category } from "@/models/category";
-import axiosClient from "@/services/axiosInstance";
 import {
   createContext,
   Dispatch,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
 } from "react";
 import { useAuthContext } from "./auth-context";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 
 interface CategoryRespone {
   id: string;
@@ -42,7 +43,7 @@ export const CategoryContextProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const client = axiosClient();
+  const client = useAxiosClient();
   const { toast } = useToast();
   const { authState } = useAuthContext();
 
@@ -54,18 +55,7 @@ export const CategoryContextProvider = ({
   const [loading, setLoading] = useState<boolean>(true); // Start with true to show loader initially
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    // Only fetch if user is authenticated
-    if (authState.isAuthenticated && !authState.loading) {
-      getCategories();
-    } else if (!authState.loading) {
-      // If not authenticated and not loading, clear data
-      setCategories([]);
-      setLoading(false);
-    }
-  }, [authState.isAuthenticated, authState.loading]);
-
-  const getCategories = async () => {
+  const getCategories = useCallback(async () => {
     try {
       setLoading(true);
       const response = await client.get("/categories");
@@ -74,13 +64,39 @@ export const CategoryContextProvider = ({
       } else {
         setCategories([]);
       }
-    } catch (error: any) {
-      setErrorMsg(error.response?.data?.error || "Error al cargar categorías");
+    } catch (error: unknown) {
+      const message =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        error.response &&
+        typeof error.response === "object" &&
+        "data" in error.response &&
+        error.response.data &&
+        typeof error.response.data === "object" &&
+        "error" in error.response.data
+          ? String((error.response.data as { error?: string }).error)
+          : "Error al cargar categorías";
+      setErrorMsg(message);
       setCategories([]);
+      toast({
+        title: "Error al cargar categorías",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [client, toast]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated && !authState.loading) {
+      void getCategories();
+    } else if (!authState.loading) {
+      setCategories([]);
+      setLoading(false);
+    }
+  }, [authState.isAuthenticated, authState.loading, getCategories]);
 
   const getCategoryById = async (id: CategoryRespone["id"]) => {
     try {

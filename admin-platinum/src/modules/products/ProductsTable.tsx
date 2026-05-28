@@ -45,7 +45,7 @@ import {
 import MyDropzone from "@/components/Dropzone";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import { useToast } from "@/hooks/use-toast";
-import axiosClient from "@/services/axiosInstance";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 import { convertImageToWebP } from "@/utils/imageConverter";
 import FeatureProductModal from "@/components/products/FeatureProductModal";
 import { Product } from "@/models/product";
@@ -79,7 +79,7 @@ const DataTable = ({
   const lastUploadedFileRef = useRef<string>("");
   const { uploading } = useS3FileManager();
   const { toast } = useToast();
-  const client = axiosClient();
+  const client = useAxiosClient();
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
   const [selectedProductForFeature, setSelectedProductForFeature] = useState<Product | null>(null);
   const [selectedProductApplications, setSelectedProductApplications] = useState<Application[]>([]);
@@ -149,6 +149,15 @@ const DataTable = ({
         setTotalPages(pages || 1);
       } catch (error) {
         console.error('[ProductsTable] Error fetching products:', error);
+        const msg = error instanceof Error ? error.message : "";
+        const isTimeout = /timeout|ECONNABORTED/i.test(msg);
+        toast({
+          title: isTimeout ? "Tiempo de espera agotado" : "Error al cargar productos",
+          description: isTimeout
+            ? "El servidor tardó demasiado. Intenta de nuevo o elige otra categoría."
+            : "No se pudieron cargar los productos de esta categoría.",
+          variant: "destructive",
+        });
         setProducts([]);
         setTotalItems(0);
         setTotalPages(1);
@@ -158,7 +167,7 @@ const DataTable = ({
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey, client, toast]);
 
   useEffect(() => {
     setPage(1);
@@ -1255,7 +1264,7 @@ const DataTable = ({
             // Refetch the specific product to get updated featured status
             const updatedProduct = await getProductById(selectedProductForFeature.id);
             if (updatedProduct) {
-              setSelectedProductForFeature(updatedProduct);
+              setSelectedProductForFeature(updatedProduct as unknown as Product);
             }
           }
         }}

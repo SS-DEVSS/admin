@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import { Item } from "@/models/product";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,12 +15,13 @@ import { BlogRelatedLinks } from "@/utils/blogRelatedLinks";
 import { getGroupedApplicationSuggestions, getLinkedApplicationDisplayItems, isApplicationGroupFullyLinked, removeApplicationYearFromLinked, type LinkedApplicationDisplayItem } from "@/utils/applicationLabel";
 import SearchCombobox from "@/components/products/SearchCombobox";
 import ProductLinksPicker from "@/components/products/ProductLinksPicker";
+import { mapListProductToItem, productService } from "@/services/productService";
 
 export type RelatedLinksEditorProps = {
-  products: Item[];
-  productsLoading: boolean;
   relatedLinks: BlogRelatedLinks;
   onChange: (next: BlogRelatedLinks) => void;
+  /** Nombres de productos ya guardados (p. ej. al editar). */
+  selectedProductLabels?: Record<string, string>;
   productPickerLabel?: string;
   productPickerEmptyMessage?: string;
   sectionCards?: boolean;
@@ -220,10 +221,9 @@ const LinkedApplicationChip = ({
 };
 
 export default function RelatedLinksEditor({
-  products,
-  productsLoading,
   relatedLinks,
   onChange,
+  selectedProductLabels,
   productPickerLabel,
   productPickerEmptyMessage,
   sectionCards = false,
@@ -232,15 +232,47 @@ export default function RelatedLinksEditor({
 }: RelatedLinksEditorProps) {
   const [referenceDraft, setReferenceDraft] = useState("");
   const [applicationDraft, setApplicationDraft] = useState("");
+  const [selectedProducts, setSelectedProducts] = useState<Item[]>([]);
+  const productCacheRef = useRef<Map<string, Item>>(new Map());
 
-  const selectedProducts = useMemo(
-    () => products.filter((product) => relatedLinks.productIds.includes(product.id)),
-    [products, relatedLinks.productIds]
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSelectedProducts = async () => {
+      const ids = relatedLinks.productIds;
+      if (ids.length === 0) {
+        setSelectedProducts([]);
+        return;
+      }
+
+      const loaded: Item[] = [];
+      for (const id of ids) {
+        const cached = productCacheRef.current.get(id);
+        if (cached) {
+          loaded.push(cached);
+          continue;
+        }
+        const product = await productService.getProductById(id);
+        if (cancelled) return;
+        if (product) {
+          const item = mapListProductToItem(product);
+          productCacheRef.current.set(id, item);
+          loaded.push(item);
+        }
+      }
+      if (!cancelled) setSelectedProducts(loaded);
+    };
+
+    void loadSelectedProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [relatedLinks.productIds]);
 
   const showApplications = useMemo(
-    () => products.some((product) => (product.applications?.length ?? 0) > 0),
-    [products]
+    () => selectedProducts.some((product) => (product.applications?.length ?? 0) > 0),
+    [selectedProducts]
   );
 
   const referenceSuggestions = useMemo(
@@ -349,10 +381,9 @@ export default function RelatedLinksEditor({
 
   const productsSection = (
     <ProductLinksPicker
-      products={products}
-      productsLoading={productsLoading}
       productIds={relatedLinks.productIds}
       onChange={(productIds) => setNext({ ...relatedLinks, productIds })}
+      selectedProductLabels={selectedProductLabels}
       label={sectionCards ? undefined : productPickerLabel}
       emptyMessage={productPickerEmptyMessage}
       searchVariant={productSearchVariant}

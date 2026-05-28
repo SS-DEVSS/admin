@@ -26,8 +26,8 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import { useTs } from "@/hooks/useTs";
-import { useProductsPicker } from "@/hooks/useProductsPicker";
 import { useToast } from "@/hooks/use-toast";
+import { useCategoryContext } from "@/context/categories-context";
 import RelatedLinksEditor from "@/components/products/RelatedLinksEditor";
 import { TechnicalSheet } from "@/models/technicalSheet";
 import { AlertTriangle, FileText, Loader2, PlusCircle, Search } from "lucide-react";
@@ -90,7 +90,7 @@ const TechincalSheets = () => {
     updateTechnicalSheet,
   } = useTs();
   const getTechnicalSheetsRef = useRef(getTechnicalSheets);
-  const { products, loading: productsLoading } = useProductsPicker();
+  const { getCategories } = useCategoryContext();
   const { uploadFile, uploading } = useS3FileManager();
   const { toast } = useToast();
 
@@ -109,6 +109,11 @@ const TechincalSheets = () => {
 
   useEffect(() => {
     getTechnicalSheetsRef.current().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    void getCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -460,8 +465,6 @@ const TechincalSheets = () => {
                 <Separator />
 
                 <RelatedLinksEditor
-                  products={products}
-                  productsLoading={productsLoading}
                   relatedLinks={{
                     productIds: tsForm.productIds,
                     references: tsForm.references,

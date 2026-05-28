@@ -81,18 +81,18 @@ export type ResolvedBlogRelatedLinks = {
 
 export const resolveRelatedLinks = (
   relatedLinks: BlogRelatedLinks,
-  products: Item[]
+  products: Item[] = []
 ): ResolvedBlogRelatedLinks => {
   const productMap = new Map(products.map((product) => [product.id, product]));
   return {
-    products: relatedLinks.productIds
-      .map((id) => productMap.get(id))
-      .filter((product): product is Item => Boolean(product))
-      .map((product) => ({
-        id: product.id,
-        label: product.name,
-        adminHref: `/dashboard/producto/${product.id}`,
-      })),
+    products: relatedLinks.productIds.map((id) => {
+      const product = productMap.get(id);
+      return {
+        id,
+        label: product?.name ?? id,
+        adminHref: `/dashboard/producto/${id}`,
+      };
+    }),
     references: relatedLinks.references,
     applications: relatedLinks.applications,
   };

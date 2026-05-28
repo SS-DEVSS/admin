@@ -70,7 +70,7 @@ function flattenSearchHits(
 const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { categories = [] } = useCategoryContext();
+  const { categories = [], getCategories } = useCategoryContext();
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem('products-search-filter');
@@ -88,6 +88,11 @@ const Products = () => {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([]);
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
     useState<CatalogVisibilityFilter>("all");
+
+  useEffect(() => {
+    void getCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -170,6 +175,7 @@ const Products = () => {
 
   useEffect(() => {
     if (categories.length === 0) return;
+
     const fromUrl = searchParams.get('categoryId');
     const subFromUrl = searchParams.get('subcategoryId');
     if (fromUrl) {
@@ -182,12 +188,15 @@ const Products = () => {
     }
 
     const savedCategoryId = localStorage.getItem("products-selected-category");
-    const savedCategory = savedCategoryId ? categories.find((cat) => cat.id === savedCategoryId) : null;
+    const savedCategory = savedCategoryId
+      ? categories.find((cat) => cat.id === savedCategoryId)
+      : null;
+
     if (savedCategory) {
       setCategory(savedCategory);
-    } else {
+    } else if (!category?.id) {
       setCategory(categories[0]);
-      localStorage.setItem('products-selected-category', categories[0].id || '');
+      localStorage.setItem("products-selected-category", categories[0].id || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories]);

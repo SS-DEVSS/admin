@@ -1,8 +1,8 @@
 import { Category } from "@/models/category";
-import axiosClient from "@/services/axiosInstance";
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "./use-toast";
 import { useAuthContext } from "@/context/auth-context";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 
 interface CategoryRespone {
   id: string;
@@ -10,7 +10,7 @@ interface CategoryRespone {
 }
 
 export const useCategories = () => {
-  const client = axiosClient();
+  const client = useAxiosClient();
   const { toast } = useToast();
   const { authState } = useAuthContext();
 

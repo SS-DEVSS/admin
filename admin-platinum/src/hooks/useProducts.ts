@@ -1,10 +1,10 @@
 import { Item } from "@/models/product";
-import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
 import { useCallback, useState } from "react";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 
 export const useProducts = () => {
-  const client = axiosClient();
+  const client = useAxiosClient();
   const { toast } = useToast();
 
   const [products, setProducts] = useState<Item[]>([]);

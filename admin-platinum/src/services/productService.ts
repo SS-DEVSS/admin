@@ -1,5 +1,56 @@
 import axiosClient from './axiosInstance';
-import { Product } from '@/models/product';
+import { Item } from '@/models/product';
+
+const LIST_REQUEST_TIMEOUT_MS = 120000;
+
+export type ApiListProduct = {
+  id: string;
+  name: string;
+  type: string;
+  description?: string;
+  sku?: string | null;
+  category?: { id: string; name: string };
+  idSubcategory?: string | null;
+  subcategory?: { id: string; name: string } | null;
+  references?: Item["references"];
+  applications?: Item["applications"];
+  attributeValues?: Item["attributeValues"];
+};
+
+export type CategoryProductsResponse = {
+  products: ApiListProduct[];
+  total: number;
+  totalPages: number;
+};
+
+export const mapListProductToItem = (product: ApiListProduct): Item => ({
+  id: product.id,
+  name: product.name,
+  type: product.type as Item["type"],
+  description: product.description ?? "",
+  category: product.category ?? { id: "", name: "" },
+  idSubcategory: product.idSubcategory ?? null,
+  subcategory: product.subcategory ?? null,
+  references: product.references ?? [],
+  applications: product.applications ?? [],
+  attributeValues: product.attributeValues ?? [],
+  variants: product.sku
+    ? [
+        {
+          id: "",
+          idProduct: product.id,
+          name: product.name,
+          sku: product.sku,
+          price: 0,
+          stockQuantity: 0,
+          technicalSheets: [],
+          images: [],
+          kitItems: [],
+          attributeValues: [],
+        },
+      ]
+    : [],
+});
 
 export interface FeaturedProduct {
   id: string;
@@ -74,15 +125,40 @@ export const productService = {
     return response.data;
   },
 
-  getProductById: async (id: string): Promise<Product | null> => {
+  getProductById: async (id: string): Promise<ApiListProduct | null> => {
     const client = axiosClient();
     try {
-      const response = await client.get<Product>(`/products/${id}`, {
-        timeout: 120000,
+      const response = await client.get<ApiListProduct>(`/products/${id}`, {
+        timeout: LIST_REQUEST_TIMEOUT_MS,
       });
       return response.data;
     } catch {
       return null;
     }
+  },
+
+  getProductsByCategory: async (
+    categoryId: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      idSubcategory?: string;
+    }
+  ): Promise<CategoryProductsResponse> => {
+    const client = axiosClient();
+    const params: Record<string, string | number | boolean> = {
+      page: options?.page ?? 1,
+      pageSize: options?.pageSize ?? 100,
+      includeHidden: true,
+    };
+    if (options?.search?.trim()) params.search = options.search.trim();
+    if (options?.idSubcategory?.trim()) params.idSubcategory = options.idSubcategory.trim();
+
+    const response = await client.get<CategoryProductsResponse>(
+      `/products/category/${categoryId}`,
+      { params, timeout: LIST_REQUEST_TIMEOUT_MS }
+    );
+    return response.data;
   },
 };
