@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import { Link, useNavigate } from "react-router-dom";
 import { Item, Variant } from "@/models/product";
-import { useProducts } from "@/hooks/useProducts";
 import { Category } from "@/models/category";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -87,7 +86,7 @@ const DataTable = ({
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const { getProductById } = useProducts();
+  const { getProductById } = productService;
 
   const [products, setProducts] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,7 +138,10 @@ const DataTable = ({
           params.catalogVisibility = catalogVisibilityFilter;
         }
 
-        const response = await client.get(`/products/category/${category.id}`, { params });
+        const response = await client.get(`/products/category/${category.id}`, {
+          params,
+          timeout: 120000,
+        });
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
 
         setProducts(fetchedProducts || []);

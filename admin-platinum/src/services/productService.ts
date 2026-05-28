@@ -1,4 +1,5 @@
 import axiosClient from './axiosInstance';
+import { Product } from '@/models/product';
 
 export interface FeaturedProduct {
   id: string;
@@ -71,5 +72,17 @@ export const productService = {
       { productIds, visibleInCatalog }
     );
     return response.data;
+  },
+
+  getProductById: async (id: string): Promise<Product | null> => {
+    const client = axiosClient();
+    try {
+      const response = await client.get<Product>(`/products/${id}`, {
+        timeout: 120000,
+      });
+      return response.data;
+    } catch {
+      return null;
+    }
   },
 };

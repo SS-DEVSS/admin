@@ -2,7 +2,7 @@ import { Item } from "@/models/product";
 import { Reference } from "@/models/reference";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PickerReference = {
   id: string;
@@ -24,7 +24,8 @@ type PickerProduct = {
   applications?: Item["applications"];
 };
 
-const PICKER_PAGE_SIZE = 200;
+const PICKER_PAGE_SIZE = 100;
+const PICKER_REQUEST_TIMEOUT_MS = 120000;
 
 const toPickerReference = (reference: PickerReference): Reference => ({
   id: reference.id,
@@ -70,39 +71,50 @@ export const useProductsPicker = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadIdRef = useRef(0);
 
-  useEffect(() => {
-    void loadProducts();
-    // Carga única al montar; incluir loadProducts/client dispara refetch en cada render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const fetchPickerPage = useCallback(
+    (page: number) =>
+      client.get("/products/picker", {
+        params: { page, pageSize: PICKER_PAGE_SIZE },
+        timeout: PICKER_REQUEST_TIMEOUT_MS,
+      }),
+    [client]
+  );
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
+    const loadId = ++loadIdRef.current;
+
     try {
       setLoading(true);
-      const firstPage = await client.get("/products/picker", {
-        params: { page: 1, pageSize: PICKER_PAGE_SIZE },
-      });
+      setLoadingMore(false);
+      setProducts([]);
+
+      const firstPage = await fetchPickerPage(1);
+      if (loadId !== loadIdRef.current) return;
 
       const totalPages: number = firstPage.data.totalPages ?? 1;
       const firstProducts: PickerProduct[] = firstPage.data.products ?? [];
-      let allProducts = [...firstProducts];
+      setProducts(firstProducts.map(toPickerItem));
+      setLoading(false);
 
-      if (totalPages > 1) {
-        const otherPages = await Promise.all(
-          Array.from({ length: totalPages - 1 }, (_, index) =>
-            client.get("/products/picker", {
-              params: { page: index + 2, pageSize: PICKER_PAGE_SIZE },
-            })
-          )
-        );
-        otherPages.forEach((response) => {
-          allProducts = [...allProducts, ...(response.data.products ?? [])];
-        });
+      if (totalPages <= 1) return;
+
+      setLoadingMore(true);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const response = await fetchPickerPage(page);
+        if (loadId !== loadIdRef.current) return;
+
+        const pageProducts: PickerProduct[] = response.data.products ?? [];
+        setProducts((current) => [
+          ...current,
+          ...pageProducts.map(toPickerItem),
+        ]);
       }
-
-      setProducts(allProducts.map(toPickerItem));
     } catch (error: unknown) {
+      if (loadId !== loadIdRef.current) return;
+
       console.error("[useProductsPicker] Error fetching products:", error);
       const msg = error instanceof Error ? error.message : "";
       const isTimeout = /timeout|ECONNABORTED/i.test(msg);
@@ -115,9 +127,16 @@ export const useProductsPicker = () => {
       });
       setProducts([]);
     } finally {
-      setLoading(false);
+      if (loadId === loadIdRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  };
+  }, [fetchPickerPage, toast]);
 
-  return { products, loading, reloadProducts: loadProducts };
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
+
+  return { products, loading, loadingMore, reloadProducts: loadProducts };
 };

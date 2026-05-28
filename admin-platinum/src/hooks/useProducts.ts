@@ -1,23 +1,16 @@
 import { Item } from "@/models/product";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
-// import { productsSample } from "@/sampleData/products";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export const useProducts = () => {
   const client = axiosClient();
   const { toast } = useToast();
 
   const [products, setProducts] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true); // Start with true to show loader initially
-  //   const [loading, setLoading] = useState<boolean>(false);
-  //   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    getProducts();
-  }, []);
-
-  const getProducts = async () => {
+  const getProducts = useCallback(async () => {
     try {
       setLoading(true);
       const firstPage = await client.get(`/products?type=all&page=1&pageSize=100`);
@@ -35,9 +28,9 @@ export const useProducts = () => {
       }
 
       setProducts(allProducts);
-    } catch (error: any) {
-      console.error('[useProducts] Error fetching products:', error);
-      const msg = error?.message || "";
+    } catch (error: unknown) {
+      console.error("[useProducts] Error fetching products:", error);
+      const msg = error instanceof Error ? error.message : "";
       const isTimeout = /timeout|ECONNABORTED/i.test(msg);
       toast({
         title: isTimeout ? "Tiempo de espera agotado" : "Error al cargar productos",
@@ -49,62 +42,53 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [client, toast]);
 
-  const getProductById = async (id: string) => {
+  const getProductById = useCallback(async (id: string) => {
     try {
-      setLoading(true);
       const { data } = await client.get(`/products/${id}`);
       return data;
     } catch (error) {
+      console.error("[useProducts] Error fetching product by id:", error);
       return null;
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [client]);
 
   const deleteProduct = async (id: Item["id"]) => {
     try {
       await client.delete(`/products/${id}`);
-      await getProducts(); // Refresh the list
+      await getProducts();
     } catch (error) {
       console.error("Error deleting product:", error);
       throw error;
     }
   };
 
-  const createProduct = async (productData: any) => {
+  const createProduct = async (productData: unknown) => {
     try {
       setLoading(true);
 
-      const { data } = await client.post('/products', productData, {
-        timeout: 120000, // 2 minutes timeout for product creation
+      const { data } = await client.post("/products", productData, {
+        timeout: 120000,
       });
 
-
-      // Refresh the list in background (don't wait for it)
       getProducts().catch((err) => {
         console.error("Error refreshing products list:", err);
-        // Don't throw - this is a background operation
       });
       return data;
-    } catch (error: any) {
-      console.error("Error creating product:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
+    } catch (error: unknown) {
+      console.error("Error creating product:", error);
       throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const updateProduct = async (id: string, productData: any) => {
+  const updateProduct = async (id: string, productData: unknown) => {
     try {
       setLoading(true);
       const { data } = await client.patch(`/products/${id}`, productData);
-      await getProducts(); // Refresh the list
+      await getProducts();
       return data;
     } catch (error) {
       console.error("Error updating product:", error);

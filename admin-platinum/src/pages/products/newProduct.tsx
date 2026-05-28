@@ -18,7 +18,7 @@ const NewProduct = () => {
   const { id } = useParams();
   const isEditMode = !!id;
   const navigate = useNavigate();
-  const { getProductById, createProduct, updateProduct, getProducts, loading: productsLoading } = useProducts();
+  const { getProductById, createProduct, updateProduct, getProducts } = useProducts();
   const { categories } = useCategoryContext();
   const { toast } = useToast();
   const [currentProduct, setCurrentProduct] = useState<any>(null);
@@ -558,7 +558,7 @@ const NewProduct = () => {
     }
   };
 
-  if (isLoadingProduct || (isEditMode && !currentProduct && productsLoading)) {
+  if (isLoadingProduct) {
     return <Loader fullScreen message="Cargando producto..." />;
   }
 
