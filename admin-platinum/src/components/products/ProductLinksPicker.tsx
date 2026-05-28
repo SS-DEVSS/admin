@@ -51,7 +51,7 @@ export default function ProductLinksPicker({
   searchVariant = "combobox",
 }: ProductLinksPickerProps) {
   const { toast } = useToast();
-  const { categories, getCategories, loading: categoriesLoading } = useCategoryContext();
+  const { categories, loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
 
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -62,11 +62,6 @@ export default function ProductLinksPicker({
   const [subcategoryTree, setSubcategoryTree] = useState<SubcategoryTreeNode[]>([]);
   const [categoryProducts, setCategoryProducts] = useState<Item[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
-
-  useEffect(() => {
-    void getCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const categoryOptions = useMemo(
     () =>

@@ -1,5 +1,6 @@
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Category } from "@/models/category";
+import { getSharedAxiosClient } from "@/services/axiosInstance";
 import {
   createContext,
   Dispatch,
@@ -7,10 +8,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import { isAxiosError } from "axios";
 import { useAuthContext } from "./auth-context";
-import { useAxiosClient } from "@/hooks/useAxiosClient";
 
 interface CategoryRespone {
   id: string;
@@ -26,7 +28,7 @@ interface ContextCategoryTypes {
   getCategoryById: (
     id: CategoryRespone["id"]
   ) => Promise<Category | undefined>;
-  getCategories: () => void;
+  getCategories: (force?: boolean) => Promise<Category[]>;
   addCategory: (
     category: Omit<Category, "id">
   ) => Promise<CategoryRespone | null>;
@@ -34,7 +36,7 @@ interface ContextCategoryTypes {
   deleteCategory: (id: Category["id"]) => void;
 }
 
-const CategoryContext = createContext<ContextCategoryTypes>({} as any);
+const CategoryContext = createContext<ContextCategoryTypes>({} as ContextCategoryTypes);
 
 export const useCategoryContext = () => useContext(CategoryContext);
 
@@ -43,8 +45,7 @@ export const CategoryContextProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const client = useAxiosClient();
-  const { toast } = useToast();
+  const client = getSharedAxiosClient();
   const { authState } = useAuthContext();
 
   const [selectedCategory, setSelectedCategory] = useState<
@@ -52,47 +53,68 @@ export const CategoryContextProvider = ({
   >(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
-  const [loading, setLoading] = useState<boolean>(true); // Start with true to show loader initially
+  const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const getCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await client.get("/categories");
-      if (Array.isArray(response.data)) {
-        setCategories(response.data);
-      } else {
-        setCategories([]);
-      }
-    } catch (error: unknown) {
-      const message =
-        error &&
-        typeof error === "object" &&
-        "response" in error &&
-        error.response &&
-        typeof error.response === "object" &&
-        "data" in error.response &&
-        error.response.data &&
-        typeof error.response.data === "object" &&
-        "error" in error.response.data
-          ? String((error.response.data as { error?: string }).error)
-          : "Error al cargar categorías";
-      setErrorMsg(message);
-      setCategories([]);
-      toast({
-        title: "Error al cargar categorías",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const categoriesRef = useRef<Category[]>([]);
+  const inflightRef = useRef<Promise<Category[]> | null>(null);
+
+  const getCategories = useCallback(async (force = false): Promise<Category[]> => {
+    if (!force && categoriesRef.current.length > 0) {
+      return categoriesRef.current;
     }
-  }, [client, toast]);
+    if (inflightRef.current) {
+      return inflightRef.current;
+    }
+
+    const request = (async () => {
+      try {
+        setLoading(true);
+        const response = await client.get("/categories", { timeout: 30000 });
+        const data = Array.isArray(response.data) ? response.data : [];
+        categoriesRef.current = data;
+        setCategories(data);
+        return data;
+      } catch (error: unknown) {
+        if (isAxiosError(error) && error.code === "ERR_CANCELED") {
+          return categoriesRef.current;
+        }
+        const message =
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "error" in error.response.data
+            ? String((error.response.data as { error?: string }).error)
+            : "Error al cargar categorías";
+        setErrorMsg(message);
+        categoriesRef.current = [];
+        setCategories([]);
+        toast({
+          title: "Error al cargar categorías",
+          description: message,
+          variant: "destructive",
+        });
+        return [];
+      } finally {
+        inflightRef.current = null;
+        setLoading(false);
+      }
+    })();
+
+    inflightRef.current = request;
+    return request;
+  }, [client]);
 
   useEffect(() => {
     if (authState.isAuthenticated && !authState.loading) {
       void getCategories();
     } else if (!authState.loading) {
+      categoriesRef.current = [];
       setCategories([]);
       setLoading(false);
     }
@@ -137,7 +159,7 @@ export const CategoryContextProvider = ({
         variant: "success",
         description: response.data.message,
       });
-      await getCategories();
+      await getCategories(true);
     } catch (error: any) {
       setErrorMsg(error.response.data.error);
       toast({
@@ -169,7 +191,7 @@ export const CategoryContextProvider = ({
         variant: "success",
         description: response.data.message,
       });
-      await getCategories();
+      await getCategories(true);
       return response.data;
     } catch (error: any) {
       toast({
@@ -202,7 +224,7 @@ export const CategoryContextProvider = ({
         variant: "success",
         description: response.data.message || "La categoría se actualizó exitosamente.",
       });
-      await getCategories(); // Recargar la lista después de actualizar
+      await getCategories(true);
       return response.data;
     } catch (error: any) {
       setErrorMsg(error.response?.data?.error || "Error al actualizar la categoría");

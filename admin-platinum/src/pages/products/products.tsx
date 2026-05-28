@@ -27,6 +27,7 @@ import { useCategoryContext } from "@/context/categories-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import DataTable from "@/modules/products/ProductsTable";
+import Loader from "@/components/Loader";
 import {
   Select,
   SelectContent,
@@ -70,7 +71,7 @@ function flattenSearchHits(
 const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { categories = [], getCategories } = useCategoryContext();
+  const { categories = [], loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem('products-search-filter');
@@ -89,10 +90,41 @@ const Products = () => {
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
     useState<CatalogVisibilityFilter>("all");
 
+  // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
   useEffect(() => {
-    void getCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!filterMenuOpen || !categories.length) return;
+
+    let isCancelled = false;
+
+    const loadAllTrees = async () => {
+      try {
+        const entries = await Promise.all(
+          categories
+            .filter((cat): cat is Category & { id: string } => !!cat.id)
+            .map(async (cat) => {
+              const tree = await getTree(cat.id!);
+              return [cat.id!, tree] as const;
+            })
+        );
+
+        if (!isCancelled) {
+          const map: Record<string, SubcategoryTreeNode[]> = {};
+          for (const [catId, tree] of entries) {
+            map[catId] = tree;
+          }
+          setSubcategoryTreeByCategory(map);
+        }
+      } catch {
+        // Silenciar errores de carga de árbol en filtros
+      }
+    };
+
+    void loadAllTrees();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [filterMenuOpen, categories, getTree]);
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -136,42 +168,6 @@ const Products = () => {
         )
       : [];
   const showGlobalSearch = searchQuery.length > 0;
-
-  // Precargar árbol de subcategorías por categoría para armar el menú jerárquico
-  useEffect(() => {
-    if (!categories.length) return;
-
-    let isCancelled = false;
-
-    const loadAllTrees = async () => {
-      try {
-        const entries = await Promise.all(
-          categories
-            .filter((cat): cat is Category & { id: string } => !!cat.id)
-            .map(async (cat) => {
-              const tree = await getTree(cat.id!);
-              return [cat.id!, tree] as const;
-            })
-        );
-
-        if (!isCancelled) {
-          const map: Record<string, SubcategoryTreeNode[]> = {};
-          for (const [catId, tree] of entries) {
-            map[catId] = tree;
-          }
-          setSubcategoryTreeByCategory(map);
-        }
-      } catch {
-        // Silenciar errores de carga de árbol en filtros
-      }
-    };
-
-    loadAllTrees();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [categories, getTree]);
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -542,12 +538,16 @@ const Products = () => {
             </div>
           </CardHeader>
           <div>
-            <DataTable
-              category={category}
-              searchFilter={searchFilter}
-              subcategoryId={subcategoryId}
-              catalogVisibilityFilter={catalogVisibilityFilter}
-            />
+            {categoriesLoading && categories.length === 0 ? (
+              <Loader message="Cargando categorías..." />
+            ) : (
+              <DataTable
+                category={category}
+                searchFilter={searchFilter}
+                subcategoryId={subcategoryId}
+                catalogVisibilityFilter={catalogVisibilityFilter}
+              />
+            )}
           </div>
         </Card>
       </div>

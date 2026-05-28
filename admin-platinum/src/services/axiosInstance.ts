@@ -70,4 +70,14 @@ const axiosClient = (token: string | null = null): AxiosInstance => {
   return client;
 };
 
+/** Instancia compartida para evitar múltiples interceptores y peticiones duplicadas. */
+let sharedClient: AxiosInstance | null = null;
+
+export const getSharedAxiosClient = (): AxiosInstance => {
+  if (!sharedClient) {
+    sharedClient = axiosClient();
+  }
+  return sharedClient;
+};
+
 export default axiosClient;

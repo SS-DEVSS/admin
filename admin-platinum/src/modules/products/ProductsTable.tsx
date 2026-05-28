@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import MyDropzone from "@/components/Dropzone";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { useAxiosClient } from "@/hooks/useAxiosClient";
 import { convertImageToWebP } from "@/utils/imageConverter";
 import FeatureProductModal from "@/components/products/FeatureProductModal";
@@ -78,7 +78,6 @@ const DataTable = ({
   const uploadInProgressRef = useRef(false);
   const lastUploadedFileRef = useRef<string>("");
   const { uploading } = useS3FileManager();
-  const { toast } = useToast();
   const client = useAxiosClient();
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
   const [selectedProductForFeature, setSelectedProductForFeature] = useState<Product | null>(null);
@@ -167,7 +166,7 @@ const DataTable = ({
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey, client, toast]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey, client]);
 
   useEffect(() => {
     setPage(1);
@@ -220,7 +219,7 @@ const DataTable = ({
       setCatalogVisibilityPending(false);
       setCatalogVisibilityTargetIds([]);
     }
-  }, [toast]);
+  }, []);
 
   const handleImageClick = (variant: Variant) => {
     setSelectedVariant(variant);
