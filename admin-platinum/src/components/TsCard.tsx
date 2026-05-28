@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { TechnicalSheet } from "@/models/technicalSheet";
 import { useDeleteModal } from "@/context/delete-context";
 import { FileDown, FileText, MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 import axiosClient from "@/services/axiosInstance";
+import { getStoredApplicationDisplayItems } from "@/utils/applicationLabel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,11 @@ const TsCard = ({
 
   const isImage = ts.url && /\.(jpe?g|png|gif|webp)$/i.test(ts.url);
 
+  const displayApplications = useMemo(
+    () => getStoredApplicationDisplayItems(ts.applications ?? []),
+    [ts.applications]
+  );
+
   const previewUrlRef = useRef<string | null>(null);
 
   // Obtener documento desde el backend (auth) para evitar Access Denied de S3
@@ -94,6 +100,7 @@ const TsCard = ({
       description: ts.description ?? "",
       productIds: (ts.products || []).map((p) => p.id),
       references: ts.references ?? [],
+      applications: ts.applications ?? [],
     });
     setFile(null);
     setIsOpen(true);
@@ -117,7 +124,7 @@ const TsCard = ({
       const objectUrl = URL.createObjectURL(blob);
 
       const extension = ts.url?.split(".").pop()?.split("?")[0] || "pdf";
-      const safeTitle = (ts.title || "boletin").replace(/[^\w\-]+/g, "_");
+      const safeTitle = (ts.title || "boletin").replace(/[^\w-]+/g, "_");
       const link = document.createElement("a");
       link.href = objectUrl;
       link.download = `${safeTitle}.${extension}`;
@@ -183,7 +190,7 @@ const TsCard = ({
             </DropdownMenuContent>
           </DropdownMenu>
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-x-hidden overflow-y-auto sm:w-full">
                 <DialogHeader>
                   <DialogTitle>{ts.title}</DialogTitle>
                   <DialogDescription>{ts.description || "Sin descripción."}</DialogDescription>
@@ -205,6 +212,21 @@ const TsCard = ({
                       <ul className="list-disc pl-5 text-sm text-muted-foreground">
                         {ts.references.map((reference) => (
                           <li key={reference}>{reference}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {displayApplications.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-semibold mb-1">Aplicaciones</p>
+                      <ul className="space-y-2 text-sm text-muted-foreground">
+                        {displayApplications.map((application) => (
+                          <li
+                            key={application.key}
+                            className="rounded-md border bg-muted/20 px-3 py-2 break-words"
+                          >
+                            {application.displayLabel}
+                          </li>
                         ))}
                       </ul>
                     </div>
@@ -248,11 +270,11 @@ const TsCard = ({
               Ver vista previa
             </button>
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+              <DialogContent className="max-h-[90vh] max-w-4xl overflow-x-hidden overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Vista previa — {ts.title}</DialogTitle>
                 </DialogHeader>
-                <div className="flex-1 min-h-[70vh] rounded-lg border bg-muted/30 overflow-hidden flex items-center justify-center">
+                <div className="min-h-[60vh] rounded-lg border bg-muted/30 overflow-hidden flex items-center justify-center">
                   {previewLoading && (
                     <p className="text-muted-foreground">Cargando documento…</p>
                   )}
@@ -270,7 +292,7 @@ const TsCard = ({
                       <iframe
                         title={`Vista previa ${ts.title}`}
                         src={previewDocUrl}
-                        className="w-full h-full min-h-[70vh] border-0"
+                        className="w-full min-h-[60vh] border-0"
                       />
                     )
                   )}
@@ -297,6 +319,16 @@ const TsCard = ({
             {ts.references && ts.references.length > 0
               ? ts.references.join(", ")
               : "Sin referencias asociadas."}
+          </p>
+        </div>
+        <div className="border-t pt-4">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-semibold">
+            Aplicaciones
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-3">
+            {displayApplications.length > 0
+              ? displayApplications.map((item) => item.displayLabel).join("; ")
+              : "Sin aplicaciones asociadas."}
           </p>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import { Dispatch, useCallback, useState, useEffect } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { CheckCircle2, FileText, X } from "lucide-react";
 
 interface MyDropzoneProps {
@@ -8,10 +8,14 @@ interface MyDropzoneProps {
   type?: "document" | "image";
   className?: string;
   currentImageUrl?: string; // URL de la imagen actual (si existe)
+  /** Nombre del documento ya guardado (modo edición, sin File local). */
+  currentDocumentName?: string;
   onImageClick?: () => void; // Callback para cuando se hace click en la imagen actual
   emptyTextStyle?: "default" | "reference"; // reference = dos líneas, segunda en azul subrayado
   /** Botón pequeño encima de la vista previa para quitar el archivo sin filas de botones debajo */
   imageOverlayRemove?: boolean;
+  /** Texto cuando ya hay imagen guardada (modo edición). */
+  currentImageLabel?: string;
 }
 
 const MyDropzone = ({
@@ -20,9 +24,11 @@ const MyDropzone = ({
   type,
   className,
   currentImageUrl,
+  currentDocumentName,
   onImageClick,
   emptyTextStyle = "default",
   imageOverlayRemove = false,
+  currentImageLabel = "Imagen actual adjunta",
 }: MyDropzoneProps) => {
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -49,7 +55,7 @@ const MyDropzone = ({
   }, [file, type]);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: any) => {
+    (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       setError(null);
       if (rejectedFiles.length > 0) {
         setError("Selecciona un archivo válido.");
@@ -96,7 +102,10 @@ const MyDropzone = ({
   const showCurrentImagePreview = currentImageUrl && !file && !previewUrl && type === "image";
   const showPreview = previewUrl && type === "image";
   const showDocumentSelected = type === "document" && !!(file && file.name);
-  const showText = !showCurrentImagePreview && !showPreview && !showDocumentSelected;
+  const showCurrentDocument =
+    type === "document" && !file && !!currentDocumentName?.trim();
+  const showText =
+    !showCurrentImagePreview && !showPreview && !showDocumentSelected && !showCurrentDocument;
 
   const emptyStateContent =
     emptyTextStyle === "reference" ? (
@@ -120,19 +129,26 @@ const MyDropzone = ({
     return (
       <div
         {...getRootProps()}
-        className={`${className} flex flex-col items-center justify-center min-h-[200px] cursor-pointer ${isDragActive ? "bg-[#F5F9FD] border-[#0bbff4]" : ""}`}
+        className={`${className} border border-dashed rounded-lg flex flex-col items-center justify-center min-h-[200px] cursor-pointer bg-green-50 border-green-400 px-4 py-6 ${
+          isDragActive ? "bg-[#F5F9FD] border-[#0bbff4]" : ""
+        }`}
       >
         <input {...getInputProps()} />
+        <CheckCircle2 className="h-8 w-8 text-green-600 mb-2" />
+        <p className="text-sm font-semibold text-[#4E5154] mb-2 text-center">
+          {currentImageLabel}
+        </p>
         <img
           src={currentImageUrl}
-          className="max-w-full max-h-[280px] object-contain rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+          alt={currentImageLabel}
+          className="max-w-full max-h-[280px] object-contain rounded-lg border bg-white cursor-pointer hover:opacity-90 transition-opacity"
           onClick={(e) => {
             e.stopPropagation();
             onImageClick?.();
           }}
         />
-        <p className="text-sm text-muted-foreground mt-2 text-center">
-          Arrastra otra imagen o haz clic para cambiar
+        <p className="text-sm text-muted-foreground mt-3 text-center">
+          Arrastra otra imagen o haz clic para reemplazar la portada
         </p>
         {error && <p className="text-center text-red-500 mt-2">{error}</p>}
       </div>
@@ -147,7 +163,9 @@ const MyDropzone = ({
         ? "bg-[#F5F9FD] border-[#0bbff4]"
         : file && file.name
           ? "bg-green-50 border-green-400"
-          : ""
+          : showCurrentDocument
+            ? "bg-green-50 border-green-400"
+            : ""
         } border border-dashed rounded-lg ${className} flex flex-col items-center justify-center`}
     >
       <input {...getInputProps()} />
@@ -208,6 +226,21 @@ const MyDropzone = ({
                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm text-[#4E5154] truncate max-w-[260px]">
                   {file?.name}
+                </span>
+              </div>
+              <p className="text-xs text-[#94A3B8] underline hover:cursor-pointer">
+                Haz clic para reemplazar el archivo
+              </p>
+            </div>
+          )}
+          {showCurrentDocument && (
+            <div className="w-full flex flex-col items-center gap-2 px-4 text-center">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <p className="text-sm font-semibold text-[#4E5154]">Documento actual adjunto</p>
+              <div className="inline-flex items-center gap-2 rounded-md bg-white/80 border px-3 py-2 max-w-full">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-[#4E5154] truncate max-w-[260px]">
+                  {currentDocumentName}
                 </span>
               </div>
               <p className="text-xs text-[#94A3B8] underline hover:cursor-pointer">

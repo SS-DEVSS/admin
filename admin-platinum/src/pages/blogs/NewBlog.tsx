@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -18,7 +17,7 @@ import MyDropzone from "@/components/Dropzone";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
 import BlogPreview from "@/components/blogs/BlogPreview";
 import BlogRelatedLinksEditor from "@/components/blogs/BlogRelatedLinksEditor";
-import { useProducts } from "@/hooks/useProducts";
+import { useProductsPicker } from "@/hooks/useProductsPicker";
 import {
   BlogRelatedLinks,
   emptyRelatedLinks,
@@ -26,8 +25,7 @@ import {
   resolveRelatedLinks,
   serializeContentWithRelatedLinks,
 } from "@/utils/blogRelatedLinks";
-
-const stripHtmlTags = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+import { hasRichTextContent } from "@/utils/richTextContent";
 
 const NewBlog = () => {
   const navigate = useNavigate();
@@ -40,16 +38,24 @@ const NewBlog = () => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [relatedLinks, setRelatedLinks] = useState<BlogRelatedLinks>(emptyRelatedLinks());
-  const { products, loading: productsLoading } = useProducts();
+  const { products, loading: productsLoading } = useProductsPicker();
 
-  const hasDescriptionContent = stripHtmlTags(description) !== "";
-  const hasMainContent = stripHtmlTags(content) !== "";
+  const hasDescriptionContent = hasRichTextContent(description);
+  const hasMainContent = hasRichTextContent(content);
+  const hasCoverImage = coverImage instanceof File && coverImage.size > 0;
 
   const canSubmit =
     title.trim() !== "" &&
     hasDescriptionContent &&
     hasMainContent &&
-    coverImage != null;
+    hasCoverImage;
+
+  const missingFields = [
+    !title.trim() && "título",
+    !hasDescriptionContent && "descripción",
+    !hasMainContent && "contenido del blog",
+    !hasCoverImage && "imagen de portada",
+  ].filter(Boolean) as string[];
 
   const handleSubmit = async () => {
     if (!canSubmit || !coverImage) return;
@@ -98,9 +104,6 @@ const NewBlog = () => {
           </Link>
           <div>
             <CardTitle>Nuevo blog</CardTitle>
-            <CardDescription>
-              Escribe el contenido con el editor enriquecido de TipTap.
-            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -119,6 +122,7 @@ const NewBlog = () => {
 
           <MarkdownEditor
             label="Descripción"
+            required
             value={description}
             onChange={setDescription}
             placeholder="Escribe una descripción corta del blog."
@@ -139,6 +143,7 @@ const NewBlog = () => {
 
           <MarkdownEditor
             label="Contenido del blog"
+            required
             value={content}
             onChange={setContent}
             placeholder="Escribe el contenido del blog. Usa la barra de herramientas para títulos, listas, enlaces, etc."
@@ -163,7 +168,13 @@ const NewBlog = () => {
             relatedLinks={resolveRelatedLinks(relatedLinks, products)}
           />
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col gap-2 pt-4">
+            {!canSubmit && !submitting && missingFields.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Para publicar, completa: {missingFields.join(", ")}.
+              </p>
+            ) : null}
+            <div className="flex gap-3">
             <Link to="/dashboard/blogs">
               <Button type="button" variant="outline">
                 Cancelar
@@ -176,6 +187,7 @@ const NewBlog = () => {
             >
               {submitting ? "Guardando..." : "Publicar blog"}
             </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
