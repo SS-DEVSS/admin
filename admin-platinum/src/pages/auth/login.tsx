@@ -91,7 +91,7 @@ const Login = () => {
         )}
         <Button
           type="submit"
-          className="w-full bg-brand-orange text-white transition-colors duration-200 hover:bg-[#D9680F]"
+          className="w-full bg-brand-orange text-[#002858] transition-colors duration-200 hover:bg-[#D9680F] hover:text-[#002858]"
           disabled={loading}
         >
           {loading ? "Iniciando sesión..." : "Iniciar Sesión"}

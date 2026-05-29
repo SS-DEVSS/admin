@@ -3,7 +3,6 @@ import {
   LayoutGrid,
   Menu,
   Package,
-  Package2,
   ShoppingCart,
   LogOut,
   PanelLeftClose,
@@ -51,6 +50,32 @@ const menuItems: MenuItem[] = [
 const catalogUrl =
   import.meta.env.VITE_CATALOG_URL ?? "https://platinum-web-six.vercel.app";
 
+const sidebarNavIdle =
+  "text-white/70 transition-all hover:bg-white/10 hover:text-white";
+const sidebarNavActive =
+  "bg-brand-orange text-[#002858] hover:bg-[#D9680F] hover:text-[#002858] [&_svg]:text-[#002858]";
+
+const BrandLogo = ({
+  showLabel,
+  variant = "dark",
+}: {
+  showLabel: boolean;
+  variant?: "dark" | "light";
+}) => (
+  <div
+    className={`flex items-center gap-2 font-semibold ${
+      variant === "light" ? "text-white" : "text-brand-navy"
+    }`}
+  >
+    <img
+      src="/favicon-platinum.svg"
+      alt="Platinum Driveline"
+      className="h-8 w-8 shrink-0 object-contain"
+    />
+    {showLabel ? <span className="truncate">Platinum Driveline</span> : null}
+  </div>
+);
+
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const [menuLarge, setMenuLarge] = useState<boolean>(false);
   const { signOut } = useAuthContext();
@@ -80,11 +105,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       to={href}
       className={({ isActive }) =>
         menuLarge
-          ? `flex items-center gap-3 rounded-lg px-3 py-3 my-2 first:mt-0 text-muted-foreground transition-all hover:text-primary ${
-              isActive ? "bg-black text-white hover:text-slate-300" : ""
+          ? `flex items-center gap-3 rounded-lg px-3 py-3 my-2 first:mt-0 ${
+              isActive ? sidebarNavActive : sidebarNavIdle
             }`
-          : `flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary ${
-              isActive ? "bg-black text-white hover:text-slate-300" : ""
+          : `flex h-9 w-9 items-center justify-center rounded-lg my-1 ${
+              isActive ? sidebarNavActive : sidebarNavIdle
             }`
       }
     >
@@ -120,7 +145,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     <NavLink
       to={href}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-lg px-3 py-4 text-muted-foreground transition-all hover:text-primary ${isActive ? "bg-black text-white mr-6" : ""
+        `flex items-center gap-3 rounded-lg px-3 py-4 ${
+          isActive ? `${sidebarNavActive} mr-6` : sidebarNavIdle
         }`
       }
     >
@@ -130,8 +156,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 
   const catalogLinkClass = menuLarge
-    ? "flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-muted-foreground transition-all hover:text-primary hover:bg-accent"
-    : "flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary hover:bg-accent";
+    ? `flex items-center gap-3 rounded-lg px-3 py-3 my-2 ${sidebarNavIdle}`
+    : `flex h-9 w-9 items-center justify-center rounded-lg my-1 ${sidebarNavIdle}`;
   const catalogLinkContent = () => (
     <a
       href={catalogUrl}
@@ -149,17 +175,14 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       <div
         className={`${
           !menuLarge ? "w-14 overflow-x-hidden" : "w-[280px]"
-        } hidden border-r bg-muted/40 md:block shrink-0`}
+        } hidden border-r border-white/10 bg-[#002858] md:block shrink-0`}
       >
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div
             className={`${!menuLarge ? "mx-auto px-0" : "px-4 lg:px-6"
-              } flex h-14 items-center border-b lg:h-[60px]`}
+              } flex h-14 items-center border-b border-white/10 lg:h-[60px]`}
           >
-            <div className="flex items-center gap-2 font-semibold">
-              <Package2 className="h-6 w-6" />
-              {menuLarge && <span>Platinum Driveline</span>}
-            </div>
+            <BrandLogo showLabel={menuLarge} variant="light" />
           </div>
           <div className="flex-1 overflow-y-auto">
             <nav
@@ -172,8 +195,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     <div
                       className={
                         menuLarge
-                          ? "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary cursor-pointer hover:bg-accent"
-                          : "flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary cursor-pointer hover:bg-accent"
+                          ? `flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer ${sidebarNavIdle}`
+                          : `flex h-9 w-9 items-center justify-center rounded-lg my-1 cursor-pointer ${sidebarNavIdle}`
                       }
                       onClick={() => setMenuLarge(!menuLarge)}
                     >
@@ -222,7 +245,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className="flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg my-1 text-white/70 transition-all hover:bg-white/10 hover:text-red-300 cursor-pointer"
                           onClick={handleLogout}
                         >
                           <LogOut className="h-4 w-4" />
@@ -242,7 +265,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           ) : (
             <div className="mt-auto p-4">
               <div
-                className="flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-muted-foreground transition-all hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer"
+                className="flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-white/70 transition-all hover:bg-white/10 hover:text-red-300 cursor-pointer"
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4" />
@@ -255,9 +278,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       <header className="p-3 md:p-0">
         <Sheet>
           <div className="flex justify-between">
-            <div className="flex items-center md:hidden gap-2 font-semibold">
-              <Package2 className="h-6 w-6" />
-              <span>Platinum Driveline</span>
+            <div className="flex items-center md:hidden">
+              <BrandLogo showLabel />
             </div>
             <SheetTrigger asChild>
               <Button
@@ -270,7 +292,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               </Button>
             </SheetTrigger>
           </div>
-          <SheetContent side="left" className="flex flex-col">
+          <SheetContent side="left" className="flex flex-col bg-[#002858] text-white border-white/10">
             <nav className="grid gap-2 text-lg font-medium">
               {menuItems.map((item) => (
                 <LinkComponentMobile
@@ -284,7 +306,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 href={catalogUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-lg px-3 py-4 text-muted-foreground transition-all hover:text-primary"
+                className={`flex items-center gap-3 rounded-lg px-3 py-4 ${sidebarNavIdle}`}
               >
                 <ExternalLink className="h-4 w-4" />
                 Ver catálogo
@@ -292,7 +314,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             </nav>
             <div className="mt-auto">
               <div
-                className="flex items-center gap-3 rounded-lg px-3 py-4 text-muted-foreground transition-all hover:text-primary cursor-pointer"
+                className={`flex items-center gap-3 rounded-lg px-3 py-4 cursor-pointer ${sidebarNavIdle} hover:text-red-300`}
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4" />
