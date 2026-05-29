@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import { Item } from "@/models/product";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,17 +10,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Loader2, X } from "lucide-react";
 import { BlogRelatedLinks } from "@/utils/blogRelatedLinks";
 import { getGroupedApplicationSuggestions, getLinkedApplicationDisplayItems, isApplicationGroupFullyLinked, removeApplicationYearFromLinked, type LinkedApplicationDisplayItem } from "@/utils/applicationLabel";
 import SearchCombobox from "@/components/products/SearchCombobox";
 import ProductLinksPicker from "@/components/products/ProductLinksPicker";
+import { mapListProductToItem, productService } from "@/services/productService";
 
 export type RelatedLinksEditorProps = {
-  products: Item[];
-  productsLoading: boolean;
   relatedLinks: BlogRelatedLinks;
   onChange: (next: BlogRelatedLinks) => void;
+  /** Nombres de productos ya guardados (p. ej. al editar). */
+  selectedProductLabels?: Record<string, string>;
+  /** Id de sesión de edición: activa loading en sectionCards solo al abrir el modal. */
+  hydrateSessionKey?: string;
   productPickerLabel?: string;
   productPickerEmptyMessage?: string;
   sectionCards?: boolean;
@@ -30,6 +33,13 @@ export type RelatedLinksEditorProps = {
 
 const toUniqueValues = (values: string[]) =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+
+const SectionLoading = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center gap-3 py-10">
+    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    <p className="text-sm text-muted-foreground">{message}</p>
+  </div>
+);
 
 const SectionWrapper = ({
   title,
@@ -44,12 +54,12 @@ const SectionWrapper = ({
 }) => {
   if (!sectionCards) return <>{children}</>;
   return (
-    <Card className="border shadow-sm min-w-0 overflow-hidden">
+    <Card className="border shadow-sm min-w-0 overflow-visible">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="pt-0">{children}</CardContent>
+      <CardContent className="overflow-visible pt-0">{children}</CardContent>
     </Card>
   );
 };
@@ -220,10 +230,10 @@ const LinkedApplicationChip = ({
 };
 
 export default function RelatedLinksEditor({
-  products,
-  productsLoading,
   relatedLinks,
   onChange,
+  selectedProductLabels,
+  hydrateSessionKey,
   productPickerLabel,
   productPickerEmptyMessage,
   sectionCards = false,
@@ -232,16 +242,84 @@ export default function RelatedLinksEditor({
 }: RelatedLinksEditorProps) {
   const [referenceDraft, setReferenceDraft] = useState("");
   const [applicationDraft, setApplicationDraft] = useState("");
-
-  const selectedProducts = useMemo(
-    () => products.filter((product) => relatedLinks.productIds.includes(product.id)),
-    [products, relatedLinks.productIds]
+  const [selectedProducts, setSelectedProducts] = useState<Item[]>([]);
+  const [sectionLinksLoading, setSectionLinksLoading] = useState(false);
+  const productCacheRef = useRef<Map<string, Item>>(new Map());
+  const pendingInitialSectionLoadRef = useRef(
+    Boolean(hydrateSessionKey && sectionCards)
   );
+
+  useEffect(() => {
+    pendingInitialSectionLoadRef.current = Boolean(hydrateSessionKey && sectionCards);
+    setSectionLinksLoading(false);
+  }, [hydrateSessionKey, sectionCards]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSelectedProducts = async () => {
+      const ids = relatedLinks.productIds;
+      const showSectionLoader =
+        pendingInitialSectionLoadRef.current &&
+        sectionCards &&
+        hydrateSessionKey != null &&
+        ids.length > 0;
+
+      if (ids.length === 0) {
+        setSelectedProducts([]);
+        if (showSectionLoader) setSectionLinksLoading(false);
+        pendingInitialSectionLoadRef.current = false;
+        return;
+      }
+
+      if (showSectionLoader) {
+        setSectionLinksLoading(true);
+      }
+
+      try {
+        const loaded = await Promise.all(
+          ids.map(async (id) => {
+            const cached = productCacheRef.current.get(id);
+            if (cached) return cached;
+
+            const product = await productService.getProductById(id);
+            if (cancelled || !product) return null;
+
+            const item = mapListProductToItem(product);
+            productCacheRef.current.set(id, item);
+            return item;
+          })
+        );
+
+        if (!cancelled) {
+          setSelectedProducts(loaded.filter((item): item is Item => item != null));
+        }
+      } finally {
+        if (!cancelled) {
+          if (showSectionLoader) {
+            setSectionLinksLoading(false);
+          }
+          pendingInitialSectionLoadRef.current = false;
+        }
+      }
+    };
+
+    void loadSelectedProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [relatedLinks.productIds, sectionCards, hydrateSessionKey]);
 
   const showApplications = useMemo(
-    () => products.some((product) => (product.applications?.length ?? 0) > 0),
-    [products]
+    () => selectedProducts.some((product) => (product.applications?.length ?? 0) > 0),
+    [selectedProducts]
   );
+
+  const showApplicationsSection =
+    sectionLinksLoading ||
+    showApplications ||
+    relatedLinks.applications.length > 0;
 
   const referenceSuggestions = useMemo(
     () =>
@@ -348,19 +426,20 @@ export default function RelatedLinksEditor({
   };
 
   const productsSection = (
-    <ProductLinksPicker
-      products={products}
-      productsLoading={productsLoading}
-      productIds={relatedLinks.productIds}
-      onChange={(productIds) => setNext({ ...relatedLinks, productIds })}
-      label={sectionCards ? undefined : productPickerLabel}
-      emptyMessage={productPickerEmptyMessage}
-      searchVariant={productSearchVariant}
-    />
+    <div className="relative z-40 isolate">
+      <ProductLinksPicker
+        productIds={relatedLinks.productIds}
+        onChange={(productIds) => setNext({ ...relatedLinks, productIds })}
+        selectedProductLabels={selectedProductLabels}
+        label={sectionCards ? undefined : productPickerLabel}
+        emptyMessage={productPickerEmptyMessage}
+        searchVariant={productSearchVariant}
+      />
+    </div>
   );
 
   const referencesSection = (
-    <div className="space-y-3">
+    <div className="relative z-10 space-y-3">
       {!sectionCards ? <Label>Referencias vinculadas</Label> : null}
       <div className="flex gap-2">
         {referenceSearchVariant === "combobox" ? (
@@ -434,8 +513,8 @@ export default function RelatedLinksEditor({
     </div>
   );
 
-  const applicationsSection = showApplications ? (
-    <div className="min-w-0 max-w-full space-y-3 overflow-hidden">
+  const applicationsSection = showApplicationsSection ? (
+    <div className="min-w-0 max-w-full space-y-3 overflow-visible">
       {!sectionCards ? <Label>Aplicaciones vinculadas</Label> : null}
       <div className="flex gap-2">
         <Input
@@ -486,31 +565,53 @@ export default function RelatedLinksEditor({
   ) : null;
 
   if (sectionCards) {
+    const linksLoading = sectionLinksLoading;
+
     return (
-      <div className="min-w-0 max-w-full space-y-4 overflow-hidden">
+      <div className="min-w-0 max-w-full space-y-4 overflow-visible">
         <SectionWrapper
           title={productPickerLabel || "Productos vinculados"}
           description="Filtra por categoría y subcategoría, busca y agrega productos."
           sectionCards
         >
-          {productsSection}
+          {linksLoading ? (
+            <SectionLoading message="Cargando productos..." />
+          ) : (
+            productsSection
+          )}
         </SectionWrapper>
         <SectionWrapper
           title="Referencias vinculadas"
           description="Busca en la lista o escribe una referencia manualmente."
           sectionCards
         >
-          {referencesSection}
+          {linksLoading ? (
+            <SectionLoading message="Cargando referencias..." />
+          ) : (
+            referencesSection
+          )}
         </SectionWrapper>
-        {applicationsSection ? (
+        {showApplicationsSection ? (
           <SectionWrapper
             title="Aplicaciones vinculadas"
             description="Agrega el rango completo o selecciona años específicos."
             sectionCards
           >
-            {applicationsSection}
+            {linksLoading ? (
+              <SectionLoading message="Cargando aplicaciones..." />
+            ) : (
+              applicationsSection
+            )}
           </SectionWrapper>
         ) : null}
+      </div>
+    );
+  }
+
+  if (sectionLinksLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionLoading message="Cargando productos, referencias y aplicaciones..." />
       </div>
     );
   }

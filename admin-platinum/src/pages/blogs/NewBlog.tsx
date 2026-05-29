@@ -17,7 +17,6 @@ import MyDropzone from "@/components/Dropzone";
 import MarkdownEditor from "@/components/blogs/MarkdownEditor";
 import BlogPreview from "@/components/blogs/BlogPreview";
 import BlogRelatedLinksEditor from "@/components/blogs/BlogRelatedLinksEditor";
-import { useProductsPicker } from "@/hooks/useProductsPicker";
 import {
   BlogRelatedLinks,
   emptyRelatedLinks,
@@ -38,7 +37,6 @@ const NewBlog = () => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [relatedLinks, setRelatedLinks] = useState<BlogRelatedLinks>(emptyRelatedLinks());
-  const { products, loading: productsLoading } = useProductsPicker();
 
   const hasDescriptionContent = hasRichTextContent(description);
   const hasMainContent = hasRichTextContent(content);
@@ -153,8 +151,6 @@ const NewBlog = () => {
           <div className="space-y-2">
             <Label>Vínculos del blog</Label>
             <BlogRelatedLinksEditor
-              products={products}
-              productsLoading={productsLoading}
               relatedLinks={relatedLinks}
               onChange={setRelatedLinks}
             />
@@ -165,7 +161,7 @@ const NewBlog = () => {
             description={description}
             content={cleanMainContent}
             coverImageUrl={coverImagePreview}
-            relatedLinks={resolveRelatedLinks(relatedLinks, products)}
+            relatedLinks={resolveRelatedLinks(relatedLinks)}
           />
 
           <div className="flex flex-col gap-2 pt-4">

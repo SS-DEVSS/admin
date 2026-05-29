@@ -26,7 +26,6 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
 import { useTs } from "@/hooks/useTs";
-import { useProductsPicker } from "@/hooks/useProductsPicker";
 import { useToast } from "@/hooks/use-toast";
 import RelatedLinksEditor from "@/components/products/RelatedLinksEditor";
 import { TechnicalSheet } from "@/models/technicalSheet";
@@ -90,7 +89,6 @@ const TechincalSheets = () => {
     updateTechnicalSheet,
   } = useTs();
   const getTechnicalSheetsRef = useRef(getTechnicalSheets);
-  const { products, loading: productsLoading } = useProductsPicker();
   const { uploadFile, uploading } = useS3FileManager();
   const { toast } = useToast();
 
@@ -138,6 +136,21 @@ const TechincalSheets = () => {
       (file != null && (file as File).name != null && (file as File).name !== ""),
     [tsForm, file]
   );
+
+  const selectedProductLabelsForEdit = useMemo(() => {
+    if (!isEditMode || !editingTsId) return undefined;
+    const ts = technicalSheets.find((item) => item.id === editingTsId);
+    if (!ts?.products?.length) return undefined;
+
+    const labels: Record<string, string> = {};
+    for (const product of ts.products) {
+      if (!product.id) continue;
+      const sku = product.sku?.trim();
+      const name = product.name?.trim();
+      labels[product.id] = sku || name || product.id;
+    }
+    return labels;
+  }, [isEditMode, editingTsId, technicalSheets]);
 
   const handleFileUpload = async (
     f: File | null
@@ -460,14 +473,14 @@ const TechincalSheets = () => {
                 <Separator />
 
                 <RelatedLinksEditor
-                  products={products}
-                  productsLoading={productsLoading}
                   relatedLinks={{
                     productIds: tsForm.productIds,
                     references: tsForm.references,
                     applications: tsForm.applications,
                   }}
                   onChange={handleRelatedLinksChange}
+                  selectedProductLabels={selectedProductLabelsForEdit}
+                  hydrateSessionKey={isEditMode ? editingTsId : undefined}
                   productPickerLabel="Productos relacionados"
                   productPickerEmptyMessage="Sin productos asociados."
                   sectionCards

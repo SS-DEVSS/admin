@@ -1,8 +1,8 @@
 import { Category } from "@/models/category";
-import axiosClient from "@/services/axiosInstance";
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "./use-toast";
+import { useAuthContext } from "@/context/auth-context";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 
 interface CategoryRespone {
   id: string;
@@ -10,29 +10,35 @@ interface CategoryRespone {
 }
 
 export const useCategories = () => {
-  const client = axiosClient();
+  const client = useAxiosClient();
   const { toast } = useToast();
+  const { authState } = useAuthContext();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [category, setCategory] = useState({});
-  const [loading, setLoading] = useState<boolean>(true); // Start with true to show loader initially
+  const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    getCategories();
-  }, []);
-
-  const getCategories = async () => {
+  const getCategories = useCallback(async () => {
     try {
       setLoading(true);
       const data = await client.get("/categories");
-      setCategories(data.data);
+      setCategories(Array.isArray(data.data) ? data.data : []);
     } catch (error) {
-      // Error handling
+      setCategories([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [client]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated && !authState.loading) {
+      void getCategories();
+    } else if (!authState.loading) {
+      setCategories([]);
+      setLoading(false);
+    }
+  }, [authState.isAuthenticated, authState.loading, getCategories]);
 
   const getCategoryById = async (id: CategoryRespone["id"]) => {
     try {

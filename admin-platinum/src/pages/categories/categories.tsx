@@ -40,8 +40,8 @@ const Categorias = () => {
 
   // Recargar categorías cuando se vuelve a esta página
   useEffect(() => {
-    getCategories();
-  }, [location.pathname]);
+    void getCategories(true);
+  }, [location.pathname, getCategories]);
 
   useEffect(() => {
     if (selectedBrand) {

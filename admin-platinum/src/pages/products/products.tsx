@@ -23,10 +23,11 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useDeferredValue } from "react";
 import { Category } from "@/models/category";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategoryContext } from "@/context/categories-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import DataTable from "@/modules/products/ProductsTable";
+import Loader from "@/components/Loader";
 import {
   Select,
   SelectContent,
@@ -70,7 +71,7 @@ function flattenSearchHits(
 const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { categories = [] } = useCategories();
+  const { categories = [], loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem('products-search-filter');
@@ -89,52 +90,9 @@ const Products = () => {
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
     useState<CatalogVisibilityFilter>("all");
 
-  const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchFilter(value);
-    if (value) {
-      localStorage.setItem('products-search-filter', value);
-    } else {
-      localStorage.removeItem('products-search-filter');
-    }
-  };
-
-  const selectCategoryAndSubcategory = (cat: Category | null, subId: string | null) => {
-    setCategory(cat);
-    setSubcategoryId(subId);
-    if (cat?.id) {
-      localStorage.setItem("products-selected-category", cat.id);
-    } else {
-      localStorage.removeItem("products-selected-category");
-    }
-    setFilterMenuOpen(false);
-  };
-
-  const goBack = () => setDrillStack((prev) => prev.slice(0, -1));
-  const drillIntoCategory = (cat: Category) => setDrillStack((prev) => [...prev, { type: "category", category: cat }]);
-  const drillIntoSubcategory = (cat: Category, node: SubcategoryTreeNode) =>
-    setDrillStack((prev) => [...prev, { type: "subcategory", category: cat, node }]);
-
-  const handleFilterOpenChange = (open: boolean) => {
-    setFilterMenuOpen(open);
-    if (!open) {
-      setDrillStack([]);
-      setFilterMenuSearch("");
-    }
-  };
-
-  const searchQuery = filterMenuSearchDeferred.trim().toLowerCase();
-  const globalSearchHits =
-    searchQuery.length > 0
-      ? flattenSearchHits(categories, subcategoryTreeByCategory).filter((hit) =>
-          hit.label.toLowerCase().includes(searchQuery)
-        )
-      : [];
-  const showGlobalSearch = searchQuery.length > 0;
-
-  // Precargar árbol de subcategorías por categoría para armar el menú jerárquico
+  // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
   useEffect(() => {
-    if (!categories.length) return;
+    if (!filterMenuOpen || !categories.length) return;
 
     let isCancelled = false;
 
@@ -161,15 +119,59 @@ const Products = () => {
       }
     };
 
-    loadAllTrees();
+    void loadAllTrees();
 
     return () => {
       isCancelled = true;
     };
-  }, [categories, getTree]);
+  }, [filterMenuOpen, categories, getTree]);
+
+  const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchFilter(value);
+    if (value) {
+      localStorage.setItem('products-search-filter', value);
+    } else {
+      localStorage.removeItem('products-search-filter');
+    }
+  };
+
+  const selectCategoryAndSubcategory = (cat: Category | null, subId: string | null) => {
+    setCategory(cat);
+    setSubcategoryId(subId);
+    if (cat?.id) {
+      localStorage.setItem("products-selected-category", cat.id);
+    } else {
+      localStorage.setItem("products-selected-category", "all");
+    }
+    setFilterMenuOpen(false);
+  };
+
+  const goBack = () => setDrillStack((prev) => prev.slice(0, -1));
+  const drillIntoCategory = (cat: Category) => setDrillStack((prev) => [...prev, { type: "category", category: cat }]);
+  const drillIntoSubcategory = (cat: Category, node: SubcategoryTreeNode) =>
+    setDrillStack((prev) => [...prev, { type: "subcategory", category: cat, node }]);
+
+  const handleFilterOpenChange = (open: boolean) => {
+    setFilterMenuOpen(open);
+    if (!open) {
+      setDrillStack([]);
+      setFilterMenuSearch("");
+    }
+  };
+
+  const searchQuery = filterMenuSearchDeferred.trim().toLowerCase();
+  const globalSearchHits =
+    searchQuery.length > 0
+      ? flattenSearchHits(categories, subcategoryTreeByCategory).filter((hit) =>
+          hit.label.toLowerCase().includes(searchQuery)
+        )
+      : [];
+  const showGlobalSearch = searchQuery.length > 0;
 
   useEffect(() => {
     if (categories.length === 0) return;
+
     const fromUrl = searchParams.get('categoryId');
     const subFromUrl = searchParams.get('subcategoryId');
     if (fromUrl) {
@@ -182,12 +184,21 @@ const Products = () => {
     }
 
     const savedCategoryId = localStorage.getItem("products-selected-category");
-    const savedCategory = savedCategoryId ? categories.find((cat) => cat.id === savedCategoryId) : null;
+    if (savedCategoryId === "all") {
+      setCategory(null);
+      setSubcategoryId(null);
+      return;
+    }
+
+    const savedCategory = savedCategoryId
+      ? categories.find((cat) => cat.id === savedCategoryId)
+      : null;
+
     if (savedCategory) {
       setCategory(savedCategory);
-    } else {
+    } else if (!category?.id) {
       setCategory(categories[0]);
-      localStorage.setItem('products-selected-category', categories[0].id || '');
+      localStorage.setItem("products-selected-category", categories[0].id || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories]);
@@ -533,12 +544,16 @@ const Products = () => {
             </div>
           </CardHeader>
           <div>
-            <DataTable
-              category={category}
-              searchFilter={searchFilter}
-              subcategoryId={subcategoryId}
-              catalogVisibilityFilter={catalogVisibilityFilter}
-            />
+            {categoriesLoading && categories.length === 0 ? (
+              <Loader message="Cargando categorías..." />
+            ) : (
+              <DataTable
+                category={category}
+                searchFilter={searchFilter}
+                subcategoryId={subcategoryId}
+                catalogVisibilityFilter={catalogVisibilityFilter}
+              />
+            )}
           </div>
         </Card>
       </div>

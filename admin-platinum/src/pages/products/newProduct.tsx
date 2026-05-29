@@ -18,7 +18,7 @@ const NewProduct = () => {
   const { id } = useParams();
   const isEditMode = !!id;
   const navigate = useNavigate();
-  const { getProductById, createProduct, updateProduct, getProducts, loading: productsLoading } = useProducts();
+  const { getProductById, createProduct, updateProduct } = useProducts();
   const { categories } = useCategoryContext();
   const { toast } = useToast();
   const [currentProduct, setCurrentProduct] = useState<any>(null);
@@ -525,8 +525,6 @@ const NewProduct = () => {
           description: "El producto se ha creado correctamente. Puedes importar referencias y aplicaciones desde las secciones de importación.",
         });
 
-        // Refresh products list to show the new product
-        await getProducts();
       }
 
       // Ensure loader is shown for at least 800ms for better UX
@@ -558,7 +556,7 @@ const NewProduct = () => {
     }
   };
 
-  if (isLoadingProduct || (isEditMode && !currentProduct && productsLoading)) {
+  if (isLoadingProduct) {
     return <Loader fullScreen message="Cargando producto..." />;
   }
 

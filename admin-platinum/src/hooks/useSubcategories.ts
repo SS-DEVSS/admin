@@ -1,7 +1,7 @@
 /** Hook: subcategory API (getTree, getByCategoryId, create, update, remove). Normalizes tree response to camelCase + children. */
 import { useState, useCallback } from "react";
-import axiosClient from "@/services/axiosInstance";
-import { useToast } from "./use-toast";
+import { useAxiosClient } from "./useAxiosClient";
+import { toast } from "./use-toast";
 import type { Subcategory, SubcategoryTreeNode } from "../models/subcategory";
 
 function normalizeTreeNode(raw: any): SubcategoryTreeNode {
@@ -45,8 +45,7 @@ export type UpdateSubcategoryPayload = {
 };
 
 export const useSubcategories = () => {
-  const client = axiosClient();
-  const { toast } = useToast();
+  const client = useAxiosClient();
   const [loading, setLoading] = useState(false);
 
   const getTree = useCallback(async (categoryId: string): Promise<SubcategoryTreeNode[]> => {
@@ -55,7 +54,7 @@ export const useSubcategories = () => {
     });
     if (!Array.isArray(data)) return [];
     return data.map(normalizeTreeNode);
-  }, []);
+  }, [client]);
 
   const getByCategoryId = useCallback(async (
     categoryId: string
@@ -64,7 +63,7 @@ export const useSubcategories = () => {
       params: { categoryId },
     });
     return Array.isArray(data) ? data : [];
-  }, []);
+  }, [client]);
 
   const create = async (
     payload: CreateSubcategoryPayload

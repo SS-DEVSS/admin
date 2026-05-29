@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import { Link, useNavigate } from "react-router-dom";
 import { Item, Variant } from "@/models/product";
-import { useProducts } from "@/hooks/useProducts";
 import { Category } from "@/models/category";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -45,8 +44,8 @@ import {
 } from "@/components/ui/dialog";
 import MyDropzone from "@/components/Dropzone";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
-import { useToast } from "@/hooks/use-toast";
-import axiosClient from "@/services/axiosInstance";
+import { toast } from "@/hooks/use-toast";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
 import { convertImageToWebP } from "@/utils/imageConverter";
 import FeatureProductModal from "@/components/products/FeatureProductModal";
 import { Product } from "@/models/product";
@@ -79,15 +78,14 @@ const DataTable = ({
   const uploadInProgressRef = useRef(false);
   const lastUploadedFileRef = useRef<string>("");
   const { uploading } = useS3FileManager();
-  const { toast } = useToast();
-  const client = axiosClient();
+  const client = useAxiosClient();
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
   const [selectedProductForFeature, setSelectedProductForFeature] = useState<Product | null>(null);
   const [selectedProductApplications, setSelectedProductApplications] = useState<Application[]>([]);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const { getProductById } = useProducts();
+  const { getProductById } = productService;
 
   const [products, setProducts] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,34 +110,44 @@ const DataTable = ({
     return () => clearTimeout(timer);
   }, [searchFilter]);
 
-  // Fetch products by category with pagination and search
+  // Fetch products (by category or all when no category selected)
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!category?.id) {
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
-        const params: Record<string, any> = {
+        const params: Record<string, string | number | boolean> = {
           page,
           pageSize,
+          includeHidden: true,
         };
 
         if (debouncedSearch && debouncedSearch.trim()) {
           params.search = debouncedSearch.trim();
         }
-        if (subcategoryId && subcategoryId.trim()) {
-          params.idSubcategory = subcategoryId.trim();
-        }
-        params.includeHidden = true;
         if (catalogVisibilityFilter !== "all") {
           params.catalogVisibility = catalogVisibilityFilter;
         }
 
-        const response = await client.get(`/products/category/${category.id}`, { params });
+        let response;
+        if (category?.id) {
+          if (subcategoryId && subcategoryId.trim()) {
+            params.idSubcategory = subcategoryId.trim();
+          }
+          response = await client.get(`/products/category/${category.id}`, {
+            params,
+            timeout: 120000,
+          });
+        } else {
+          response = await client.get("/products", {
+            params: {
+              page: params.page,
+              pageSize: params.pageSize,
+              ...(params.search ? { search: params.search } : {}),
+            },
+            timeout: 120000,
+          });
+        }
+
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
 
         setProducts(fetchedProducts || []);
@@ -147,6 +155,17 @@ const DataTable = ({
         setTotalPages(pages || 1);
       } catch (error) {
         console.error('[ProductsTable] Error fetching products:', error);
+        const msg = error instanceof Error ? error.message : "";
+        const isTimeout = /timeout|ECONNABORTED/i.test(msg);
+        toast({
+          title: isTimeout ? "Tiempo de espera agotado" : "Error al cargar productos",
+          description: isTimeout
+            ? "El servidor tardó demasiado. Intenta de nuevo o elige otra categoría."
+            : category?.id
+              ? "No se pudieron cargar los productos de esta categoría."
+              : "No se pudieron cargar los productos.",
+          variant: "destructive",
+        });
         setProducts([]);
         setTotalItems(0);
         setTotalPages(1);
@@ -156,11 +175,11 @@ const DataTable = ({
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey, client]);
 
   useEffect(() => {
     setPage(1);
-  }, [catalogVisibilityFilter]);
+  }, [category?.id, subcategoryId, catalogVisibilityFilter]);
 
   const getProductIdFromRow = (row: Variant & { _originalItem?: Item | null }) =>
     row._originalItem?.id || row.idProduct || row.id;
@@ -209,7 +228,7 @@ const DataTable = ({
       setCatalogVisibilityPending(false);
       setCatalogVisibilityTargetIds([]);
     }
-  }, [toast]);
+  }, []);
 
   const handleImageClick = (variant: Variant) => {
     setSelectedVariant(variant);
@@ -1253,7 +1272,7 @@ const DataTable = ({
             // Refetch the specific product to get updated featured status
             const updatedProduct = await getProductById(selectedProductForFeature.id);
             if (updatedProduct) {
-              setSelectedProductForFeature(updatedProduct);
+              setSelectedProductForFeature(updatedProduct as unknown as Product);
             }
           }
         }}
