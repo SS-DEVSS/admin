@@ -137,6 +137,21 @@ const TechincalSheets = () => {
     [tsForm, file]
   );
 
+  const selectedProductLabelsForEdit = useMemo(() => {
+    if (!isEditMode || !editingTsId) return undefined;
+    const ts = technicalSheets.find((item) => item.id === editingTsId);
+    if (!ts?.products?.length) return undefined;
+
+    const labels: Record<string, string> = {};
+    for (const product of ts.products) {
+      if (!product.id) continue;
+      const sku = product.sku?.trim();
+      const name = product.name?.trim();
+      labels[product.id] = sku || name || product.id;
+    }
+    return labels;
+  }, [isEditMode, editingTsId, technicalSheets]);
+
   const handleFileUpload = async (
     f: File | null
   ): Promise<string | null> => {
@@ -464,6 +479,8 @@ const TechincalSheets = () => {
                     applications: tsForm.applications,
                   }}
                   onChange={handleRelatedLinksChange}
+                  selectedProductLabels={selectedProductLabelsForEdit}
+                  hydrateSessionKey={isEditMode ? editingTsId : undefined}
                   productPickerLabel="Productos relacionados"
                   productPickerEmptyMessage="Sin productos asociados."
                   sectionCards

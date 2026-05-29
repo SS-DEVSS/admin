@@ -78,8 +78,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     <NavLink
       to={href}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-lg px-3 py-3 my-2 first:mt-0 text-muted-foreground transition-all hover:text-primary ${isActive ? "bg-black text-white hover:text-slate-300" : ""
-        }`
+        menuLarge
+          ? `flex items-center gap-3 rounded-lg px-3 py-3 my-2 first:mt-0 text-muted-foreground transition-all hover:text-primary ${
+              isActive ? "bg-black text-white hover:text-slate-300" : ""
+            }`
+          : `flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary ${
+              isActive ? "bg-black text-white hover:text-slate-300" : ""
+            }`
       }
     >
       {!menuLarge ? (
@@ -123,25 +128,27 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     </NavLink>
   );
 
-  const catalogLinkClass =
-    "flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-muted-foreground transition-all hover:text-primary hover:bg-accent";
-  const catalogLinkContent = (compact: boolean) => (
+  const catalogLinkClass = menuLarge
+    ? "flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-muted-foreground transition-all hover:text-primary hover:bg-accent"
+    : "flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary hover:bg-accent";
+  const catalogLinkContent = () => (
     <a
       href={CATALOG_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className={compact ? `${catalogLinkClass} inline-flex` : `${catalogLinkClass} mr-0`}
+      className={catalogLinkClass}
     >
       <ExternalLink className="h-4 w-4 shrink-0" />
-      {!compact && <span>Ver catálogo</span>}
+      {menuLarge && <span>Ver catálogo</span>}
     </a>
   );
 
   return (
     <div className="flex-col md:flex md:flex-row h-screen w-full">
       <div
-        className={`${!menuLarge ? "w-12" : "w-[280px]"
-          } hidden border-r bg-muted/40 md:block shrink-0 relative z-[9999]`}
+        className={`${
+          !menuLarge ? "w-14 overflow-x-hidden" : "w-[280px]"
+        } hidden border-r bg-muted/40 md:block shrink-0`}
       >
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div
@@ -162,7 +169,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary cursor-pointer hover:bg-accent"
+                      className={
+                        menuLarge
+                          ? "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary cursor-pointer hover:bg-accent"
+                          : "flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary cursor-pointer hover:bg-accent"
+                      }
                       onClick={() => setMenuLarge(!menuLarge)}
                     >
                       {menuLarge ? (
@@ -177,7 +188,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     <p>{menuLarge ? "Colapsar menú lateral" : "Expandir menú lateral"}</p>
                   </TooltipContent>
                 </Tooltip>
-                <section className="flex-1 min-h-0 overflow-y-auto py-1">
+                <section
+                  className={`flex-1 min-h-0 overflow-y-auto py-1 ${
+                    !menuLarge ? "flex flex-col items-center px-1" : ""
+                  }`}
+                >
                   {menuItems.map((item) => (
                     <LinkComponent
                       key={item.href}
@@ -190,14 +205,14 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     {!menuLarge ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          {catalogLinkContent(true)}
+                          {catalogLinkContent()}
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Ver catálogo</p>
                         </TooltipContent>
                       </Tooltip>
                     ) : (
-                      catalogLinkContent(false)
+                      catalogLinkContent()
                     )}
                   </div>
                 </section>
@@ -206,7 +221,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className="flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-muted-foreground transition-all hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer"
                           onClick={handleLogout}
                         >
                           <LogOut className="h-4 w-4" />

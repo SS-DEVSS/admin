@@ -11,6 +11,9 @@ type SearchComboboxProps = {
   emptyMessage?: string;
   maxOptions?: number;
   className?: string;
+  loading?: boolean;
+  /** Tras elegir una opción, mantener el listado abierto (p. ej. agregar varios productos). */
+  keepOpenAfterSelect?: boolean;
 };
 
 export default function SearchCombobox({
@@ -23,9 +26,13 @@ export default function SearchCombobox({
   emptyMessage = "No hay opciones que coincidan.",
   maxOptions = 80,
   className,
+  loading = false,
+  keepOpenAfterSelect = false,
 }: SearchComboboxProps) {
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredOptions = useMemo(() => {
     const query = value.trim().toLowerCase();
@@ -34,6 +41,15 @@ export default function SearchCombobox({
       : options;
     return base.slice(0, maxOptions);
   }, [value, options, maxOptions]);
+
+  const updatePlacement = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setOpenUpward(spaceBelow < 220 && spaceAbove > spaceBelow);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,18 +62,27 @@ export default function SearchCombobox({
   }, []);
 
   const openDropdown = () => {
-    if (!disabled) setOpen(true);
+    if (disabled) return;
+    updatePlacement();
+    setOpen(true);
   };
 
+  const showDropdown = open && !disabled;
+
   return (
-    <div ref={containerRef} className={`relative ${className ?? ""}`}>
+    <div
+      ref={containerRef}
+      className={`relative ${showDropdown ? "z-50" : "z-0"} ${className ?? ""}`}
+    >
       <Input
+        ref={inputRef}
         value={value}
         onChange={(e) => {
           onValueChange(e.target.value);
           openDropdown();
         }}
         onClick={openDropdown}
+        onFocus={openDropdown}
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
@@ -65,20 +90,31 @@ export default function SearchCombobox({
           if (e.key === "Escape") setOpen(false);
         }}
       />
-      {open && !disabled ? (
-        <div className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
-          {filteredOptions.length === 0 ? (
+      {showDropdown ? (
+        <div
+          className={`absolute z-[100] w-full overflow-y-auto rounded-md border border-border bg-background shadow-lg ${
+            openUpward ? "bottom-full mb-1 max-h-60" : "top-full mt-1 max-h-72"
+          }`}
+        >
+          {loading ? (
+            <p className="px-3 py-2 text-sm text-muted-foreground">Cargando opciones...</p>
+          ) : filteredOptions.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">{emptyMessage}</p>
           ) : (
             filteredOptions.map((option) => (
               <button
                 key={option}
                 type="button"
-                className="flex w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                className="flex w-full bg-background px-3 py-2 text-left text-sm hover:bg-muted"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onSelect(option);
-                  setOpen(false);
+                  if (keepOpenAfterSelect) {
+                    updatePlacement();
+                    setOpen(true);
+                  } else {
+                    setOpen(false);
+                  }
                 }}
               >
                 {option}
@@ -89,4 +125,4 @@ export default function SearchCombobox({
       ) : null}
     </div>
   );
-}
+};

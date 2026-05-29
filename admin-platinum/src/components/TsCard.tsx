@@ -219,14 +219,9 @@ const TsCard = ({
                   {displayApplications.length > 0 ? (
                     <div>
                       <p className="text-sm font-semibold mb-1">Aplicaciones</p>
-                      <ul className="space-y-2 text-sm text-muted-foreground">
+                      <ul className="list-disc pl-5 text-sm text-muted-foreground">
                         {displayApplications.map((application) => (
-                          <li
-                            key={application.key}
-                            className="rounded-md border bg-muted/20 px-3 py-2 break-words"
-                          >
-                            {application.displayLabel}
-                          </li>
+                          <li key={application.key}>{application.displayLabel}</li>
                         ))}
                       </ul>
                     </div>

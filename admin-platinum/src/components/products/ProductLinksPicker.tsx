@@ -1,10 +1,11 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Item } from "@/models/product";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, X } from "lucide-react";
 import SearchCombobox from "@/components/products/SearchCombobox";
+import SubcategoryTreePicker from "@/components/products/SubcategoryTreePicker";
 import { useCategoryContext } from "@/context/categories-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
@@ -23,23 +24,22 @@ type ProductLinksPickerProps = {
 
 const getProductSku = (product: Item) => product.variants?.[0]?.sku?.trim() || "";
 
-const flattenSubcategoryOptions = (nodes: SubcategoryTreeNode[]): [string, string][] => {
-  const result: [string, string][] = [];
-  const walk = (items: SubcategoryTreeNode[]) => {
-    for (const node of items) {
-      const id = node.id?.trim();
-      const name = node.name?.trim();
-      if (id && name) result.push([id, name]);
-      if (node.children?.length) walk(node.children);
-    }
-  };
-  walk(nodes);
-  return result.sort((a, b) => a[1].localeCompare(b[1]));
+const formatProductOption = (product: Item) => {
+  const name = product.name?.trim() || "";
+  const sku = getProductSku(product);
+  if (!sku) return name;
+  if (sku.toLowerCase() === name.toLowerCase()) return name;
+  return `${name} (${sku})`;
 };
 
-const formatProductOption = (product: Item) => {
-  const sku = getProductSku(product);
-  return sku ? `${product.name} (${sku})` : product.name;
+/** Corrige etiquetas cacheadas tipo "SKU (SKU)". */
+const normalizeProductLabel = (label: string) => {
+  const trimmed = label.trim();
+  const match = trimmed.match(/^(.+?) \((.+)\)$/);
+  if (match && match[1].trim().toLowerCase() === match[2].trim().toLowerCase()) {
+    return match[1].trim();
+  }
+  return trimmed;
 };
 
 export default function ProductLinksPicker({
@@ -56,12 +56,25 @@ export default function ProductLinksPicker({
 
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("all");
   const [subcategoryTree, setSubcategoryTree] = useState<SubcategoryTreeNode[]>([]);
   const [categoryProducts, setCategoryProducts] = useState<Item[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const labelCacheRef = useRef<Record<string, string>>({});
+  const [, setLabelCacheTick] = useState(0);
+
+  const setCachedLabel = useCallback((id: string, label: string) => {
+    if (!id || !label || labelCacheRef.current[id] === label) return;
+    labelCacheRef.current[id] = label;
+    setLabelCacheTick((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    for (const [id, label] of Object.entries(selectedProductLabels)) {
+      if (id && label) setCachedLabel(id, label);
+    }
+  }, [selectedProductLabels, setCachedLabel]);
 
   const categoryOptions = useMemo(
     () =>
@@ -76,11 +89,6 @@ export default function ProductLinksPicker({
     if (selectedCategoryId || categoryOptions.length === 0) return;
     setSelectedCategoryId(categoryOptions[0][0]);
   }, [categoryOptions, selectedCategoryId]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(productSearch.trim()), 400);
-    return () => clearTimeout(timer);
-  }, [productSearch]);
 
   useEffect(() => {
     if (!selectedCategoryId) {
@@ -98,11 +106,6 @@ export default function ProductLinksPicker({
     };
   }, [selectedCategoryId, getTree]);
 
-  const subcategoryOptions = useMemo(
-    () => flattenSubcategoryOptions(subcategoryTree),
-    [subcategoryTree]
-  );
-
   const loadCategoryProducts = useCallback(async () => {
     if (!selectedCategoryId) {
       setCategoryProducts([]);
@@ -114,7 +117,6 @@ export default function ProductLinksPicker({
       const first = await productService.getProductsByCategory(selectedCategoryId, {
         page: 1,
         pageSize: 100,
-        search: debouncedSearch || undefined,
         idSubcategory:
           selectedSubcategoryId !== "all" ? selectedSubcategoryId : undefined,
       });
@@ -126,7 +128,6 @@ export default function ProductLinksPicker({
           const next = await productService.getProductsByCategory(selectedCategoryId, {
             page,
             pageSize: 100,
-            search: debouncedSearch || undefined,
             idSubcategory:
               selectedSubcategoryId !== "all" ? selectedSubcategoryId : undefined,
           });
@@ -146,11 +147,38 @@ export default function ProductLinksPicker({
     } finally {
       setProductsLoading(false);
     }
-  }, [selectedCategoryId, selectedSubcategoryId, debouncedSearch, toast]);
+  }, [selectedCategoryId, selectedSubcategoryId, toast]);
 
   useEffect(() => {
     void loadCategoryProducts();
   }, [loadCategoryProducts]);
+
+  // Etiquetas de productos ya vinculados (otras categorías o al editar)
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveLabels = async () => {
+      for (const id of productIds) {
+        if (labelCacheRef.current[id] || selectedProductLabels[id]) continue;
+
+        const fromCategory = categoryProducts.find((p) => p.id === id);
+        if (fromCategory) {
+          setCachedLabel(id, formatProductOption(fromCategory));
+          continue;
+        }
+
+        const product = await productService.getProductById(id);
+        if (cancelled || !product) continue;
+        setCachedLabel(id, formatProductOption(mapListProductToItem(product)));
+      }
+    };
+
+    void resolveLabels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productIds, categoryProducts, selectedProductLabels, setCachedLabel]);
 
   const productOptions = useMemo(
     () => categoryProducts.filter((product) => !productIds.includes(product.id)),
@@ -179,6 +207,10 @@ export default function ProductLinksPicker({
 
   const addProductById = (id: string) => {
     if (!id || productIds.includes(id)) return;
+    const product = categoryProducts.find((p) => p.id === id);
+    if (product) {
+      setCachedLabel(id, formatProductOption(product));
+    }
     onChange([...productIds, id]);
     setSelectedProductId("");
     setProductSearch("");
@@ -194,8 +226,9 @@ export default function ProductLinksPicker({
 
   const getChipLabel = (id: string) => {
     const fromList = categoryProducts.find((p) => p.id === id);
-    if (fromList) return fromList.name;
-    if (selectedProductLabels[id]) return selectedProductLabels[id];
+    if (fromList) return formatProductOption(fromList);
+    if (labelCacheRef.current[id]) return normalizeProductLabel(labelCacheRef.current[id]);
+    if (selectedProductLabels[id]) return normalizeProductLabel(selectedProductLabels[id]);
     return id;
   };
 
@@ -222,31 +255,18 @@ export default function ProductLinksPicker({
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       </div>
-      <div className="relative">
-        <select
-          className="h-10 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm disabled:opacity-50"
-          value={selectedSubcategoryId}
-          onChange={(e) => {
-            setSelectedSubcategoryId(e.target.value);
-            setSelectedProductId("");
-          }}
-          disabled={!selectedCategoryId || subcategoryOptions.length === 0}
-        >
-          <option value="all">
-            {!selectedCategoryId
-              ? "Selecciona una categoría"
-              : subcategoryOptions.length === 0
-                ? "Sin subcategorías"
-                : "Todas las subcategorías"}
-          </option>
-          {subcategoryOptions.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      </div>
+      <SubcategoryTreePicker
+        tree={subcategoryTree}
+        value={selectedSubcategoryId}
+        onChange={(subcategoryId) => {
+          setSelectedSubcategoryId(subcategoryId);
+          setSelectedProductId("");
+        }}
+        disabled={!selectedCategoryId}
+        emptyLabel={
+          !selectedCategoryId ? "Selecciona una categoría" : "Sin subcategorías"
+        }
+      />
     </div>
   );
 
@@ -271,9 +291,7 @@ export default function ProductLinksPicker({
 
   const searchPlaceholder = !selectedCategoryId
     ? "Selecciona una categoría primero"
-    : productsLoading
-      ? "Cargando productos..."
-      : "Buscar producto por nombre o SKU...";
+    : "Buscar producto por nombre o SKU...";
 
   return (
     <div className="space-y-3">
@@ -290,11 +308,14 @@ export default function ProductLinksPicker({
           }}
           options={productOptionLabels}
           placeholder={searchPlaceholder}
-          disabled={!selectedCategoryId || productsLoading}
+          disabled={!selectedCategoryId}
+          loading={productsLoading}
           emptyMessage={
             !selectedCategoryId
               ? "Elige una categoría para ver productos."
-              : "No hay productos que coincidan."
+              : productsLoading
+                ? "Cargando productos..."
+                : "No hay productos que coincidan."
           }
         />
       ) : (
@@ -303,7 +324,7 @@ export default function ProductLinksPicker({
             value={productSearch}
             onChange={(e) => setProductSearch(e.target.value)}
             placeholder="Buscar por nombre o SKU"
-            disabled={!selectedCategoryId || productsLoading}
+            disabled={!selectedCategoryId}
           />
           <div className="flex gap-2">
             <div className="relative w-full">
