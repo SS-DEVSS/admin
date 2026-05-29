@@ -34,24 +34,35 @@ const Login = () => {
     try {
       await signIn(email, password);
       navigate("/dashboard/productos");
-    } catch (err: any) {
-      setError(err.message || "Error al iniciar sesión");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al iniciar sesión";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <CredentialsLayout>
+    <CredentialsLayout
+      logo={
+        <img
+          src="/login_back.webp"
+          alt="Platinum Driveline"
+          className="h-20 w-auto max-w-[280px] object-contain opacity-90 sm:h-20"
+        />
+      }
+    >
       <div className="grid gap-2 text-center">
-        <h1 className="text-3xl font-bold">Login</h1>
+        <h1 className="text-3xl font-bold text-brand-navy">Iniciar Sesión</h1>
         <p className="text-balance text-muted-foreground">
           Ingresa las credenciales para acceder al sistema
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="grid gap-4">
+      <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="email">Correo</Label>
+          <Label htmlFor="email" className="text-brand-navy">
+            Correo
+          </Label>
           <Input
             id="email"
             type="email"
@@ -59,32 +70,38 @@ const Login = () => {
             value={email}
             onChange={handleEmailChange}
             required
+            className="border-gray-200 focus-visible:ring-brand-orange"
           />
         </div>
         <div className="grid gap-2">
-          <div className="flex items-center">
-            <Label htmlFor="password">Contraseña</Label>
-            <Link
-              to="/olvide-mi-contrasena"
-              className="ml-auto inline-block text-sm underline"
-            >
-              Recuperar contraseña
-            </Link>
-          </div>
+          <Label htmlFor="password" className="text-brand-navy">
+            Contraseña
+          </Label>
           <Input
             id="password"
             type="password"
             value={password}
             onChange={handlePasswordChange}
             required
+            className="border-gray-200 focus-visible:ring-brand-orange"
           />
         </div>
         {error && (
-          <div className="text-sm text-red-500 text-center">{error}</div>
+          <div className="text-center text-sm text-red-500">{error}</div>
         )}
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Iniciando sesión..." : "Login"}
+        <Button
+          type="submit"
+          className="w-full bg-brand-orange text-white transition-colors duration-200 hover:bg-[#D9680F]"
+          disabled={loading}
+        >
+          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
         </Button>
+        <Link
+          to="/olvide-mi-contrasena"
+          className="block text-center text-sm text-brand-navy underline-offset-4 hover:underline"
+        >
+          Recuperar contraseña
+        </Link>
       </form>
     </CredentialsLayout>
   );
