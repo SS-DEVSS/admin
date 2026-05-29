@@ -25,6 +25,7 @@ module.exports = {
   				navy: '#002858',
   				orange: '#F47D1F',
   			},
+  			placeholderBg: '#999999',
   			redLabel: '#D21A1A',
   			naranja: '#D87E2E',
   			border: 'hsl(var(--border))',

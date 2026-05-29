@@ -685,28 +685,34 @@ const DataTable = ({
         accessorKey: "images",
         header: "",
         meta: { headClassName: "w-12 px-0", cellClassName: "w-12 px-0" },
-        cell: ({ row }: { row: any }) => (
-          <div
-            className="h-10 w-10 bg-white border border-gray-200 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => handleImageClick(row.original)}
-          >
-            {row.getValue("images") && Array.isArray(row.getValue("images")) && row.getValue("images").length > 0 ? (
-              <img
-                className="m-auto aspect-square p-1 w-full h-full object-contain rounded-md cursor-pointer"
-                src={row.getValue("images")[row.getValue("images").length - 1].url}
-                alt={row.original.name}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePreviewImage(row.getValue("images")[row.getValue("images").length - 1].url, row.original);
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-center text-xs text-gray-500">
-                <Upload className="w-4 h-4" />
-              </div>
-            )}
-          </div>
-        ),
+        cell: ({ row }: { row: any }) => {
+          const images = row.getValue("images");
+          const hasImage =
+            images && Array.isArray(images) && images.length > 0 && images[images.length - 1]?.url;
+
+          return (
+            <div
+              className="h-10 w-10 bg-white border border-gray-200 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handleImageClick(row.original)}
+            >
+              {hasImage ? (
+                <img
+                  className="m-auto aspect-square p-1 w-full h-full object-contain rounded-md cursor-pointer"
+                  src={images[images.length - 1].url}
+                  alt={row.original.name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreviewImage(images[images.length - 1].url, row.original);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-center text-xs text-gray-500">
+                  <Upload className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "sku",
