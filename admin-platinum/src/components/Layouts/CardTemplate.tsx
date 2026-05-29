@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   MoreVertical,
   PlusCircle,
@@ -22,6 +23,14 @@ import { Category } from "@/models/category";
 import { Separator } from "../ui/separator";
 import { cleanFilePath } from "@/services/S3FileManager";
 import { Button } from "../ui/button";
+import {
+  getDisplayImageUrl,
+  getImageClassName,
+  IMAGE_PLACEHOLDER_BG,
+  IMAGE_PLACEHOLDER_BG_CLASS,
+  isMissingImageUrl,
+  onImageErrorFallback,
+} from "@/utils/imagePlaceholder";
 
 type CardTemplateProps = {
   category?: Category;
@@ -89,39 +98,40 @@ const CardTemplate = ({
     return null;
   };
 
-  const renderImage = () => {
-    const imageUrl = getImageUrl();
+  const rawImageUrl = getImageUrl();
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
-    if (imageUrl) {
-      return (
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [brand?.id, brand?.logoImgUrl, category?.id, category?.imgUrl]);
+
+  const showPlaceholderStyle =
+    isMissingImageUrl(rawImageUrl) || imageLoadFailed;
+
+  const renderImage = () => {
+    return (
+      <div
+        className={`h-[300px] w-full flex items-center justify-center rounded-t-lg overflow-hidden ${
+          showPlaceholderStyle ? IMAGE_PLACEHOLDER_BG_CLASS : "bg-white"
+        }`}
+        style={
+          showPlaceholderStyle
+            ? { backgroundColor: IMAGE_PLACEHOLDER_BG }
+            : undefined
+        }
+      >
         <img
-          src={imageUrl}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.nextElementSibling?.classList.remove("hidden");
+          src={getDisplayImageUrl(rawImageUrl)}
+          onError={(event) => {
+            setImageLoadFailed(true);
+            onImageErrorFallback(event);
           }}
           alt={`${brand ? brand?.name : category?.name} image`}
-          className="h-[300px] w-full object-cover rounded-t-lg bg-[#D9D9D9] mx-auto"
+          className={getImageClassName(
+            showPlaceholderStyle ? null : rawImageUrl,
+            "max-h-full max-w-full object-contain"
+          )}
         />
-      );
-    }
-
-    // Fallback SVG placeholder
-    return (
-      <div className="h-[300px] w-full flex items-center justify-center bg-gray-200 rounded-t-lg mx-auto">
-        <svg
-          className="w-20 h-20 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
       </div>
     );
   };
@@ -154,21 +164,6 @@ const CardTemplate = ({
         }
       >
         {renderImage()}
-        <div className="hidden h-[300px] w-full flex items-center justify-center bg-gray-200 rounded-t-lg mx-auto">
-          <svg
-            className="w-20 h-20 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-        </div>
         <CardContent className="border-t">
           <div className="flex justify-between items-center pt-8">
             <CardTitle className="!text-xl capitalize">

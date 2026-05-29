@@ -629,6 +629,7 @@ const DataTable = ({
     const baseColumns = [
       {
         id: "select",
+        meta: { headClassName: "w-10 px-2", cellClassName: "w-10 px-2" },
         header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
           <Checkbox
             checked={table.getIsAllPageRowsSelected()}
@@ -650,6 +651,7 @@ const DataTable = ({
       {
         accessorKey: "featured",
         header: "",
+        meta: { headClassName: "w-9 px-0", cellClassName: "w-9 px-0" },
         cell: ({ row }: { row: any }) => {
           const productId = (row.original as any)?._originalItem?.id || (row.original as any)?.idProduct || row.original.id;
 
@@ -664,9 +666,9 @@ const DataTable = ({
           const productApplications = (product as any)?.applications || [];
 
           return (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-start pl-1">
               <Star
-                className={`h-5 w-5 cursor-pointer transition-colors ${isFeatured ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-400"
+                className={`h-4 w-4 cursor-pointer transition-colors ${isFeatured ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-400"
                   }`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -682,32 +684,40 @@ const DataTable = ({
       {
         accessorKey: "images",
         header: "",
-        cell: ({ row }: { row: any }) => (
-          <div
-            className="w-12 h-12 bg-white border border-gray-200 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => handleImageClick(row.original)}
-          >
-            {row.getValue("images") && Array.isArray(row.getValue("images")) && row.getValue("images").length > 0 ? (
-              <img
-                className="m-auto aspect-square p-1 w-full h-full object-contain rounded-md cursor-pointer"
-                src={row.getValue("images")[row.getValue("images").length - 1].url}
-                alt={row.original.name}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePreviewImage(row.getValue("images")[row.getValue("images").length - 1].url, row.original);
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-center text-xs text-gray-500">
-                <Upload className="w-4 h-4" />
-              </div>
-            )}
-          </div>
-        ),
+        meta: { headClassName: "w-12 px-0", cellClassName: "w-12 px-0" },
+        cell: ({ row }: { row: any }) => {
+          const images = row.getValue("images");
+          const hasImage =
+            images && Array.isArray(images) && images.length > 0 && images[images.length - 1]?.url;
+
+          return (
+            <div
+              className="h-10 w-10 bg-white border border-gray-200 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handleImageClick(row.original)}
+            >
+              {hasImage ? (
+                <img
+                  className="m-auto aspect-square p-1 w-full h-full object-contain rounded-md cursor-pointer"
+                  src={images[images.length - 1].url}
+                  alt={row.original.name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreviewImage(images[images.length - 1].url, row.original);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-center text-xs text-gray-500">
+                  <Upload className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "sku",
         header: "SKU",
+        meta: { headClassName: "pl-1 pr-3", cellClassName: "pl-1 pr-3" },
         cell: ({ row }: { row: any }) => {
           const productId = getProductIdFromRow(row.original);
           const skuValue = row.getValue("sku") || row.original?.sku || "";
@@ -731,12 +741,10 @@ const DataTable = ({
       },
     ];
 
-    const initialColumns = baseColumns;
-
-    // Add type column
-    initialColumns.push({
+    const typeColumn = {
       accessorKey: "type",
       header: "Composición",
+      meta: { headClassName: "", cellClassName: "" },
       cell: ({ row }: { row: any }) => {
         return (
           <div>
@@ -744,7 +752,7 @@ const DataTable = ({
           </div>
         );
       },
-    });
+    };
 
     const catalogVisibilityColumn = [
       {
@@ -852,7 +860,8 @@ const DataTable = ({
     ];
 
     return [
-      ...initialColumns,
+      ...baseColumns,
+      typeColumn,
       ...catalogVisibilityColumn,
       ...actionColumn,
     ];
@@ -1085,8 +1094,11 @@ const DataTable = ({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta as
+                    | { headClassName?: string }
+                    | undefined;
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className={meta?.headClassName}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -1120,14 +1132,19 @@ const DataTable = ({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta as
+                      | { cellClassName?: string }
+                      | undefined;
+                    return (
+                    <TableCell key={cell.id} className={meta?.cellClassName}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
                       )}
                     </TableCell>
-                  ))}
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (
