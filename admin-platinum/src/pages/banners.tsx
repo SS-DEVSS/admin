@@ -36,6 +36,10 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
+import {
+  IMAGE_UPLOAD_ACCEPT_LABEL,
+  IMAGE_UPLOAD_MAX_LABEL,
+} from "@/utils/imageUpload";
 
 async function uploadToKey(
   uploadFile: ReturnType<typeof useS3FileManager>["uploadFile"],
@@ -246,6 +250,9 @@ const Banners = () => {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
+              <p className="text-xs text-muted-foreground md:col-span-2 -mt-2">
+                Formatos: {IMAGE_UPLOAD_ACCEPT_LABEL}. Tamaño máximo por imagen: {IMAGE_UPLOAD_MAX_LABEL}.
+              </p>
               <div className="space-y-2" aria-required="true">
                 <div className="flex items-center justify-between gap-2">
                   <Label className="inline-flex items-center gap-1">

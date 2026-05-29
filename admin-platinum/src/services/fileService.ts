@@ -1,4 +1,18 @@
 import axiosClient from './axiosInstance';
+import { convertImageToWebP } from '@/utils/imageConverter';
+import { normalizeImageFile } from '@/utils/imageUpload';
+
+const prepareImageForUpload = async (file: globalThis.File): Promise<globalThis.File> => {
+  const normalized = normalizeImageFile(file);
+  if (!normalized.type.startsWith('image/')) {
+    throw new Error('Formato no reconocido. Usa PNG, JPG/JPEG o WebP.');
+  }
+  try {
+    return await convertImageToWebP(normalized);
+  } catch {
+    return normalized;
+  }
+};
 
 export interface File {
   id: string;
@@ -59,8 +73,9 @@ export const fileService = {
     type: 'image' | 'document'
   ): Promise<{ id: string; url: string; key: string }> => {
     const client = axiosClient();
+    const fileToSend = type === 'image' ? await prepareImageForUpload(file) : file;
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', fileToSend);
 
     const endpoint = type === 'document' ? '/files/documents' : '/files/images';
     const response = await client.post<{ id: string; url: string; key: string }>(endpoint, formData, {

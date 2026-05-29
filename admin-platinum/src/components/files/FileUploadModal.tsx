@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, Image as ImageIcon, FileText, Loader2, X } from 'lucide-react';
 import { useFilesContext } from '@/context/files-context';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeImageFile } from '@/utils/imageUpload';
 
 type FileType = 'image' | 'document';
 
@@ -44,10 +45,14 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
   const onDrop = useCallback(
     (acceptedFiles: globalThis.File[]) => {
       if (acceptedFiles.length > 0) {
-        setSelectedFiles((prev) => [...prev, ...acceptedFiles]);
+        const next =
+          fileType === 'image'
+            ? acceptedFiles.map((file) => normalizeImageFile(file))
+            : acceptedFiles;
+        setSelectedFiles((prev) => [...prev, ...next]);
       }
     },
-    []
+    [fileType]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -83,8 +88,17 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
       if (onUploadComplete) {
         onUploadComplete();
       }
-    } catch (error) {
-      console.error('Upload error:', error);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string }; status?: number } };
+      const errorMessage =
+        axiosErr.response?.data?.error ??
+        (err instanceof Error ? err.message : 'Error al subir los archivos');
+      console.error('Upload error:', err);
+      toast({
+        title: axiosErr.response?.status === 400 ? 'Archivo no válido' : 'Error al subir',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     } finally {
       setIsUploading(false);
     }
