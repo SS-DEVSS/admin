@@ -21,6 +21,10 @@ module.exports = {
   	},
   	extend: {
   		colors: {
+  			brand: {
+  				navy: '#002858',
+  				orange: '#F47D1F',
+  			},
   			redLabel: '#D21A1A',
   			naranja: '#D87E2E',
   			border: 'hsl(var(--border))',
