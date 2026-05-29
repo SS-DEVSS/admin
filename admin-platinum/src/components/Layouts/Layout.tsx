@@ -48,7 +48,8 @@ const menuItems: MenuItem[] = [
   // { href: "/ajustes", icon: Settings, text: "Ajustes" },
 ];
 
-const CATALOG_URL = "https://platinum-web-six.vercel.app";
+const catalogUrl =
+  import.meta.env.VITE_CATALOG_URL ?? "https://platinum-web-six.vercel.app";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const [menuLarge, setMenuLarge] = useState<boolean>(false);
@@ -133,7 +134,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     : "flex h-9 w-9 items-center justify-center rounded-lg my-1 text-muted-foreground transition-all hover:text-primary hover:bg-accent";
   const catalogLinkContent = () => (
     <a
-      href={CATALOG_URL}
+      href={catalogUrl}
       target="_blank"
       rel="noopener noreferrer"
       className={catalogLinkClass}
@@ -280,7 +281,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 />
               ))}
               <a
-                href={CATALOG_URL}
+                href={catalogUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 rounded-lg px-3 py-4 text-muted-foreground transition-all hover:text-primary"
