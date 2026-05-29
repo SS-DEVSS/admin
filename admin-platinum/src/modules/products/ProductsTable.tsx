@@ -741,12 +741,10 @@ const DataTable = ({
       },
     ];
 
-    const initialColumns = baseColumns;
-
-    // Add type column
-    initialColumns.push({
+    const typeColumn = {
       accessorKey: "type",
       header: "Composición",
+      meta: { headClassName: "", cellClassName: "" },
       cell: ({ row }: { row: any }) => {
         return (
           <div>
@@ -754,7 +752,7 @@ const DataTable = ({
           </div>
         );
       },
-    });
+    };
 
     const catalogVisibilityColumn = [
       {
@@ -862,7 +860,8 @@ const DataTable = ({
     ];
 
     return [
-      ...initialColumns,
+      ...baseColumns,
+      typeColumn,
       ...catalogVisibilityColumn,
       ...actionColumn,
     ];

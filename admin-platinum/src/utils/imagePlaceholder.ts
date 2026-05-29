@@ -18,7 +18,10 @@ export function isMissingImageUrl(url: string | null | undefined): boolean {
 }
 
 export function getDisplayImageUrl(url: string | null | undefined): string {
-  return isMissingImageUrl(url) ? IMAGE_PLACEHOLDER : url.trim();
+  if (url == null || typeof url !== "string" || isMissingImageUrl(url)) {
+    return IMAGE_PLACEHOLDER;
+  }
+  return url.trim();
 }
 
 export function getImageClassName(
