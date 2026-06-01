@@ -1,5 +1,6 @@
 import axiosClient from "./axiosInstance";
 import { convertImageToWebP } from "@/utils/imageConverter";
+import { normalizeImageFile } from "@/utils/imageUpload";
 
 export const cleanFilePath = (
   path: string | null | undefined,
@@ -24,10 +25,10 @@ export const uploadFileToS3 = async (
   const client = axiosClient();
   
   // Convertir imagen a WebP si es una imagen (no documentos PDF)
-  let fileToUpload = file;
-  if (!prefix.includes("documents") && file.type.startsWith("image/")) {
+  let fileToUpload = normalizeImageFile(file);
+  if (!prefix.includes("documents") && fileToUpload.type.startsWith("image/")) {
     try {
-      fileToUpload = await convertImageToWebP(file);
+      fileToUpload = await convertImageToWebP(fileToUpload);
     } catch (error) {
       console.error("[S3FileManager] Error al convertir imagen a WebP, subiendo original:", error);
       // Si falla la conversión, subir el archivo original

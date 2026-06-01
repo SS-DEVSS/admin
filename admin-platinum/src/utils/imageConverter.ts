@@ -2,11 +2,13 @@
  * Convierte una imagen a formato WebP
  * @param file - Archivo de imagen a convertir
  * @param quality - Calidad de compresión (0-1), por defecto 0.85
+ * @param maxDimension - Lado máximo en px (mantiene proporción)
  * @returns Promise<File> - Archivo WebP convertido
  */
 export const convertImageToWebP = async (
   file: File,
-  quality: number = 0.85
+  quality: number = 0.85,
+  maxDimension: number = 1920
 ): Promise<File> => {
   return new Promise((resolve, reject) => {
     // Verificar que sea una imagen
@@ -26,21 +28,25 @@ export const convertImageToWebP = async (
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // Crear canvas
         const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // Dibujar imagen en canvas
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('No se pudo crear el contexto del canvas'));
           return;
         }
 
-        ctx.drawImage(img, 0, 0);
+        let targetWidth = img.width;
+        let targetHeight = img.height;
+        if (targetWidth > maxDimension || targetHeight > maxDimension) {
+          const ratio = Math.min(maxDimension / targetWidth, maxDimension / targetHeight);
+          targetWidth = Math.round(targetWidth * ratio);
+          targetHeight = Math.round(targetHeight * ratio);
+        }
 
-        // Convertir a WebP
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
         canvas.toBlob(
           (blob) => {
             if (!blob) {
