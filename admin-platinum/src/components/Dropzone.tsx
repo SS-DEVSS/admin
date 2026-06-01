@@ -93,7 +93,7 @@ const MyDropzone = ({
             "image/jpeg": [".jpg", ".jpeg"],
           }
         : IMAGE_UPLOAD_ACCEPT,
-    maxSize: type === "document" ? 5 * 1024 * 1024 : IMAGE_UPLOAD_MAX_BYTES,
+    maxSize: type === "document" ? 70 * 1024 * 1024 : IMAGE_UPLOAD_MAX_BYTES,
   });
 
   const test = (path: string | undefined): string => {

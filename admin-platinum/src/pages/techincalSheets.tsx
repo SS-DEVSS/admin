@@ -445,7 +445,7 @@ const TechincalSheets = () => {
                       <span className="text-red-500">*</span> Archivo (PDF o documento)
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Formatos permitidos: PDF, JPG y PNG. Tamaño maximo recomendado: 5 MB.
+                      Formatos permitidos: PDF, JPG y PNG. Tamaño maximo recomendado: 70 MB.
                       {isEditMode
                         ? " Deja vacío para conservar el documento actual; elige un archivo solo si deseas reemplazarlo."
                         : null}
