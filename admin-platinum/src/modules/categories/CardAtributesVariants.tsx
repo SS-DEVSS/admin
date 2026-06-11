@@ -83,6 +83,7 @@ interface AttributeFormType {
   scope?: AttributeScope;
   visibleInCatalog?: boolean;
   visibleInProductDetail?: boolean;
+  filterRequired?: boolean;
 }
 
 const AttributeFormInitialState = {
@@ -230,6 +231,18 @@ const CardAtributesVariants = ({
     setCurrentAttribute(null);
     setDialogMode("add");
     setIsDialogOpen(true);
+
+    if (type === AttributeScope.APPLICATION) {
+      const sortedApp = [...attributes.applicationAttributes].sort(
+        (a, b) => (a.order ?? 0) - (b.order ?? 0)
+      );
+      const previousApp = sortedApp[sortedApp.length - 1];
+      const canBeFilterRequired = sortedApp.length === 0 || previousApp.filterRequired !== false;
+      setAttributeForm({
+        ...AttributeFormInitialState,
+        filterRequired: canBeFilterRequired,
+      });
+    }
   };
 
   const handleAddPredefinedField = (displayName: string, fieldType: string, csvName: string) => {
@@ -250,6 +263,7 @@ const CardAtributesVariants = ({
       order: order,
       visibleInCatalog: true,
       visibleInProductDetail: true,
+      ...(type === AttributeScope.APPLICATION ? { filterRequired: true } : {}),
     };
 
     setForm((prev) => ({
@@ -298,6 +312,7 @@ const CardAtributesVariants = ({
       scope: attribute.scope as AttributeScope | undefined,
       visibleInCatalog: attribute.visibleInCatalog ?? true,
       visibleInProductDetail: attribute.visibleInProductDetail ?? true,
+      filterRequired: attribute.filterRequired !== false,
     });
   };
 
@@ -395,24 +410,67 @@ const CardAtributesVariants = ({
       order: dialogMode === "add" ? order : (attributeForm.order ?? currentAttribute?.order ?? 0),
       visibleInCatalog: attributeForm.visibleInCatalog ?? true,
       visibleInProductDetail: attributeForm.visibleInProductDetail ?? true,
+      ...(type === AttributeScope.APPLICATION
+        ? { filterRequired: attributeForm.filterRequired !== false }
+        : {}),
       ...(dialogMode === "edit" && currentAttribute?.id ? { id: currentAttribute.id } : {}),
     };
 
-    if (dialogMode === "add") {
-      // Adding a new attribute
+    const cascadeApplicationFilterRequired = (
+      appAttributes: CategoryAtributes[],
+      changedOrder: number,
+      filterRequired: boolean
+    ): CategoryAtributes[] => {
+      return appAttributes.map((attr) => {
+        if (attr.order === changedOrder) {
+          return { ...attr, filterRequired };
+        }
+        if (!filterRequired && (attr.order ?? 0) > changedOrder) {
+          return { ...attr, filterRequired: false };
+        }
+        return attr;
+      });
+    };
+
+    const syncApplicationAttributesToForm = (appAttributes: CategoryAtributes[]) => {
       setForm((prev) => ({
         ...prev,
-        attributes: [...prev.attributes, payload],
+        attributes: [
+          ...prev.attributes.filter((attr) => attr.scope !== "APPLICATION"),
+          ...appAttributes,
+        ],
       }));
-
       setAttributes((prev) => ({
         ...prev,
-        ...(type === "PRODUCT"
-          ? { productAttributes: [...prev.productAttributes, payload] }
-          : type === "VARIANT"
-            ? { variantAttributes: [...prev.variantAttributes, payload] }
-            : { applicationAttributes: [...prev.applicationAttributes, payload] }),
+        applicationAttributes: appAttributes,
       }));
+    };
+
+    if (dialogMode === "add") {
+      if (type === AttributeScope.APPLICATION) {
+        const nextApplicationAttributes = cascadeApplicationFilterRequired(
+          [...attributes.applicationAttributes, payload],
+          payload.order ?? 0,
+          payload.filterRequired !== false
+        );
+        syncApplicationAttributesToForm(nextApplicationAttributes);
+        setAttributes((prev) => ({
+          ...prev,
+          applicationAttributes: nextApplicationAttributes,
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          attributes: [...prev.attributes, payload],
+        }));
+
+        setAttributes((prev) => ({
+          ...prev,
+          ...(type === AttributeScope.PRODUCT
+            ? { productAttributes: [...prev.productAttributes, payload] }
+            : { variantAttributes: [...prev.variantAttributes, payload] }),
+        }));
+      }
     } else if (dialogMode === "edit") {
       // Al editar, buscar por id si existe, sino por name
       const matchAttribute = (attr: CategoryAtributes) => {
@@ -424,33 +482,42 @@ const CardAtributesVariants = ({
           (attr.display_name && attr.display_name === currentAttribute?.name);
       };
 
-      setForm((prev) => ({
-        ...prev,
-        attributes: prev.attributes.map((attr) =>
-          matchAttribute(attr) ? payload : attr
-        ),
-      }));
+      if (type === AttributeScope.APPLICATION) {
+        const updatedApplicationAttributes = cascadeApplicationFilterRequired(
+          attributes.applicationAttributes.map((attr) =>
+            matchAttribute(attr) ? payload : attr
+          ),
+          payload.order ?? 0,
+          payload.filterRequired !== false
+        );
+        syncApplicationAttributesToForm(updatedApplicationAttributes);
+        setAttributes((prev) => ({
+          ...prev,
+          applicationAttributes: updatedApplicationAttributes,
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          attributes: prev.attributes.map((attr) =>
+            matchAttribute(attr) ? payload : attr
+          ),
+        }));
 
-      setAttributes((prev) => ({
-        ...prev,
-        ...(type === "PRODUCT"
-          ? {
-            productAttributes: prev.productAttributes.map((attr) =>
-              matchAttribute(attr) ? payload : attr
-            ),
-          }
-          : type === "VARIANT"
+        setAttributes((prev) => ({
+          ...prev,
+          ...(type === AttributeScope.PRODUCT
             ? {
-              variantAttributes: prev.variantAttributes.map((attr) =>
+              productAttributes: prev.productAttributes.map((attr) =>
                 matchAttribute(attr) ? payload : attr
               ),
             }
             : {
-              applicationAttributes: prev.applicationAttributes.map((attr) =>
+              variantAttributes: prev.variantAttributes.map((attr) =>
                 matchAttribute(attr) ? payload : attr
               ),
             }),
-      }));
+        }));
+      }
     }
 
     setIsDialogOpen(false);
@@ -817,6 +884,66 @@ const CardAtributesVariants = ({
                 <Label htmlFor="r2">No</Label>
               </div>
             </RadioGroup>
+
+            {title === "Atributos de Aplicaciones" && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label>
+                    Requerido en filtro web<span className="text-redLabel">*</span>
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Los filtros requeridos deben seleccionarse en orden en el catálogo web.
+                          Los filtros opcionales se habilitan después y pueden elegirse con saltos.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <RadioGroup
+                  value={attributeForm.filterRequired !== false ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setAttributeForm({
+                      ...attributeForm,
+                      filterRequired: value === "true",
+                    })
+                  }
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="true"
+                      id="filter-required-yes"
+                      disabled={
+                        (() => {
+                          const sortedApp = [...attributes.applicationAttributes].sort(
+                            (a, b) => (a.order ?? 0) - (b.order ?? 0)
+                          );
+                          const currentOrder =
+                            dialogMode === "add"
+                              ? sortedApp.length
+                              : (attributeForm.order ?? currentAttribute?.order ?? 0);
+                          if (currentOrder === 0) return false;
+                          const previousApp = sortedApp.find(
+                            (attr) => attr.order === currentOrder - 1
+                          );
+                          return previousApp?.filterRequired === false;
+                        })()
+                      }
+                    />
+                    <Label htmlFor="filter-required-yes">Sí</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="false" id="filter-required-no" />
+                    <Label htmlFor="filter-required-no">No</Label>
+                  </div>
+                </RadioGroup>
+              </>
+            )}
 
             {title === "Atributos de Producto" && (
               <div className="space-y-3 rounded-md border p-3">
