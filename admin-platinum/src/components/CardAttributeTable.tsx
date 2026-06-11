@@ -138,6 +138,11 @@ const SortableAttributeRow = ({
       <TableCell>
         <Badge>{attribute.required ? "Si" : "No"}</Badge>
       </TableCell>
+      {title === "Atributos de Aplicaciones" ? (
+        <TableCell>
+          <Badge>{attribute.filterRequired !== false ? "Si" : "No"}</Badge>
+        </TableCell>
+      ) : null}
       {title === "Atributos de Producto" ? (
         <>
           <TableCell>
@@ -217,6 +222,9 @@ const CardAttributeTable = ({
       <TableHead>Nombre</TableHead>
       <TableHead>Tipo de Dato</TableHead>
       <TableHead>Requerido</TableHead>
+      {_title === "Atributos de Aplicaciones" ? (
+        <TableHead>Requerido en filtro web</TableHead>
+      ) : null}
       {_title === "Atributos de Producto" ? (
         <>
           <TableHead>Visible en Catálogo</TableHead>
@@ -238,6 +246,11 @@ const CardAttributeTable = ({
       <TableCell>
         <Badge>{attribute.required ? "Si" : "No"}</Badge>
       </TableCell>
+      {_title === "Atributos de Aplicaciones" ? (
+        <TableCell>
+          <Badge>{attribute.filterRequired !== false ? "Si" : "No"}</Badge>
+        </TableCell>
+      ) : null}
       {_title === "Atributos de Producto" ? (
         <>
           <TableCell>

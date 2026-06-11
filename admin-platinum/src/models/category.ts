@@ -51,6 +51,7 @@ export type CategoryAtributes = {
   id_category?: string;
   visibleInCatalog?: boolean;
   visibleInProductDetail?: boolean;
+  filterRequired?: boolean;
 };
 
 export type CategoryAttributeApi = CategoryAtributes & {
@@ -58,6 +59,8 @@ export type CategoryAttributeApi = CategoryAtributes & {
   displayName?: string | null;
   visible_in_catalog?: boolean;
   visible_in_product_detail?: boolean;
+  filter_required?: boolean;
+  filterRequired?: boolean;
 };
 
 export function normalizeCategoryAttributeFromApi(
@@ -77,5 +80,6 @@ export function normalizeCategoryAttributeFromApi(
       attr.visibleInCatalog ?? attr.visible_in_catalog ?? true,
     visibleInProductDetail:
       attr.visibleInProductDetail ?? attr.visible_in_product_detail ?? true,
+    filterRequired: attr.filterRequired ?? attr.filter_required ?? true,
   };
 }

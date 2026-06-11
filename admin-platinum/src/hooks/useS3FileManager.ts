@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { deleteFileFromS3, uploadFileToS3 } from "@/services/S3FileManager";
+import { normalizeImageFile } from "@/utils/imageUpload";
 import { toast } from "./use-toast";
 
 export const useS3FileManager = () => {
@@ -14,8 +15,20 @@ export const useS3FileManager = () => {
       successToast?: { title: string; description?: string };
     }
   ) => {
-    if (!file || !file.type) {
+    const normalizedFile =
+      options?.destination === "document" ? file : normalizeImageFile(file);
+
+    if (!normalizedFile?.name) {
       console.warn("[useS3FileManager] Invalid file provided");
+      return;
+    }
+
+    if (!normalizedFile.type && options?.destination !== "document") {
+      toast({
+        title: "Formato no reconocido",
+        description: "Usa PNG, JPG/JPEG o WebP.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -33,7 +46,7 @@ export const useS3FileManager = () => {
     setUploading(true);
     setError(null);
     
-    const fileNameLen = file.name.length + 66;
+    const fileNameLen = normalizedFile.name.length + 66;
     if (fileNameLen > 255) {
       setUploading(false);
       toast({
@@ -46,12 +59,12 @@ export const useS3FileManager = () => {
     }
     
     try {
-      const extension = file.type.split("/")[1];
+      const extension = normalizedFile.type.split("/")[1];
       let data: any;
       if (options?.destination === "document" || extension === "pdf") {
-        data = await uploadFileToS3(file, "uploads/documents/");
+        data = await uploadFileToS3(normalizedFile, "uploads/documents/");
       } else {
-        data = await uploadFileToS3(file);
+        data = await uploadFileToS3(normalizedFile);
       }
       
       if (data && data.key && data.location) {

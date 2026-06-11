@@ -72,6 +72,20 @@ export interface formTypes {
   attributes: CategoryAtributes[];
 }
 
+const validateApplicationFilterRequiredPrefix = (attributes: CategoryAtributes[]): boolean => {
+  const applicationAttributes = attributes
+    .filter((attr) => attr.scope === "APPLICATION")
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  let sawOptional = false;
+  for (const attribute of applicationAttributes) {
+    const isRequired = attribute.filterRequired !== false;
+    if (sawOptional && isRequired) return false;
+    if (!isRequired) sawOptional = true;
+  }
+  return true;
+};
+
 const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) => {
   const { selectedBrand } = useBrandContext();
   const { brands } = useBrands();
@@ -279,6 +293,16 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
   ) => {
     let abortedForAttributeConfirm = false;
     try {
+      if (!validateApplicationFilterRequiredPrefix(form.attributes)) {
+        toast({
+          title: "Configuración de filtros inválida",
+          description:
+            "Los filtros requeridos en web deben ser consecutivos desde el primero. No puede haber un filtro requerido después de uno opcional.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsSubmitting(true);
       setSavingStartTime(Date.now());
       if (category && updateCategory) {
@@ -319,6 +343,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
             scope: attr.scope.toLowerCase(),
             visibleInCatalog: attr.visibleInCatalog ?? true,
             visibleInProductDetail: attr.visibleInProductDetail ?? true,
+            ...(attr.scope === "APPLICATION"
+              ? { filterRequired: attr.filterRequired !== false }
+              : {}),
           }));
         const attributesToDelete = originalAttributeIds.filter(id => !currentAttributeIds.includes(id));
 
@@ -340,6 +367,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               (attr.visibleInCatalog ?? true) === (orig.visibleInCatalog ?? true);
             const detailMatch =
               (attr.visibleInProductDetail ?? true) === (orig.visibleInProductDetail ?? true);
+            const filterRequiredMatch =
+              attr.scope !== "APPLICATION" ||
+              (attr.filterRequired !== false) === (orig.filterRequired !== false);
             if (
               formDisplay === origDisplay &&
               formCsv === origCsv &&
@@ -348,7 +378,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               attr.order === orig.order &&
               attr.scope === orig.scope &&
               catalogMatch &&
-              detailMatch
+              detailMatch &&
+              filterRequiredMatch
             ) {
               return null;
             }
@@ -365,6 +396,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               scope: attr.scope.toLowerCase(),
               visibleInCatalog: attr.visibleInCatalog ?? true,
               visibleInProductDetail: attr.visibleInProductDetail ?? true,
+              ...(attr.scope === "APPLICATION"
+                ? { filterRequired: attr.filterRequired !== false }
+                : {}),
             };
           })
           .filter(
@@ -470,6 +504,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                   scope: attr.scope,
                   visibleInCatalog: attr.visibleInCatalog ?? true,
                   visibleInProductDetail: attr.visibleInProductDetail ?? true,
+                  ...(attr.scope === "APPLICATION"
+                    ? { filterRequired: attr.filterRequired !== false }
+                    : {}),
                 })),
               };
 

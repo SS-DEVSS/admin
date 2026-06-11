@@ -1,6 +1,12 @@
 import { Dispatch, useCallback, useState, useEffect } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { CheckCircle2, FileText, X } from "lucide-react";
+import {
+  getDropzoneRejectionMessage,
+  IMAGE_UPLOAD_ACCEPT,
+  IMAGE_UPLOAD_MAX_BYTES,
+  normalizeImageFile,
+} from "@/utils/imageUpload";
 
 interface MyDropzoneProps {
   file?: File | null;
@@ -58,25 +64,23 @@ const MyDropzone = ({
     (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       setError(null);
       if (rejectedFiles.length > 0) {
-        setError("Selecciona un archivo válido.");
+        const code = rejectedFiles[0]?.errors[0]?.code ?? "unknown";
+        setError(getDropzoneRejectionMessage(code));
         return;
       }
 
       if (acceptedFiles.length > 0) {
-        const sanitizedFiles = acceptedFiles.map((file) => {
-          const sanitizedFile = new File(
-            [file],
-            file.name ? file.name.replace(/[()]/g, "") : "file",
-            {
-              type: file.type,
-            }
-          );
-          return sanitizedFile;
-        });
-        fileSetter(sanitizedFiles[0]);
+        const raw = acceptedFiles[0];
+        const normalized = type === "image" ? normalizeImageFile(raw) : raw;
+        const sanitizedFile = new File(
+          [normalized],
+          normalized.name ? normalized.name.replace(/[()]/g, "") : "file",
+          { type: normalized.type }
+        );
+        fileSetter(sanitizedFile);
       }
     },
-    [fileSetter]
+    [fileSetter, type]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -84,13 +88,12 @@ const MyDropzone = ({
     accept:
       type === "document"
         ? {
-          "application/pdf": [],
-          "image/png": [],
-          "image/jpeg": [],
-          "image/jpg": [],
-        }
-        : { "image/png": [], "image/jpeg": [], "image/jpg": [], "image/webp": [] },
-    maxSize: 5000 * 1000,
+            "application/pdf": [".pdf"],
+            "image/png": [".png"],
+            "image/jpeg": [".jpg", ".jpeg"],
+          }
+        : IMAGE_UPLOAD_ACCEPT,
+    maxSize: type === "document" ? 70 * 1024 * 1024 : IMAGE_UPLOAD_MAX_BYTES,
   });
 
   const test = (path: string | undefined): string => {
