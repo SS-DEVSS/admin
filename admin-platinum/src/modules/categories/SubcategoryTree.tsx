@@ -255,12 +255,12 @@ export default function SubcategoryTree({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <FolderTree className="h-5 w-5" />
             <CardTitle>Subcategorías</CardTitle>
           </div>
-          <Button type="button" variant="outline" size="sm" className="h-8 border-muted-foreground/30" onClick={handleAddRoot}>
+          <Button type="button" variant="outline" size="sm" className="h-8 w-full sm:w-auto border-muted-foreground/30" onClick={handleAddRoot}>
             <Plus className="h-4 w-4 mr-2" />
             Agregar subcategoría raíz
           </Button>

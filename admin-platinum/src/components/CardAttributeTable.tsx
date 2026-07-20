@@ -304,10 +304,12 @@ const CardAttributeTable = ({
   ));
 
   const tableContent = (bodyRows: ReactNode) => (
-    <Table>
-      <TableHeader>{headerRow}</TableHeader>
-      <TableBody>{bodyRows}</TableBody>
-    </Table>
+    <div className="w-full overflow-x-auto">
+      <Table>
+        <TableHeader>{headerRow}</TableHeader>
+        <TableBody>{bodyRows}</TableBody>
+      </Table>
+    </div>
   );
 
   return (

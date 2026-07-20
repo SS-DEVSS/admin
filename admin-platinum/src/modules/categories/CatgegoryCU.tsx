@@ -34,7 +34,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CardAtributesVariants from "./CardAtributesVariants";
 import {
   Dialog,
@@ -635,11 +635,19 @@ const CategoryCU = ({
       <main className="max-w-4xl mx-auto px-0 md:px-6">
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/dashboard/categorias">
-              <Card className="p-2">
+            <button
+              type="button"
+              aria-label="Volver"
+              onClick={() =>
+                window.history.length > 1
+                  ? navigate(-1)
+                  : navigate("/dashboard/categorias")
+              }
+            >
+              <Card className="p-2 cursor-pointer transition-colors hover:bg-muted">
                 <ChevronLeft className="h-4 w-4" />
               </Card>
-            </Link>
+            </button>
             <p className="text-2xl font-semibold leading-none tracking-tight">
               {!category ? "Nueva Categoría" : `${category.name}`}
             </p>
@@ -909,18 +917,24 @@ const CategoryCU = ({
       </main>
       <section className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 flex justify-end gap-3">
-          <Link to="/dashboard/categorias">
-            <Button variant={"outline"}>Cancelar</Button>
-          </Link>
+          <Button
+            variant={"outline"}
+            type="button"
+            onClick={() =>
+              window.history.length > 1
+                ? navigate(-1)
+                : navigate("/dashboard/categorias")
+            }
+          >
+            Cancelar
+          </Button>
           <Button
             size="sm"
             disabled={!validateForm || isSubmitting || attributeConfirmOpen}
             className="h-10 px-6 gap-1"
             onClick={() => handleSubmit(form)}
           >
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              {isSubmitting ? "Guardando..." : "Guardar"}
-            </span>
+            {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
         </div>
       </section>

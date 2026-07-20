@@ -350,9 +350,9 @@ const Banners = () => {
               banners.map((banner: Banner, index: number) => (
                 <Card
                   key={banner.id}
-                  className="bg-[#EEEEEE] border border-border/60 flex flex-row items-stretch gap-0"
+                  className="bg-[#EEEEEE] border border-border/60 flex flex-col sm:flex-row items-stretch gap-0"
                 >
-                  <div className="flex flex-1 min-w-0 gap-3 p-3">
+                  <div className="flex flex-col sm:flex-row flex-1 min-w-0 gap-3 p-3">
                     <div className="flex flex-row gap-2 shrink-0">
                       <div className="border rounded-lg overflow-hidden bg-white">
                         <img
@@ -487,7 +487,7 @@ const Banners = () => {
                 </div>
               </div>
             ) : null}
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={closeEdit} disabled={editSaving}>
                 Cancelar
               </Button>

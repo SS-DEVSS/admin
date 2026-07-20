@@ -99,7 +99,7 @@ const Attributes = ({
       <CardContent className="flex flex-wrap justify-between gap-4">
         {getProductAttributes.map(
           (attribute: CategoryAtributes) => (
-            <div key={attribute.id} className="basis-[48%]">
+            <div key={attribute.id} className="basis-full sm:basis-[48%]">
               <Label className="mb-2 block">
                 {attribute.required && <span className="text-red-500 mr-1">*</span>}
                 {translateAttributeName(attribute.name, false)}

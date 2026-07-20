@@ -50,7 +50,8 @@ const NewProduct = () => {
           // Find the category object from context based on product.category.id
           const categoryId = product.category?.id || product.category;
 
-          let fullCategory = categories.find(c => c.id === categoryId) || null;
+          let fullCategory =
+            categories.find((c) => c.id === categoryId) || null;
 
           // If category not found in context, create a basic category object from product data
           if (!fullCategory && product.category) {
@@ -61,13 +62,18 @@ const NewProduct = () => {
           }
 
           // Get the first image URL if available
-          const firstImage = product.images && product.images.length > 0
-            ? product.images[0].url
-            : "";
+          const firstImage =
+            product.images && product.images.length > 0
+              ? product.images[0].url
+              : "";
 
           // Get brand from product, or from category's brands if product doesn't have one
           let brandId = product.brand?.id || "";
-          if (!brandId && fullCategory?.brands && fullCategory.brands.length > 0) {
+          if (
+            !brandId &&
+            fullCategory?.brands &&
+            fullCategory.brands.length > 0
+          ) {
             // Use the first brand from the category
             brandId = fullCategory.brands[0].id || "";
           }
@@ -92,7 +98,8 @@ const NewProduct = () => {
             imgUrl: firstImage,
             visibleInCatalog:
               (product as { visibleInCatalog?: boolean }).visibleInCatalog ??
-              (product as { visible_in_catalog?: boolean }).visible_in_catalog ??
+              (product as { visible_in_catalog?: boolean })
+                .visible_in_catalog ??
               true,
           });
 
@@ -102,15 +109,28 @@ const NewProduct = () => {
             // Get product attributes from category (handle both array and object formats)
             let productAttributes: any[] = [];
             if (Array.isArray(fullCategory.attributes)) {
-              productAttributes = fullCategory.attributes.filter((a: any) => a.scope === "PRODUCT");
-            } else if (fullCategory.attributes && typeof fullCategory.attributes === 'object' && 'product' in fullCategory.attributes) {
-              productAttributes = (fullCategory.attributes as { product: any[] }).product || [];
+              productAttributes = fullCategory.attributes.filter(
+                (a: any) => a.scope === "PRODUCT",
+              );
+            } else if (
+              fullCategory.attributes &&
+              typeof fullCategory.attributes === "object" &&
+              "product" in fullCategory.attributes
+            ) {
+              productAttributes =
+                (fullCategory.attributes as { product: any[] }).product || [];
             }
 
             product.attributeValues.forEach((av: any) => {
-              const attributeDef = productAttributes.find((a: any) => a.id === av.idAttribute && a.scope === "PRODUCT");
+              const attributeDef = productAttributes.find(
+                (a: any) => a.id === av.idAttribute && a.scope === "PRODUCT",
+              );
               if (attributeDef) {
-                attrs[attributeDef.name] = av.valueString || av.valueNumber || av.valueBoolean || av.valueDate;
+                attrs[attributeDef.name] =
+                  av.valueString ||
+                  av.valueNumber ||
+                  av.valueBoolean ||
+                  av.valueDate;
               }
             });
           }
@@ -126,142 +146,162 @@ const NewProduct = () => {
           // Backend applications have: id, sku, origin, attributeValues
           // Frontend expects: id, referenceBrand, referenceNumber, type, description
           if (product.applications && Array.isArray(product.applications)) {
-            const formattedApplications = product.applications.map((app: any) => {
-              // Extract key attributes from attributeValues
-              // Applications typically have: Modelo, Submodelo, Año, Litros_Motor, etc.
-              const getAttributeValue = (attrName: string) => {
-                const attr = app.attributeValues?.find((av: any) =>
-                  av.attribute?.name === attrName ||
-                  av.attribute?.name?.toLowerCase() === attrName.toLowerCase()
-                );
-                if (!attr) return null;
+            const formattedApplications = product.applications.map(
+              (app: any) => {
+                // Extract key attributes from attributeValues
+                // Applications typically have: Modelo, Submodelo, Año, Litros_Motor, etc.
+                const getAttributeValue = (attrName: string) => {
+                  const attr = app.attributeValues?.find(
+                    (av: any) =>
+                      av.attribute?.name === attrName ||
+                      av.attribute?.name?.toLowerCase() ===
+                        attrName.toLowerCase(),
+                  );
+                  if (!attr) return null;
 
-                const isYearAttribute = attrName.toLowerCase().includes("año") ||
-                  attrName.toLowerCase().includes("anio") ||
-                  attrName.toLowerCase().includes("year");
+                  const isYearAttribute =
+                    attrName.toLowerCase().includes("año") ||
+                    attrName.toLowerCase().includes("anio") ||
+                    attrName.toLowerCase().includes("year");
 
-                // For year attributes, prioritize valueNumber (as it's stored now)
-                if (isYearAttribute) {
-                  if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-                    return attr.valueNumber;
-                  }
-                  // Fallback to valueDate if valueNumber not available
-                  if (attr.valueDate) {
-                    const date = new Date(attr.valueDate);
-                    if (!isNaN(date.getTime())) {
-                      return date.getFullYear();
+                  // For year attributes, prioritize valueNumber (as it's stored now)
+                  if (isYearAttribute) {
+                    if (
+                      attr.valueNumber !== null &&
+                      attr.valueNumber !== undefined
+                    ) {
+                      return attr.valueNumber;
                     }
+                    // Fallback to valueDate if valueNumber not available
+                    if (attr.valueDate) {
+                      const date = new Date(attr.valueDate);
+                      if (!isNaN(date.getTime())) {
+                        return date.getFullYear();
+                      }
+                    }
+                    // Last resort: valueString
+                    if (attr.valueString) {
+                      const str = String(attr.valueString);
+                      const yearMatch = str.match(/^(\d{4})/);
+                      if (yearMatch) {
+                        return parseInt(yearMatch[1], 10);
+                      }
+                      return str;
+                    }
+                    return null;
                   }
-                  // Last resort: valueString
-                  if (attr.valueString) {
-                    const str = String(attr.valueString);
-                    const yearMatch = str.match(/^(\d{4})/);
+
+                  // For non-year attributes, use standard priority
+                  return (
+                    attr.valueString ||
+                    attr.valueNumber ||
+                    attr.valueBoolean ||
+                    null
+                  );
+                };
+
+                // Try common attribute names
+                const modelo = getAttributeValue("Modelo");
+                const submodelo = getAttributeValue("Submodelo");
+                const año = getAttributeValue("Año");
+                const litrosMotor = getAttributeValue("Litros_Motor");
+                const ccMotor = getAttributeValue("CC_Motor");
+                const cidMotor = getAttributeValue("CID_Motor");
+                const cilindrosMotor = getAttributeValue("Cilindros_Motor");
+                const bloqueMotor = getAttributeValue("Bloque_Motor");
+                const motor = getAttributeValue("Motor");
+                const tipoMotor = getAttributeValue("Tipo_Motor");
+                const transmision =
+                  getAttributeValue("Transmisión") ||
+                  getAttributeValue("Transmision");
+
+                // Build display text from available attributes (prioritize most distinctive ones)
+                const parts: string[] = [];
+
+                // Modelo is usually the most distinctive
+                if (modelo) parts.push(String(modelo));
+
+                // Submodelo adds more specificity
+                if (submodelo) parts.push(String(submodelo));
+
+                // Año is important for differentiation - ensure it's always just the year number
+                if (año) {
+                  let añoStr = String(año);
+                  // If it looks like a timestamp or ISO date, extract just the year
+                  if (
+                    añoStr.includes("T") ||
+                    (añoStr.includes("-") && añoStr.length > 4)
+                  ) {
+                    const yearMatch = añoStr.match(/^(\d{4})/);
                     if (yearMatch) {
-                      return parseInt(yearMatch[1], 10);
+                      añoStr = yearMatch[1];
                     }
-                    return str;
                   }
-                  return null;
-                }
-
-                // For non-year attributes, use standard priority
-                return attr.valueString || attr.valueNumber || attr.valueBoolean || null;
-              };
-
-              // Try common attribute names
-              const modelo = getAttributeValue('Modelo');
-              const submodelo = getAttributeValue('Submodelo');
-              const año = getAttributeValue('Año');
-              const litrosMotor = getAttributeValue('Litros_Motor');
-              const ccMotor = getAttributeValue('CC_Motor');
-              const cidMotor = getAttributeValue('CID_Motor');
-              const cilindrosMotor = getAttributeValue('Cilindros_Motor');
-              const bloqueMotor = getAttributeValue('Bloque_Motor');
-              const motor = getAttributeValue('Motor');
-              const tipoMotor = getAttributeValue('Tipo_Motor');
-              const transmision = getAttributeValue('Transmisión') || getAttributeValue('Transmision');
-
-              // Build display text from available attributes (prioritize most distinctive ones)
-              const parts: string[] = [];
-
-              // Modelo is usually the most distinctive
-              if (modelo) parts.push(String(modelo));
-
-              // Submodelo adds more specificity
-              if (submodelo) parts.push(String(submodelo));
-
-              // Año is important for differentiation - ensure it's always just the year number
-              if (año) {
-                let añoStr = String(año);
-                // If it looks like a timestamp or ISO date, extract just the year
-                if (añoStr.includes('T') || (añoStr.includes('-') && añoStr.length > 4)) {
-                  const yearMatch = añoStr.match(/^(\d{4})/);
-                  if (yearMatch) {
-                    añoStr = yearMatch[1];
+                  // Also handle if it's a number - just convert to string
+                  if (typeof año === "number") {
+                    añoStr = año.toString();
                   }
+                  parts.push(añoStr);
                 }
-                // Also handle if it's a number - just convert to string
-                if (typeof año === 'number') {
-                  añoStr = año.toString();
+
+                // Motor information
+                if (motor) {
+                  parts.push(String(motor));
+                } else if (tipoMotor) {
+                  parts.push(String(tipoMotor));
+                } else if (litrosMotor) {
+                  parts.push(`${litrosMotor}L`);
+                } else if (ccMotor) {
+                  parts.push(`${ccMotor}CC`);
+                } else if (cidMotor) {
+                  parts.push(`${cidMotor}CID`);
                 }
-                parts.push(añoStr);
-              }
 
-              // Motor information
-              if (motor) {
-                parts.push(String(motor));
-              } else if (tipoMotor) {
-                parts.push(String(tipoMotor));
-              } else if (litrosMotor) {
-                parts.push(`${litrosMotor}L`);
-              } else if (ccMotor) {
-                parts.push(`${ccMotor}CC`);
-              } else if (cidMotor) {
-                parts.push(`${cidMotor}CID`);
-              }
+                // Additional motor details if available
+                if (cilindrosMotor && !motor) {
+                  parts.push(`${cilindrosMotor}cil`);
+                }
 
-              // Additional motor details if available
-              if (cilindrosMotor && !motor) {
-                parts.push(`${cilindrosMotor}cil`);
-              }
+                if (bloqueMotor) {
+                  parts.push(bloqueMotor);
+                }
 
-              if (bloqueMotor) {
-                parts.push(bloqueMotor);
-              }
+                if (transmision) {
+                  parts.push(transmision);
+                }
 
-              if (transmision) {
-                parts.push(transmision);
-              }
+                // If we have no distinctive attributes, don't add anything
+                // We'll just use the ID to differentiate
 
-              // If we have no distinctive attributes, don't add anything
-              // We'll just use the ID to differentiate
+                // Always append a short version of the ID to make each application unique
+                // Use last 8 characters of the ID (more readable than first 8)
+                const shortId = app.id
+                  .substring(app.id.length - 8)
+                  .toUpperCase();
 
-              // Always append a short version of the ID to make each application unique
-              // Use last 8 characters of the ID (more readable than first 8)
-              const shortId = app.id.substring(app.id.length - 8).toUpperCase();
+                // Build display text: combine attributes with ID
+                // NEVER use app.sku as it's the same for all applications
+                let displayText = "";
+                if (parts.length > 0) {
+                  displayText = `${parts.join(" - ")} (${shortId})`;
+                } else {
+                  // If no attributes, just show the ID
+                  displayText = `Aplicación (${shortId})`;
+                }
 
-              // Build display text: combine attributes with ID
-              // NEVER use app.sku as it's the same for all applications
-              let displayText = '';
-              if (parts.length > 0) {
-                displayText = `${parts.join(' - ')} (${shortId})`;
-              } else {
-                // If no attributes, just show the ID
-                displayText = `Aplicación (${shortId})`;
-              }
+                // Return Application format with displayText for UI display
+                const formatted: any = {
+                  id: app.id,
+                  sku: app.sku || "",
+                  origin: app.origin || null,
+                  attributeValues: app.attributeValues || [],
+                  // Store formatted display text for UI
+                  displayText: displayText,
+                };
 
-              // Return Application format with displayText for UI display
-              const formatted: any = {
-                id: app.id,
-                sku: app.sku || "",
-                origin: app.origin || null,
-                attributeValues: app.attributeValues || [],
-                // Store formatted display text for UI
-                displayText: displayText,
-              };
-
-              return formatted;
-            });
+                return formatted;
+              },
+            );
 
             setApplicationsState({ applications: formattedApplications });
           } else {
@@ -306,9 +346,10 @@ const NewProduct = () => {
       }
 
       // Get category ID
-      const categoryId = typeof detailsState.category === 'string'
-        ? detailsState.category
-        : detailsState.category?.id;
+      const categoryId =
+        typeof detailsState.category === "string"
+          ? detailsState.category
+          : detailsState.category?.id;
 
       if (!categoryId) {
         toast({
@@ -320,7 +361,7 @@ const NewProduct = () => {
       }
 
       // Get the category to access attributes
-      const category = categories.find(c => c.id === categoryId);
+      const category = categories.find((c) => c.id === categoryId);
       if (!category) {
         toast({
           title: "Error",
@@ -350,7 +391,7 @@ const NewProduct = () => {
             let idAttributeValue: string | undefined;
             if (isEditMode && existingProduct?.attributeValues) {
               const existingAttrValue = existingProduct.attributeValues.find(
-                (av: any) => av.idAttribute === attr.id
+                (av: any) => av.idAttribute === attr.id,
               );
               if (existingAttrValue) {
                 idAttributeValue = existingAttrValue.id;
@@ -368,23 +409,42 @@ const NewProduct = () => {
             };
 
             // Set the value based on attribute type
-            if (attr.type === "STRING" || attr.type === "TEXT" || attr.type?.toLowerCase() === "string" || attr.type?.toLowerCase() === "text") {
+            if (
+              attr.type === "STRING" ||
+              attr.type === "TEXT" ||
+              attr.type?.toLowerCase() === "string" ||
+              attr.type?.toLowerCase() === "text"
+            ) {
               attributeValue.valueString = String(value);
               attributeValue.valueNumber = null;
               attributeValue.valueBoolean = null;
               attributeValue.valueDate = null;
-            } else if (attr.type === "NUMBER" || attr.type === "NUMERIC" || attr.type === "INTEGER" || attr.type === "DECIMAL" || attr.type?.toLowerCase() === "number" || attr.type?.toLowerCase() === "numeric") {
+            } else if (
+              attr.type === "NUMBER" ||
+              attr.type === "NUMERIC" ||
+              attr.type === "INTEGER" ||
+              attr.type === "DECIMAL" ||
+              attr.type?.toLowerCase() === "number" ||
+              attr.type?.toLowerCase() === "numeric"
+            ) {
               attributeValue.valueNumber = Number(value);
               attributeValue.valueString = null;
               attributeValue.valueBoolean = null;
               attributeValue.valueDate = null;
-            } else if (attr.type === "BOOLEAN" || attr.type?.toLowerCase() === "boolean") {
+            } else if (
+              attr.type === "BOOLEAN" ||
+              attr.type?.toLowerCase() === "boolean"
+            ) {
               attributeValue.valueBoolean = Boolean(value);
               attributeValue.valueString = null;
               attributeValue.valueNumber = null;
               attributeValue.valueDate = null;
-            } else if (attr.type === "DATE" || attr.type?.toLowerCase() === "date") {
-              attributeValue.valueDate = value instanceof Date ? value : new Date(value);
+            } else if (
+              attr.type === "DATE" ||
+              attr.type?.toLowerCase() === "date"
+            ) {
+              attributeValue.valueDate =
+                value instanceof Date ? value : new Date(value);
               attributeValue.valueString = null;
               attributeValue.valueNumber = null;
               attributeValue.valueBoolean = null;
@@ -403,10 +463,15 @@ const NewProduct = () => {
         });
       }
 
-      const productName = resolveProductNameForSave(detailsState.name, detailsState.sku);
+      const productName = resolveProductNameForSave(
+        detailsState.name,
+        detailsState.sku,
+      );
 
       // Format references - compare with existing to only send changes
-      const currentReferenceIds = referencesState.references.map(ref => ref.id).filter((id): id is string => !!id);
+      const currentReferenceIds = referencesState.references
+        .map((ref) => ref.id)
+        .filter((id): id is string => !!id);
 
       if (isEditMode && id) {
         const idSubcategory = detailsState.subcategory?.id ?? null;
@@ -419,13 +484,19 @@ const NewProduct = () => {
 
         // Compare references with existing product to only send changes
         if (existingProduct && existingProduct.references) {
-          const existingReferenceIds = existingProduct.references.map((ref: any) => ref.id).filter((id: any): id is string => !!id);
+          const existingReferenceIds = existingProduct.references
+            .map((ref: any) => ref.id)
+            .filter((id: any): id is string => !!id);
 
           // Find references to add (in current but not in existing) - use IDs for new references
-          const referencesToAdd = currentReferenceIds.filter((id: string) => !existingReferenceIds.includes(id));
+          const referencesToAdd = currentReferenceIds.filter(
+            (id: string) => !existingReferenceIds.includes(id),
+          );
 
           // Find references to remove (in existing but not in current) - use referenceNumbers for removal
-          const referencesToRemoveIds = existingReferenceIds.filter((id: string) => !currentReferenceIds.includes(id));
+          const referencesToRemoveIds = existingReferenceIds.filter(
+            (id: string) => !currentReferenceIds.includes(id),
+          );
           // Map the IDs to referenceNumbers for the backend
           const referencesToRemove = existingProduct.references
             .filter((ref: any) => referencesToRemoveIds.includes(ref.id))
@@ -459,7 +530,7 @@ const NewProduct = () => {
           // Check if it's a full URL or just a path
           // If it's a full URL (starts with http), use it as imageUrl
           // Otherwise, it's already a path and we can use it as imgUrl
-          if (detailsState.imgUrl.startsWith('http')) {
+          if (detailsState.imgUrl.startsWith("http")) {
             productPayload.imageUrl = detailsState.imgUrl;
           } else {
             productPayload.imgUrl = detailsState.imgUrl;
@@ -500,7 +571,9 @@ const NewProduct = () => {
           idCategory: categoryId,
           idSubcategory: detailsState.subcategory?.id ?? null,
           references: [],
-          attributes: Array.isArray(formattedAttributes) ? formattedAttributes : [],
+          attributes: Array.isArray(formattedAttributes)
+            ? formattedAttributes
+            : [],
           variants: variants,
         };
 
@@ -510,7 +583,7 @@ const NewProduct = () => {
           // Check if it's a full URL or just a path
           // If it's a full URL (starts with http), use it as imageUrl
           // Otherwise, it's already a path and we can use it as imgUrl
-          if (detailsState.imgUrl.startsWith('http')) {
+          if (detailsState.imgUrl.startsWith("http")) {
             productPayload.imageUrl = detailsState.imgUrl;
           } else {
             productPayload.imgUrl = detailsState.imgUrl;
@@ -522,13 +595,15 @@ const NewProduct = () => {
         toast({
           title: "Producto creado",
           variant: "success",
-          description: "El producto se ha creado correctamente. Puedes importar referencias y aplicaciones desde las secciones de importación.",
+          description:
+            "El producto se ha creado correctamente. Puedes importar referencias y aplicaciones desde las secciones de importación.",
         });
-
       }
 
       // Ensure loader is shown for at least 800ms for better UX
-      const elapsed = savingStartTimeRef.current ? Date.now() - savingStartTimeRef.current : 0;
+      const elapsed = savingStartTimeRef.current
+        ? Date.now() - savingStartTimeRef.current
+        : 0;
       const minDisplayTime = 800;
       const remainingTime = Math.max(0, minDisplayTime - elapsed);
 
@@ -543,7 +618,8 @@ const NewProduct = () => {
       setIsSubmitting(false);
       savingStartTimeRef.current = null;
 
-      const errorMessage = error.response?.data?.error ||
+      const errorMessage =
+        error.response?.data?.error ||
         error.response?.data?.message ||
         error.message ||
         "Error al guardar el producto";
@@ -562,9 +638,7 @@ const NewProduct = () => {
 
   return (
     <>
-      {isSubmitting && (
-        <Loader fullScreen message="Guardando cambios..." />
-      )}
+      {isSubmitting && <Loader fullScreen message="Guardando cambios..." />}
       <Layout>
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
@@ -578,7 +652,7 @@ const NewProduct = () => {
             </p>
           </div>
         </header>
-        <section className="flex flex-col gap-4 mt-6 max-w-4xl mx-auto px-4 pb-24">
+        <section className="flex flex-col gap-4 sm:mt-6 max-w-4xl mx-auto pb-24">
           <Details
             detailsState={detailsState}
             setDetailsState={setDetailsState}
@@ -598,13 +672,20 @@ const NewProduct = () => {
             />
           )}
         </section>
-        <section className="fixed bottom-0 left-0 right-0 z-[100] bg-background border-t shadow-lg">
+        <section className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
           <div className="max-w-4xl mx-auto px-4 py-4 flex justify-end gap-3">
             <Link to="/dashboard/productos">
               <Button variant="outline">Cancelar</Button>
             </Link>
-            <Button disabled={!canContinue || isSubmitting} onClick={handleSubmit}>
-              {isSubmitting ? "Guardando..." : isEditMode ? "Actualizar Producto" : "Publicar Producto"}
+            <Button
+              disabled={!canContinue || isSubmitting}
+              onClick={handleSubmit}
+            >
+              {isSubmitting
+                ? "Guardando..."
+                : isEditMode
+                  ? "Actualizar Producto"
+                  : "Publicar Producto"}
             </Button>
           </div>
         </section>

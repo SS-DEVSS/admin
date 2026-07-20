@@ -4,16 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Image as ImageIcon, FileText, Trash2, Download, MoreVertical } from 'lucide-react';
 import { useFilesContext, File } from '@/context/files-context';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { useDeleteModal } from '@/context/delete-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,12 +34,10 @@ interface FileListProps {
 
 const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = false }: FileListProps) => {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { bulkDeleteFiles, deleteFile, loading } = useFilesContext();
+  const { openModal } = useDeleteModal();
 
   const handleSelectFile = (fileId: string) => {
     setSelectedFiles((prev) => {
@@ -70,24 +59,30 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
     }
   };
 
-  const handleBulkDeleteClick = () => {
-    if (selectedFiles.size === 0) return;
-    setBulkDeleteDialogOpen(true);
-  };
-
   const handleBulkDelete = async () => {
     if (selectedFiles.size === 0) return;
 
     try {
       await bulkDeleteFiles(Array.from(selectedFiles));
       setSelectedFiles(new Set());
-      setBulkDeleteDialogOpen(false);
       if (onFileDeleted) {
         onFileDeleted();
       }
     } catch (error) {
       console.error('Error deleting files:', error);
     }
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (selectedFiles.size === 0) return;
+    const count = selectedFiles.size;
+    openModal({
+      title: `${count} archivo(s)`,
+      description: `Se eliminarán ${count} archivo(s). Esta acción no se puede deshacer.`,
+      handleDelete: () => {
+        void handleBulkDelete();
+      },
+    });
   };
 
   const handleBulkDownload = () => {
@@ -103,33 +98,33 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
     });
   };
 
+  const confirmDeleteFile = async (file: File) => {
+    try {
+      await deleteFile(file.id, file.type);
+      if (onFileDeleted) {
+        onFileDeleted();
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+    }
+  };
+
   const handleDeleteClick = (fileId: string) => {
-    setFileToDelete(fileId);
-    setDeleteDialogOpen(true);
+    const file = files.find((f) => f.id === fileId);
+    if (!file) return;
+    openModal({
+      title: 'archivo',
+      description: 'Esta acción no se puede deshacer. El archivo se eliminará permanentemente.',
+      handleDelete: () => {
+        void confirmDeleteFile(file);
+      },
+    });
   };
 
   const handleImageClick = (file: File) => {
     if (file.type === 'image') {
       setPreviewFile(file);
       setPreviewOpen(true);
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!fileToDelete) return;
-
-    const file = files.find((f) => f.id === fileToDelete);
-    if (!file) return;
-
-    try {
-      await deleteFile(file.id, file.type);
-      setDeleteDialogOpen(false);
-      setFileToDelete(null);
-      if (onFileDeleted) {
-        onFileDeleted();
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error);
     }
   };
 
@@ -206,7 +201,7 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
         {viewType === 'cards' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {files.map((file) => (
-              <Card key={file.id} className="relative group cursor-pointer">
+              <Card key={file.id} className="relative group cursor-pointer overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative">
                   {/* Checkbox overlay */}
@@ -263,7 +258,7 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
                   {/* File preview */}
                   {file.type === 'image' ? (
                     <div
-                      className="relative aspect-square w-full bg-gray-100 rounded-t overflow-hidden"
+                      className="relative aspect-square w-full bg-gray-100 overflow-hidden"
                       onClick={() => handleImageClick(file)}
                     >
                       <img
@@ -274,7 +269,7 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
                       />
                     </div>
                   ) : (
-                    <div className="relative aspect-square w-full bg-gray-100 rounded-t flex items-center justify-center">
+                    <div className="relative aspect-square w-full bg-gray-100 flex items-center justify-center">
                       <FileText className="h-12 w-12 text-gray-400" />
                     </div>
                   )}
@@ -395,40 +390,6 @@ const FileList = ({ files, onFileDeleted, viewType = 'cards', hasSearchQuery = f
           </div>
         )}
       </div>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar archivo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. El archivo se eliminará permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600">
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar archivos seleccionados?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminarán {selectedFiles.size} archivo(s). Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600">
-              Eliminar {selectedFiles.size} archivo(s)
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <ImagePreviewModal
         open={previewOpen}

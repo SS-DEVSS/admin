@@ -199,9 +199,7 @@ const BlogPostCU = ({ blogPost }: BlogPostCUProps) => {
               </Button>
             ) : (
               <Button disabled size="sm" className="h-10 px-6 gap-1">
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Actualizar Noticia
-                </span>
+                Actualizar Noticia
               </Button>
             )}
           </div>

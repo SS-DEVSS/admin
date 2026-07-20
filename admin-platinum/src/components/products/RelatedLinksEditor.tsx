@@ -441,7 +441,7 @@ export default function RelatedLinksEditor({
   const referencesSection = (
     <div className="relative z-10 space-y-3">
       {!sectionCards ? <Label>Referencias vinculadas</Label> : null}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         {referenceSearchVariant === "combobox" ? (
           <SearchCombobox
             className="flex-1"
@@ -463,7 +463,7 @@ export default function RelatedLinksEditor({
             placeholder="Ej. LuK 620309900"
           />
         )}
-        <Button type="button" variant="outline" onClick={addReference} disabled={!referenceDraft.trim()}>
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={addReference} disabled={!referenceDraft.trim()}>
           Agregar
         </Button>
       </div>
@@ -516,7 +516,7 @@ export default function RelatedLinksEditor({
   const applicationsSection = showApplicationsSection ? (
     <div className="min-w-0 max-w-full space-y-3 overflow-visible">
       {!sectionCards ? <Label>Aplicaciones vinculadas</Label> : null}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Input
           value={applicationDraft}
           onChange={(e) => setApplicationDraft(e.target.value)}
@@ -525,6 +525,7 @@ export default function RelatedLinksEditor({
         <Button
           type="button"
           variant="outline"
+          className="w-full sm:w-auto"
           onClick={addApplication}
           disabled={!applicationDraft.trim()}
         >

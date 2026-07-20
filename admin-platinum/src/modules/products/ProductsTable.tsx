@@ -80,6 +80,7 @@ const DataTable = ({
   const { uploading } = useS3FileManager();
   const client = useAxiosClient();
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
+  const [featureLoadingId, setFeatureLoadingId] = useState<string | null>(null);
   const [selectedProductForFeature, setSelectedProductForFeature] = useState<Product | null>(null);
   const [selectedProductApplications, setSelectedProductApplications] = useState<Application[]>([]);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
@@ -651,7 +652,7 @@ const DataTable = ({
       {
         accessorKey: "featured",
         header: "",
-        meta: { headClassName: "w-9 px-0", cellClassName: "w-9 px-0" },
+        meta: { headClassName: "w-10 px-2", cellClassName: "w-10 px-2" },
         cell: ({ row }: { row: any }) => {
           const productId = (row.original as any)?._originalItem?.id || (row.original as any)?.idProduct || row.original.id;
 
@@ -663,20 +664,40 @@ const DataTable = ({
 
           // Check both camelCase and snake_case for isFeatured
           const isFeatured = product?.isFeatured || product?.is_featured || false;
-          const productApplications = (product as any)?.applications || [];
+          const isLoadingFeature = featureLoadingId === productId;
+
+          const openFeatureModal = async () => {
+            if (featureLoadingId) return;
+            setFeatureLoadingId(productId);
+            try {
+              // El endpoint de lista no incluye applications; traer el producto completo.
+              const fullProduct = await getProductById(productId);
+              const resolved = (fullProduct as any) || product;
+              setSelectedProductForFeature((resolved as unknown as Product) || null);
+              setSelectedProductApplications((resolved as any)?.applications || []);
+            } catch {
+              setSelectedProductForFeature((product as unknown as Product) || null);
+              setSelectedProductApplications((product as any)?.applications || []);
+            } finally {
+              setFeatureLoadingId(null);
+              setFeatureModalOpen(true);
+            }
+          };
 
           return (
-            <div className="flex items-center justify-start pl-1">
-              <Star
-                className={`h-4 w-4 cursor-pointer transition-colors ${isFeatured ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-400"
-                  }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedProductForFeature(product || null);
-                  setSelectedProductApplications(productApplications);
-                  setFeatureModalOpen(true);
-                }}
-              />
+            <div className="flex items-center justify-center">
+              {isLoadingFeature ? (
+                <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+              ) : (
+                <Star
+                  className={`h-4 w-4 cursor-pointer transition-colors ${isFeatured ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-400"
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void openFeatureModal();
+                  }}
+                />
+              )}
             </div>
           );
         },
@@ -684,7 +705,7 @@ const DataTable = ({
       {
         accessorKey: "images",
         header: "",
-        meta: { headClassName: "w-12 px-0", cellClassName: "w-12 px-0" },
+        meta: { headClassName: "w-14 px-2", cellClassName: "w-14 px-2" },
         cell: ({ row }: { row: any }) => {
           const images = row.getValue("images");
           const hasImage =
@@ -717,7 +738,7 @@ const DataTable = ({
       {
         accessorKey: "sku",
         header: "SKU",
-        meta: { headClassName: "pl-1 pr-3", cellClassName: "pl-1 pr-3" },
+        meta: { headClassName: "pl-2 pr-3", cellClassName: "pl-2 pr-3" },
         cell: ({ row }: { row: any }) => {
           const productId = getProductIdFromRow(row.original);
           const skuValue = row.getValue("sku") || row.original?.sku || "";
@@ -871,6 +892,8 @@ const DataTable = ({
     handleCatalogVisibility,
     catalogVisibilityPending,
     catalogVisibilityTargetIds,
+    featureLoadingId,
+    getProductById,
   ]);
 
   useEffect(() => {
@@ -935,7 +958,7 @@ const DataTable = ({
   }, [rowSelection, mappedData]);
 
   return (
-    <div className="mt-6">
+    <div>
       {selectedProductIds.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
           <span className="text-sm font-medium">
@@ -972,7 +995,7 @@ const DataTable = ({
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <DialogTitle>Cambiar Imagen del Producto</DialogTitle>
                 <DialogDescription>
@@ -982,6 +1005,7 @@ const DataTable = ({
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto shrink-0"
                 onClick={() => setFilePickerOpen(true)}
                 type="button"
                 disabled={uploading || isUploading}
@@ -1088,7 +1112,7 @@ const DataTable = ({
           )}
         </DialogContent>
       </Dialog>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -1161,11 +1185,11 @@ const DataTable = ({
         </Table>
       </div>
       {totalItems > 0 && (
-        <div className="flex items-center justify-between space-x-4 py-4 flex-wrap gap-4">
+        <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
             Mostrando {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, totalItems)} de {totalItems} productos
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -1176,7 +1200,7 @@ const DataTable = ({
             </Button>
 
             {/* Page numbers with ellipsis */}
-            <div className="flex items-center space-x-1">
+            <div className="flex flex-wrap items-center justify-center gap-1">
               {(() => {
                 const pages: (number | string)[] = [];
                 const maxVisible = 5;
@@ -1249,7 +1273,7 @@ const DataTable = ({
             </Button>
 
             {/* Go to page */}
-            <div className="flex items-center space-x-2 ml-4 pl-4 border-l">
+            <div className="flex items-center gap-2 sm:ml-2 sm:pl-4 sm:border-l">
               <span className="text-sm text-muted-foreground">Ir a:</span>
               <Input
                 type="number"

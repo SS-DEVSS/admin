@@ -259,7 +259,7 @@ const Marcas = () => {
                       </span>
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="w-[90%] max-w-2xl">
+                  <DialogContent className="w-[90%] max-w-2xl max-h-[90vh] overflow-y-auto">
                     {loading && isEditMode ? (
                       <div className="flex justify-center items-center py-12">
                         <div className="flex flex-col items-center gap-2">
