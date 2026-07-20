@@ -737,7 +737,7 @@ const CategoryCU = ({
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    <div className="flex flex-wrap gap-2 items-center border rounded-md p-3 min-h-12 bg-muted/30">
+                    <div className="flex flex-wrap gap-2 items-center rounded-md border border-input bg-background p-2 min-h-[44px] ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                       {[...selectedBrandIds].map((id) => {
                         const brand = brands.find((b) => b.id === id);
                         return brand ? (
@@ -759,7 +759,7 @@ const CategoryCU = ({
                         placeholder="Buscar y agregar marca..."
                         value={brandSearchQuery}
                         onChange={(e) => setBrandSearchQuery(e.target.value)}
-                        className="flex-1 min-w-[180px] border-0 bg-transparent shadow-none focus-visible:ring-0"
+                        className="h-8 flex-1 min-w-[160px] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">

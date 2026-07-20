@@ -13,9 +13,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FolderTree, FolderOpen, Plus, ChevronRight, ChevronDown, Trash2, Package, Pencil } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FolderTree, FolderOpen, Plus, ChevronRight, ChevronDown, Trash2, Package, Pencil, MoreVertical } from "lucide-react";
 import { useSubcategories, CreateSubcategoryPayload } from "@/hooks/useSubcategories";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
+import { useDeleteModal } from "@/context/delete-context";
 import MyDropzone from "@/components/Dropzone";
 import FilePickerModal from "@/components/files/FilePickerModal";
 import type { SubcategoryTreeNode } from "../../models/subcategory";
@@ -33,7 +41,6 @@ function TreeNode({
   onAddChild,
   onEdit,
   onDelete,
-  onCreated,
 }: {
   node: SubcategoryTreeNode;
   depth: number;
@@ -41,77 +48,81 @@ function TreeNode({
   onAddChild: (parentId: string) => void;
   onEdit: (node: SubcategoryTreeNode) => void;
   onDelete: (id: string) => void;
-  onCreated: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
 
   return (
-    <div className="border-l border-muted ml-2 mt-1" style={{ marginLeft: `${depth * 12}px` }}>
-      <div className="flex items-center gap-2 py-1.5 rounded hover:bg-muted/50 group">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="p-0.5 rounded"
-          aria-label={open ? "Colapsar" : "Expandir"}
-        >
-          {hasChildren ? (
-            open ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+    <div>
+      <div className="group flex w-fit max-w-full items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60">
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label={open ? "Colapsar" : "Expandir"}
+          >
+            {open ? (
+              <ChevronDown className="h-4 w-4" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )
-          ) : (
-            <span className="w-4 inline-block" />
-          )}
-        </button>
-        <span className="font-medium text-sm flex-1 truncate">{node.name}</span>
-        {(node.productCount ?? 0) > 0 && (
-          <Link
-            to={`/dashboard/productos?categoryId=${categoryId}&subcategoryId=${node.id}`}
-            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-            title={`Ver ${node.productCount} producto(s)`}
-          >
-            <Package className="h-3.5 w-3.5" />
-            {node.productCount} producto(s)
-          </Link>
-        )}
-        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 border-muted-foreground/30"
-            onClick={() => onEdit(node)}
-            title="Editar"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 px-2.5 border-muted-foreground/30"
-            onClick={() => onAddChild(node.id)}
-            title="Agregar subcategoría"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Subcategoría
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => onDelete(node.id)}
-            title="Eliminar"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+        ) : null}
+
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <FolderOpen className="h-4 w-4" />
         </div>
+
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{node.name}</p>
+          {(node.productCount ?? 0) > 0 && (
+            <Link
+              to={`/dashboard/productos?categoryId=${categoryId}&subcategoryId=${node.id}`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
+              title={`Ver ${node.productCount} producto(s)`}
+            >
+              <Package className="h-3 w-3" />
+              {node.productCount} producto(s)
+            </Link>
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Acciones de subcategoría"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => onAddChild(node.id)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar subcategoría
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(node)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete(node.id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
       {open && hasChildren && (
-        <div className="ml-2">
+        <div className="ml-[19px] border-l border-border/70 pl-2">
           {node.children!.map((child) => (
             <TreeNode
               key={child.id}
@@ -121,7 +132,6 @@ function TreeNode({
               onAddChild={onAddChild}
               onEdit={onEdit}
               onDelete={onDelete}
-              onCreated={onCreated}
             />
           ))}
         </div>
@@ -137,6 +147,7 @@ export default function SubcategoryTree({
 }: SubcategoryTreeProps) {
   const { getTree, create, update, remove, loading } = useSubcategories();
   const { uploadFile, uploading } = useS3FileManager();
+  const { openModal } = useDeleteModal();
   const [tree, setTree] = useState<SubcategoryTreeNode[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [createParent, setCreateParent] = useState<"root" | string>("root");
@@ -244,12 +255,16 @@ export default function SubcategoryTree({
     setEditImageUrl("");
   };
 
-  const handleDelete = async (id: string) => {
-    const msg =
-      "¿Eliminar esta subcategoría? Si tiene subcategorías hijas también se eliminarán. Los productos asignados quedarán sin subcategoría (ninguna).";
-    if (!window.confirm(msg)) return;
-    const ok = await remove(id);
-    if (ok) await loadTree();
+  const handleDelete = (id: string) => {
+    openModal({
+      title: "subcategoría",
+      description:
+        "Si tiene subcategorías hijas también se eliminarán. Los productos asignados quedarán sin subcategoría (ninguna). Esta acción no se puede deshacer.",
+      handleDelete: async () => {
+        const ok = await remove(id);
+        if (ok) await loadTree();
+      },
+    });
   };
 
   return (
@@ -285,7 +300,6 @@ export default function SubcategoryTree({
                 onAddChild={handleAddChild}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onCreated={loadTree}
               />
             ))}
           </div>
