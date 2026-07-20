@@ -1,10 +1,6 @@
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   ChevronDown,
@@ -12,6 +8,7 @@ import {
   Import,
   PlusCircle,
   Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -20,11 +17,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useDeferredValue } from "react";
 import { Category } from "@/models/category";
 import { useCategoryContext } from "@/context/categories-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import DataTable from "@/modules/products/ProductsTable";
 import Loader from "@/components/Loader";
@@ -44,11 +53,15 @@ type DrillLevel =
 const matchSearch = (query: string, name: string) =>
   !query.trim() || name.toLowerCase().includes(query.trim().toLowerCase());
 
-type SearchHit = { category: Category; subcategoryId: string | null; label: string };
+type SearchHit = {
+  category: Category;
+  subcategoryId: string | null;
+  label: string;
+};
 
 function flattenSearchHits(
   categories: Category[],
-  treeByCategory: Record<string, SubcategoryTreeNode[]>
+  treeByCategory: Record<string, SubcategoryTreeNode[]>,
 ): SearchHit[] {
   const hits: SearchHit[] = [];
   for (const cat of categories) {
@@ -74,7 +87,7 @@ const Products = () => {
   const { categories = [], loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
-    const saved = localStorage.getItem('products-search-filter');
+    const saved = localStorage.getItem("products-search-filter");
     return saved || "";
   });
   const [category, setCategory] = useState<Category | null>(null);
@@ -90,6 +103,14 @@ const Products = () => {
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
     useState<CatalogVisibilityFilter>("all");
 
+  const isDesktopFilters = useMediaQuery("(min-width: 1024px)");
+  const activeProductFilterCount =
+    (category ? 1 : 0) + (catalogVisibilityFilter !== "all" ? 1 : 0);
+  const clearProductFilters = () => {
+    selectCategoryAndSubcategory(null, null);
+    setCatalogVisibilityFilter("all");
+  };
+
   // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
   useEffect(() => {
     if (!filterMenuOpen || !categories.length) return;
@@ -104,7 +125,7 @@ const Products = () => {
             .map(async (cat) => {
               const tree = await getTree(cat.id!);
               return [cat.id!, tree] as const;
-            })
+            }),
         );
 
         if (!isCancelled) {
@@ -130,13 +151,16 @@ const Products = () => {
     const value = e.target.value;
     setSearchFilter(value);
     if (value) {
-      localStorage.setItem('products-search-filter', value);
+      localStorage.setItem("products-search-filter", value);
     } else {
-      localStorage.removeItem('products-search-filter');
+      localStorage.removeItem("products-search-filter");
     }
   };
 
-  const selectCategoryAndSubcategory = (cat: Category | null, subId: string | null) => {
+  const selectCategoryAndSubcategory = (
+    cat: Category | null,
+    subId: string | null,
+  ) => {
     setCategory(cat);
     setSubcategoryId(subId);
     if (cat?.id) {
@@ -148,9 +172,13 @@ const Products = () => {
   };
 
   const goBack = () => setDrillStack((prev) => prev.slice(0, -1));
-  const drillIntoCategory = (cat: Category) => setDrillStack((prev) => [...prev, { type: "category", category: cat }]);
+  const drillIntoCategory = (cat: Category) =>
+    setDrillStack((prev) => [...prev, { type: "category", category: cat }]);
   const drillIntoSubcategory = (cat: Category, node: SubcategoryTreeNode) =>
-    setDrillStack((prev) => [...prev, { type: "subcategory", category: cat, node }]);
+    setDrillStack((prev) => [
+      ...prev,
+      { type: "subcategory", category: cat, node },
+    ]);
 
   const handleFilterOpenChange = (open: boolean) => {
     setFilterMenuOpen(open);
@@ -164,7 +192,7 @@ const Products = () => {
   const globalSearchHits =
     searchQuery.length > 0
       ? flattenSearchHits(categories, subcategoryTreeByCategory).filter((hit) =>
-          hit.label.toLowerCase().includes(searchQuery)
+          hit.label.toLowerCase().includes(searchQuery),
         )
       : [];
   const showGlobalSearch = searchQuery.length > 0;
@@ -172,8 +200,8 @@ const Products = () => {
   useEffect(() => {
     if (categories.length === 0) return;
 
-    const fromUrl = searchParams.get('categoryId');
-    const subFromUrl = searchParams.get('subcategoryId');
+    const fromUrl = searchParams.get("categoryId");
+    const subFromUrl = searchParams.get("subcategoryId");
     if (fromUrl) {
       const cat = categories.find((c) => c.id === fromUrl);
       if (cat) {
@@ -198,7 +226,10 @@ const Products = () => {
       setCategory(savedCategory);
     } else if (!category?.id) {
       setCategory(categories[0]);
-      localStorage.setItem("products-selected-category", categories[0].id || "");
+      localStorage.setItem(
+        "products-selected-category",
+        categories[0].id || "",
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories]);
@@ -207,10 +238,16 @@ const Products = () => {
     if (!category) return "Todas las categorías";
     if (!subcategoryId) return category.name;
 
-    const tree = category.id ? subcategoryTreeByCategory[category.id] : undefined;
+    const tree = category.id
+      ? subcategoryTreeByCategory[category.id]
+      : undefined;
     if (!tree) return category.name;
 
-    const findPath = (nodes: SubcategoryTreeNode[], targetId: string, path: string[] = []): string[] | null => {
+    const findPath = (
+      nodes: SubcategoryTreeNode[],
+      targetId: string,
+      path: string[] = [],
+    ): string[] | null => {
       for (const node of nodes) {
         const currentPath = [...path, node.name];
         if (node.id === targetId) return currentPath;
@@ -227,302 +264,349 @@ const Products = () => {
     return `${category.name} › ${path.join(" › ")}`;
   };
 
+  const categoryFilterMenu = (
+    <DropdownMenu
+      open={filterMenuOpen}
+      onOpenChange={handleFilterOpenChange}
+      modal={false}
+    >
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-full lg:w-[320px] justify-between"
+        >
+          <span className="truncate text-left">{getSelectedFilterLabel()}</span>
+          <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="w-[280px] p-0"
+        align="start"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        modal={false}
+      >
+        <div
+          className="p-2 border-b"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar categoría o subcategoría..."
+              value={filterMenuSearch}
+              onChange={(e) => setFilterMenuSearch(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              className="h-9 pl-8"
+            />
+          </div>
+        </div>
+        {drillStack.length > 0 && !showGlobalSearch && (
+          <div className="px-3 py-2 bg-primary/10 border-b border-primary/20">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Estás en
+            </p>
+            <p
+              className="text-sm font-semibold truncate"
+              title={drillStack
+                .map((d) =>
+                  d.type === "category" ? d.category.name : d.node.name,
+                )
+                .join(" › ")}
+            >
+              {drillStack
+                .map((d) =>
+                  d.type === "category" ? d.category.name : d.node.name,
+                )
+                .join(" › ")}
+            </p>
+          </div>
+        )}
+        <div className="max-h-[300px] overflow-y-auto py-1">
+          {showGlobalSearch ? (
+            <>
+              <DropdownMenuItem
+                onClick={() => selectCategoryAndSubcategory(null, null)}
+              >
+                Todas las categorías
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {globalSearchHits.length === 0 ? (
+                <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                  No hay coincidencias
+                </div>
+              ) : (
+                globalSearchHits.map((hit) => (
+                  <DropdownMenuItem
+                    key={`${hit.category.id ?? ""}-${hit.subcategoryId ?? "all"}`}
+                    onClick={() =>
+                      selectCategoryAndSubcategory(
+                        hit.category,
+                        hit.subcategoryId,
+                      )
+                    }
+                  >
+                    {hit.label}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </>
+          ) : (
+            <>
+              {drillStack.length > 0 && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    onClick={goBack}
+                    className="text-muted-foreground"
+                  >
+                    ← Volver
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {drillStack.length === 0 && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => selectCategoryAndSubcategory(null, null)}
+                  >
+                    Todas las categorías
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {categories
+                    .filter((cat) =>
+                      matchSearch(filterMenuSearchDeferred, cat.name ?? ""),
+                    )
+                    .map((cat) => {
+                      if (!cat.id) return null;
+                      const tree = subcategoryTreeByCategory[cat.id];
+                      const hasChildren = tree && tree.length > 0;
+                      return (
+                        <DropdownMenuItem
+                          key={cat.id}
+                          onSelect={(e) => {
+                            if (hasChildren) e.preventDefault();
+                          }}
+                          onClick={() =>
+                            hasChildren
+                              ? drillIntoCategory(cat)
+                              : selectCategoryAndSubcategory(cat, null)
+                          }
+                          className="flex items-center justify-between"
+                        >
+                          <span>{cat.name}</span>
+                          {hasChildren && <ChevronRight className="h-4 w-4" />}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                </>
+              )}
+              {drillStack.length > 0 &&
+                (() => {
+                  const top = drillStack[drillStack.length - 1];
+                  if (top.type === "category") {
+                    const catId = top.category.id ?? "";
+                    const nodes = subcategoryTreeByCategory[catId] ?? [];
+                    return (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            selectCategoryAndSubcategory(top.category, null)
+                          }
+                        >
+                          Todas las subcategorías
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {nodes
+                          .filter((n: SubcategoryTreeNode) =>
+                            matchSearch(filterMenuSearchDeferred, n.name),
+                          )
+                          .map((node: SubcategoryTreeNode) => {
+                            const hasChildren =
+                              node.children && node.children.length > 0;
+                            return (
+                              <DropdownMenuItem
+                                key={node.id}
+                                onSelect={(e) => {
+                                  if (hasChildren) e.preventDefault();
+                                }}
+                                onClick={() =>
+                                  hasChildren
+                                    ? drillIntoSubcategory(top.category, node)
+                                    : selectCategoryAndSubcategory(
+                                        top.category,
+                                        node.id,
+                                      )
+                                }
+                                className="flex items-center justify-between"
+                              >
+                                <span>{node.name}</span>
+                                {hasChildren && (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                      </>
+                    );
+                  }
+                  const nodes = top.node.children ?? [];
+                  return (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          selectCategoryAndSubcategory(
+                            top.category,
+                            top.node.id,
+                          )
+                        }
+                      >
+                        {top.node.name}
+                      </DropdownMenuItem>
+                      {nodes.length > 0 && <DropdownMenuSeparator />}
+                      {nodes
+                        .filter((n: SubcategoryTreeNode) =>
+                          matchSearch(filterMenuSearchDeferred, n.name),
+                        )
+                        .map((node: SubcategoryTreeNode) => {
+                          const hasChildren =
+                            node.children && node.children.length > 0;
+                          return (
+                            <DropdownMenuItem
+                              key={node.id}
+                              onSelect={(e) => {
+                                if (hasChildren) e.preventDefault();
+                              }}
+                              onClick={() =>
+                                hasChildren
+                                  ? drillIntoSubcategory(top.category, node)
+                                  : selectCategoryAndSubcategory(
+                                      top.category,
+                                      node.id,
+                                    )
+                              }
+                              className="flex items-center justify-between"
+                            >
+                              <span>{node.name}</span>
+                              {hasChildren && (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                    </>
+                  );
+                })()}
+            </>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const catalogVisibilitySelect = (
+    <Select
+      value={catalogVisibilityFilter}
+      onValueChange={(value) =>
+        setCatalogVisibilityFilter(value as CatalogVisibilityFilter)
+      }
+    >
+      <SelectTrigger className="w-full lg:w-[220px]">
+        <SelectValue placeholder="Visibilidad en catálogo" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos (visibles y ocultos)</SelectItem>
+        <SelectItem value="visible">Visibles en catálogo</SelectItem>
+        <SelectItem value="hidden">Ocultos en catálogo</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
   return (
     <Layout>
       <div className="w-full max-w-full">
         <Card className="border-0 shadow-none w-full">
           <CardHeader className="flex flex-row flex-wrap items-end gap-4 p-0 m-0 pb-6 w-full">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 w-full lg:w-auto">
               <CardTitle>Productos</CardTitle>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="relative ml-0 flex-1 md:grow-0">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Buscar Producto..."
-                    value={searchFilter}
-                    onChange={handleSearchFilter}
-                    className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                  />
-                </div>
-                <DropdownMenu open={filterMenuOpen} onOpenChange={handleFilterOpenChange} modal={false}>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full lg:w-[320px] justify-between"
-                    >
-                      <span className="truncate text-left">
-                        {getSelectedFilterLabel()}
-                      </span>
-                      <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    className="w-[280px] p-0"
-                    align="start"
-                    onCloseAutoFocus={(e) => e.preventDefault()}
-                    modal={false}
-                  >
-                    <div
-                      className="p-2 border-b"
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="search"
-                          placeholder="Buscar categoría o subcategoría..."
-                          value={filterMenuSearch}
-                          onChange={(e) => setFilterMenuSearch(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          onKeyUp={(e) => e.stopPropagation()}
-                          className="h-9 pl-8"
-                        />
-                      </div>
-                    </div>
-                    {drillStack.length > 0 && !showGlobalSearch && (
-                      <div className="px-3 py-2 bg-primary/10 border-b border-primary/20">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estás en</p>
-                        <p className="text-sm font-semibold truncate" title={drillStack.map((d) => d.type === "category" ? d.category.name : d.node.name).join(" › ")}>
-                          {drillStack.map((d) => (d.type === "category" ? d.category.name : d.node.name)).join(" › ")}
-                        </p>
-                      </div>
-                    )}
-                    <div className="max-h-[300px] overflow-y-auto py-1">
-                      {showGlobalSearch ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() => selectCategoryAndSubcategory(null, null)}
-                          >
-                            Todas las categorías
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {globalSearchHits.length === 0 ? (
-                            <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                              No hay coincidencias
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                  <div className="relative flex-1 lg:flex-none lg:grow-0">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Buscar Producto..."
+                      value={searchFilter}
+                      onChange={handleSearchFilter}
+                      className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                    />
+                  </div>
+                  {!isDesktopFilters && (
+                    <Drawer direction="bottom">
+                      <DrawerTrigger asChild>
+                        <Button variant="outline" className="gap-2 shrink-0">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Filtros
+                          {activeProductFilterCount > 0 && (
+                            <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                              {activeProductFilterCount}
+                            </Badge>
+                          )}
+                        </Button>
+                      </DrawerTrigger>
+                      <DrawerContent>
+                        <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                          <DrawerHeader>
+                            <DrawerTitle>Filtrar productos</DrawerTitle>
+                            <DrawerDescription>
+                              Filtra por categoría y visibilidad en catálogo.
+                            </DrawerDescription>
+                          </DrawerHeader>
+                          <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium">
+                                Categoría
+                              </label>
+                              {categoryFilterMenu}
                             </div>
-                          ) : (
-                            globalSearchHits.map((hit) => (
-                              <DropdownMenuItem
-                                key={`${hit.category.id ?? ""}-${hit.subcategoryId ?? "all"}`}
-                                onClick={() =>
-                                  selectCategoryAndSubcategory(
-                                    hit.category,
-                                    hit.subcategoryId
-                                  )
-                                }
-                              >
-                                {hit.label}
-                              </DropdownMenuItem>
-                            ))
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {drillStack.length > 0 && (
-                            <>
-                              <DropdownMenuItem
-                                onSelect={(e) => e.preventDefault()}
-                                onClick={goBack}
-                                className="text-muted-foreground"
-                              >
-                                ← Volver
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                            </>
-                          )}
-                          {drillStack.length === 0 && (
-                            <>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  selectCategoryAndSubcategory(null, null)
-                                }
-                              >
-                                Todas las categorías
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {categories
-                                .filter((cat) =>
-                                  matchSearch(filterMenuSearchDeferred, cat.name ?? "")
-                                )
-                                .map((cat) => {
-                                  if (!cat.id) return null;
-                                  const tree =
-                                    subcategoryTreeByCategory[cat.id];
-                                  const hasChildren =
-                                    tree && tree.length > 0;
-                                  return (
-                                    <DropdownMenuItem
-                                      key={cat.id}
-                                      onSelect={(e) => {
-                                        if (hasChildren) e.preventDefault();
-                                      }}
-                                      onClick={() =>
-                                        hasChildren
-                                          ? drillIntoCategory(cat)
-                                          : selectCategoryAndSubcategory(
-                                              cat,
-                                              null
-                                            )
-                                      }
-                                      className="flex items-center justify-between"
-                                    >
-                                      <span>{cat.name}</span>
-                                      {hasChildren && (
-                                        <ChevronRight className="h-4 w-4" />
-                                      )}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                            </>
-                          )}
-                          {drillStack.length > 0 &&
-                            (() => {
-                              const top =
-                                drillStack[drillStack.length - 1];
-                              if (top.type === "category") {
-                                const catId =
-                                  top.category.id ?? "";
-                                const nodes =
-                                  subcategoryTreeByCategory[catId] ?? [];
-                                return (
-                                  <>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        selectCategoryAndSubcategory(
-                                          top.category,
-                                          null
-                                        )
-                                      }
-                                    >
-                                      Todas las subcategorías
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    {nodes
-                                      .filter((n: SubcategoryTreeNode) =>
-                                        matchSearch(
-                                          filterMenuSearchDeferred,
-                                          n.name
-                                        )
-                                      )
-                                      .map((node: SubcategoryTreeNode) => {
-                                        const hasChildren =
-                                          node.children &&
-                                          node.children.length > 0;
-                                        return (
-                                          <DropdownMenuItem
-                                            key={node.id}
-                                            onSelect={(e) => {
-                                              if (hasChildren)
-                                                e.preventDefault();
-                                            }}
-                                            onClick={() =>
-                                              hasChildren
-                                                ? drillIntoSubcategory(
-                                                    top.category,
-                                                    node
-                                                  )
-                                                : selectCategoryAndSubcategory(
-                                                    top.category,
-                                                    node.id
-                                                  )
-                                            }
-                                            className="flex items-center justify-between"
-                                          >
-                                            <span>{node.name}</span>
-                                            {hasChildren && (
-                                              <ChevronRight className="h-4 w-4" />
-                                            )}
-                                          </DropdownMenuItem>
-                                        );
-                                      })}
-                                  </>
-                                );
-                              }
-                              const nodes = top.node.children ?? [];
-                              return (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      selectCategoryAndSubcategory(
-                                        top.category,
-                                        top.node.id
-                                      )
-                                    }
-                                  >
-                                    {top.node.name}
-                                  </DropdownMenuItem>
-                                  {nodes.length > 0 && (
-                                    <DropdownMenuSeparator />
-                                  )}
-                                  {nodes
-                                    .filter((n: SubcategoryTreeNode) =>
-                                      matchSearch(
-                                        filterMenuSearchDeferred,
-                                        n.name
-                                      )
-                                    )
-                                    .map((node: SubcategoryTreeNode) => {
-                                      const hasChildren =
-                                        node.children &&
-                                        node.children.length > 0;
-                                      return (
-                                        <DropdownMenuItem
-                                          key={node.id}
-                                          onSelect={(e) => {
-                                            if (hasChildren)
-                                              e.preventDefault();
-                                          }}
-                                          onClick={() =>
-                                            hasChildren
-                                              ? drillIntoSubcategory(
-                                                  top.category,
-                                                  node
-                                                )
-                                              : selectCategoryAndSubcategory(
-                                                  top.category,
-                                                  node.id
-                                                )
-                                          }
-                                          className="flex items-center justify-between"
-                                        >
-                                          <span>{node.name}</span>
-                                          {hasChildren && (
-                                            <ChevronRight className="h-4 w-4" />
-                                          )}
-                                        </DropdownMenuItem>
-                                      );
-                                    })}
-                                </>
-                              );
-                            })()}
-                        </>
-                      )}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Select
-                  value={catalogVisibilityFilter}
-                  onValueChange={(value) =>
-                    setCatalogVisibilityFilter(value as CatalogVisibilityFilter)
-                  }
-                >
-                  <SelectTrigger className="w-full lg:w-[220px]">
-                    <SelectValue placeholder="Visibilidad en catálogo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos (visibles y ocultos)</SelectItem>
-                    <SelectItem value="visible">Visibles en catálogo</SelectItem>
-                    <SelectItem value="hidden">Ocultos en catálogo</SelectItem>
-                  </SelectContent>
-                </Select>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium">
+                                Visibilidad en catálogo
+                              </label>
+                              {catalogVisibilitySelect}
+                            </div>
+                          </div>
+                          <DrawerFooter>
+                            <Button
+                              variant="outline"
+                              onClick={clearProductFilters}
+                              disabled={activeProductFilterCount === 0}
+                            >
+                              Limpiar filtros
+                            </Button>
+                            <DrawerClose asChild>
+                              <Button>Ver resultados</Button>
+                            </DrawerClose>
+                          </DrawerFooter>
+                        </div>
+                      </DrawerContent>
+                    </Drawer>
+                  )}
+                </div>
+                {isDesktopFilters && (
+                  <>
+                    {categoryFilterMenu}
+                    {catalogVisibilitySelect}
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
               <div className="rounded-lg flex flex-1 sm:flex-none bg-[#F4F4F5]">
                 <div
                   onClick={() => navigate("/dashboard/importaciones")}
-                  className="flex w-full justify-center hover:cursor-pointer gap-3 items-center hover:bg-primary hover:text-white hover:[&>svg]:text-white rounded-lg m-1 px-3"
+                  className="flex w-full justify-center hover:cursor-pointer gap-3 items-center hover:bg-primary hover:text-white hover:[&>svg]:text-white rounded-lg px-3"
                 >
                   <Import />
                   <Button
@@ -533,7 +617,10 @@ const Products = () => {
                   </Button>
                 </div>
               </div>
-              <Link to="/dashboard/producto/new-product" className="flex flex-1 sm:flex-none">
+              <Link
+                to="/dashboard/producto/new-product"
+                className="flex flex-1 sm:flex-none"
+              >
                 <Button size="sm" className="h-10 px-6 gap-1 w-full sm:w-auto">
                   <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
