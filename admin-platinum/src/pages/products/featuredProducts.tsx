@@ -202,7 +202,7 @@ const FeaturedProducts = () => {
     <Layout>
       <div className="w-full max-w-full">
         <Card className="border-0 shadow-none w-full">
-          <CardHeader className="flex flex-row items-center justify-between p-0 m-0 pb-6 w-full">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 p-0 m-0 pb-6 w-full">
             <div className="flex flex-col gap-3">
               <CardTitle>Productos Destacados</CardTitle>
               <CardDescription>
@@ -210,6 +210,7 @@ const FeaturedProducts = () => {
               </CardDescription>
             </div>
             <Button
+              className="w-full sm:w-auto"
               onClick={handleOpenProductSelect}
               disabled={featuredProducts.length >= 6}
             >

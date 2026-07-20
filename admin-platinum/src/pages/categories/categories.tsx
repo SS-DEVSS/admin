@@ -73,13 +73,13 @@ const Categorias = () => {
     <Layout>
       <div>
         <Card className="border-0 shadow-none">
-          <CardHeader className="flex flex-row p-0 m-0">
+          <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0 pb-6">
             <div className="flex flex-col gap-3">
               <CardTitle>Categorías</CardTitle>
               <CardDescription>Maneja tus categorías.</CardDescription>
             </div>
-            <div className="ml-auto flex gap-3">
-              <div className="relative ml-auto flex-1 md:grow-0">
+            <div className="flex flex-col gap-3 w-full lg:w-auto lg:ml-auto lg:flex-row lg:flex-wrap lg:items-center">
+              <div className="relative w-full lg:flex-1 lg:min-w-[140px] md:grow-0">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
@@ -89,30 +89,32 @@ const Categorias = () => {
                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
                 />
               </div>
-              <Select value={brandFilter} onValueChange={setBrandFilter}>
-                <SelectTrigger className="w-[280px]">
-                  <SelectValue placeholder="Selecciona una marca" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Marcas</SelectLabel>
-                    <SelectItem value={"-"}>Seleccionar</SelectItem>
-                    {brands.map((brand: Brand) => (
-                      <SelectItem key={brand.id} value={brand.id!}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Link to="/dashboard/categorias/nueva">
-                <Button size="sm" className="h-10 px-6 gap-1">
-                  <PlusCircle className="h-3.5 w-3.5 mr-2" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Agregar Categoría
-                  </span>
-                </Button>
-              </Link>
+              <div className="flex items-center gap-3 w-full lg:w-auto">
+                <Select value={brandFilter} onValueChange={setBrandFilter}>
+                  <SelectTrigger className="flex-1 min-w-[160px] md:w-[280px] lg:flex-none">
+                    <SelectValue placeholder="Selecciona una marca" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Marcas</SelectLabel>
+                      <SelectItem value={"-"}>Seleccionar</SelectItem>
+                      {brands.map((brand: Brand) => (
+                        <SelectItem key={brand.id} value={brand.id!}>
+                          {brand.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Link to="/dashboard/categorias/nueva" className="shrink-0">
+                  <Button size="sm" className="h-10 px-6 gap-1">
+                    <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
+                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                      Agregar Categoría
+                    </span>
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
           {loading ? (

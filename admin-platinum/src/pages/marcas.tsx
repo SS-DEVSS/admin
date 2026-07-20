@@ -215,15 +215,15 @@ const Marcas = () => {
       <Layout>
         <div>
           <Card className="border-0 shadow-none">
-            <CardHeader className="flex flex-row p-0 m-0">
+            <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0 pb-6">
               <div className="flex flex-col gap-3">
                 <CardTitle>Marcas</CardTitle>
                 <CardDescription>
                   Maneja tus marcas y las categorías asociadas a cada una de ellas
                 </CardDescription>
               </div>
-              <div className="ml-auto flex gap-3">
-                <div className="relative ml-auto flex-1 md:grow-0">
+              <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
+                <div className="relative flex-1 md:grow-0">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
@@ -250,10 +250,10 @@ const Marcas = () => {
                   <DialogTrigger asChild>
                     <Button
                       size="sm"
-                      className="h-10 px-6 gap-1"
+                      className="h-10 px-6 gap-1 shrink-0"
                       onClick={() => handleOpenModal()}
                     >
-                      <PlusCircle className="h-3.5 w-3.5 mr-2" />
+                      <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                       <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                         Agregar Marca
                       </span>

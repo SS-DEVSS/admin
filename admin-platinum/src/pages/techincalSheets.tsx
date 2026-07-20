@@ -348,7 +348,7 @@ const TechincalSheets = () => {
   return (
     <Layout>
       <Card className="border-0 shadow-none flex flex-col">
-        <CardHeader className="flex flex-row flex-wrap items-start gap-4 p-0 m-0">
+        <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0">
           <div className="flex flex-col gap-3">
             <CardTitle>Boletines</CardTitle>
             <CardDescription>
@@ -360,8 +360,8 @@ const TechincalSheets = () => {
               </p>
             ) : null}
           </div>
-          <div className="ml-auto flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[260px] max-w-[520px]">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto sm:ml-auto">
+            <div className="relative flex-1 min-w-[200px] sm:max-w-[520px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -386,10 +386,10 @@ const TechincalSheets = () => {
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="h-10 px-6 gap-1"
+                  className="h-10 px-6 gap-1 shrink-0"
                   onClick={toggleModal}
                 >
-                  <PlusCircle className="h-3.5 w-3.5 mr-2" />
+                  <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                     Crear boletín
                   </span>

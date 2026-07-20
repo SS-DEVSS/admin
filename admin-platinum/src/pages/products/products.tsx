@@ -231,7 +231,7 @@ const Products = () => {
     <Layout>
       <div className="w-full max-w-full">
         <Card className="border-0 shadow-none w-full">
-          <CardHeader className="flex flex-row items-end p-0 m-0 pb-6 w-full">
+          <CardHeader className="flex flex-row flex-wrap items-end gap-4 p-0 m-0 pb-6 w-full">
             <div className="flex flex-col gap-3">
               <CardTitle>Productos</CardTitle>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -518,11 +518,11 @@ const Products = () => {
                 </Select>
               </div>
             </div>
-            <div className="ml-auto flex items-center gap-3">
-              <div className="rounded-lg flex bg-[#F4F4F5]">
+            <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
+              <div className="rounded-lg flex flex-1 sm:flex-none bg-[#F4F4F5]">
                 <div
                   onClick={() => navigate("/dashboard/importaciones")}
-                  className="flex hover:cursor-pointer gap-3 items-center hover:bg-primary hover:text-white hover:[&>svg]:text-white rounded-lg m-1 px-3"
+                  className="flex w-full justify-center hover:cursor-pointer gap-3 items-center hover:bg-primary hover:text-white hover:[&>svg]:text-white rounded-lg m-1 px-3"
                 >
                   <Import />
                   <Button
@@ -533,9 +533,9 @@ const Products = () => {
                   </Button>
                 </div>
               </div>
-              <Link to="/dashboard/producto/new-product">
-                <Button size="sm" className="h-10 px-6 gap-1">
-                  <PlusCircle className="h-3.5 w-3.5 mr-2" />
+              <Link to="/dashboard/producto/new-product" className="flex flex-1 sm:flex-none">
+                <Button size="sm" className="h-10 px-6 gap-1 w-full sm:w-auto">
+                  <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                     Agregar Producto
                   </span>

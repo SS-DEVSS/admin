@@ -12,7 +12,8 @@ const CreatePassword = () => {
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
@@ -21,7 +22,9 @@ const CreatePassword = () => {
     setError("");
   };
 
-  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleConfirmPasswordChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setConfirmPassword(e.target.value);
     setError("");
   };
@@ -53,7 +56,10 @@ const CreatePassword = () => {
         navigate("/dashboard/productos");
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || "Error al crear la contraseña";
+      const errorMessage =
+        err.response?.data?.error ||
+        err.message ||
+        "Error al crear la contraseña";
       setError(errorMessage);
     } finally {
       setLoading(false);

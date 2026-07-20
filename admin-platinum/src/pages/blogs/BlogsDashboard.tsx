@@ -9,6 +9,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { newsContext } from "@/context/news-context";
@@ -64,15 +71,15 @@ const BlogsDashboard = () => {
   return (
     <Layout>
       <Card className="border-0 shadow-none">
-        <CardHeader className="flex flex-row flex-wrap items-start gap-4 p-0 m-0">
+        <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0">
           <div className="flex flex-col gap-3">
             <CardTitle>Blogs</CardTitle>
             <CardDescription>
               Gestiona el contenido publicado y sus vínculos relacionados.
             </CardDescription>
           </div>
-          <div className="ml-auto flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[200px] max-w-[336px]">
+          <div className="flex flex-col gap-3 w-full lg:w-auto lg:ml-auto lg:flex-row lg:flex-wrap lg:items-center">
+            <div className="relative w-full lg:flex-1 lg:min-w-[140px] lg:max-w-[280px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -82,23 +89,28 @@ const BlogsDashboard = () => {
                 className="w-full rounded-lg bg-background pl-8"
               />
             </div>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              aria-label="Ordenar blogs por fecha"
-            >
-              <option value="newest">Mas reciente primero</option>
-              <option value="oldest">Mas antiguo primero</option>
-            </select>
-            <Link to="/dashboard/blogs/nueva">
-              <Button size="sm" className="h-10 px-6 gap-1">
-                <PlusCircle className="h-3.5 w-3.5 mr-2" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Crear blog
-                </span>
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3 w-full lg:w-auto">
+              <Select
+                value={sortOrder}
+                onValueChange={(value) => setSortOrder(value as "newest" | "oldest")}
+              >
+                <SelectTrigger className="flex-1 min-w-[210px] lg:flex-none lg:w-[210px]" aria-label="Ordenar blogs por fecha">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Mas reciente primero</SelectItem>
+                  <SelectItem value="oldest">Mas antiguo primero</SelectItem>
+                </SelectContent>
+              </Select>
+              <Link to="/dashboard/blogs/nueva" className="shrink-0">
+                <Button size="sm" className="h-10 px-6 gap-1">
+                  <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Crear blog
+                  </span>
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0 mt-4">

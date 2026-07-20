@@ -20,7 +20,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, RefreshCw, Ban, AlertTriangle, StopCircle } from "lucide-react";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, RefreshCw, Ban, AlertTriangle, StopCircle, SlidersHorizontal } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -308,6 +318,19 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
     [categories]
   );
 
+  const activeFilterCount = [
+    categoryFilter !== "all",
+    typeFilter !== "all",
+    statusFilter !== "all",
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setCategoryFilter("all");
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setPage(1);
+  };
+
   const selectedJobData = jobs.find((j) => j.id === selectedJob);
 
   const selectedJobErrors = useMemo(
@@ -332,77 +355,134 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
     }
   };
 
+  const categoryFilterSelect = (
+    <Select
+      value={categoryFilter}
+      onValueChange={(value) => {
+        setCategoryFilter(value);
+        setPage(1);
+      }}
+    >
+      <SelectTrigger className="w-full sm:w-[220px]">
+        <SelectValue placeholder="Categoría" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todas las categorías</SelectItem>
+        {sortedCategories.map((c) =>
+          c.id ? (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name}
+            </SelectItem>
+          ) : null
+        )}
+      </SelectContent>
+    </Select>
+  );
+
+  const typeFilterSelect = (
+    <Select
+      value={typeFilter}
+      onValueChange={(value) => {
+        setTypeFilter(value as ImportJobType | "all");
+        setPage(1);
+      }}
+    >
+      <SelectTrigger className="w-full sm:w-[200px]">
+        <SelectValue placeholder="Tipo" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos los tipos</SelectItem>
+        <SelectItem value="products">Productos</SelectItem>
+        <SelectItem value="references">Referencias</SelectItem>
+        <SelectItem value="applications">Aplicaciones</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
+  const statusFilterSelect = (
+    <Select
+      value={statusFilter}
+      onValueChange={(value) => {
+        setStatusFilter(value as ImportJobStatus | "all");
+        setPage(1);
+      }}
+    >
+      <SelectTrigger className="w-full sm:w-[200px]">
+        <SelectValue placeholder="Estado" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos los estados</SelectItem>
+        <SelectItem value="pending">Pendiente</SelectItem>
+        <SelectItem value="processing">En Progreso</SelectItem>
+        <SelectItem value="completed">Completado</SelectItem>
+        <SelectItem value="failed">Fallido</SelectItem>
+        <SelectItem value="stopped">Detenido</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
   return (
     <div className="w-full max-w-full">
       <Card className="border-0 shadow-none w-full">
-        <CardHeader className="flex flex-row items-end p-0 m-0 pb-6 w-full">
-          <div className="flex flex-col gap-3">
-            <CardTitle>Importaciones</CardTitle>
-            <div className="flex flex-wrap gap-3">
-              <Select
-                value={categoryFilter}
-                onValueChange={(value) => {
-                  setCategoryFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {sortedCategories.map((c) =>
-                    c.id ? (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ) : null
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 p-0 m-0 pb-6 w-full">
+          <CardTitle>Importaciones</CardTitle>
+          <div className="flex items-center gap-3 w-full lg:w-auto lg:ml-auto">
+            <Drawer direction="bottom">
+              <DrawerTrigger asChild>
+                <Button variant="outline" className="gap-2 shrink-0 lg:hidden">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                      {activeFilterCount}
+                    </Badge>
                   )}
-                </SelectContent>
-              </Select>
-              <Select
-                value={typeFilter}
-                onValueChange={(value) => {
-                  setTypeFilter(value as ImportJobType | "all");
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los tipos</SelectItem>
-                  <SelectItem value="products">Productos</SelectItem>
-                  <SelectItem value="references">Referencias</SelectItem>
-                  <SelectItem value="applications">Aplicaciones</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value as ImportJobStatus | "all");
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="processing">En Progreso</SelectItem>
-                  <SelectItem value="completed">Completado</SelectItem>
-                  <SelectItem value="failed">Fallido</SelectItem>
-                  <SelectItem value="stopped">Detenido</SelectItem>
-                </SelectContent>
-              </Select>
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent>
+                <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                  <DrawerHeader>
+                    <DrawerTitle>Filtrar importaciones</DrawerTitle>
+                    <DrawerDescription>
+                      Filtra los jobs de importación por categoría, tipo y estado.
+                    </DrawerDescription>
+                  </DrawerHeader>
+                  <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Categoría</label>
+                      {categoryFilterSelect}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Tipo</label>
+                      {typeFilterSelect}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Estado</label>
+                      {statusFilterSelect}
+                    </div>
+                  </div>
+                  <DrawerFooter>
+                    <Button
+                      variant="outline"
+                      onClick={clearFilters}
+                      disabled={activeFilterCount === 0}
+                    >
+                      Limpiar filtros
+                    </Button>
+                    <DrawerClose asChild>
+                      <Button>Ver resultados</Button>
+                    </DrawerClose>
+                  </DrawerFooter>
+                </div>
+              </DrawerContent>
+            </Drawer>
+            <div className="hidden lg:flex lg:items-center lg:gap-3">
+              {categoryFilterSelect}
+              {typeFilterSelect}
+              {statusFilterSelect}
             </div>
+            {headerActions}
           </div>
-          {headerActions && (
-            <div className="ml-auto flex items-center gap-3">
-              {headerActions}
-            </div>
-          )}
         </CardHeader>
         <div>
           {loading ? (

@@ -4,7 +4,18 @@ import Layout from '@/components/Layouts/Layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Loader2, Upload, Search, Grid3x3, List, X, ArrowUpDown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
+import { ChevronLeft, ChevronRight, Loader2, Upload, Search, Grid3x3, List, X, ArrowUpDown, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import FileList from '@/components/files/FileList';
 import FileUploadModal from '@/components/files/FileUploadModal';
 
@@ -84,29 +95,62 @@ const FileManager = () => {
     setPage(1);
   };
 
+  const activeFilterCount = filterType !== 'all' ? 1 : 0;
+
+  const clearFilters = () => {
+    setContextFilterType('all');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setPage(1);
+  };
+
+  const sortSelect = (
+    <Select value={`${sortBy}-${sortOrder}`} onValueChange={handleSortChange}>
+      <SelectTrigger className="w-full sm:w-[220px]">
+        <div className="flex items-center gap-2 whitespace-nowrap">
+          <ArrowUpDown className="h-4 w-4 flex-shrink-0" />
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="createdAt-desc">Fecha (Más reciente)</SelectItem>
+        <SelectItem value="createdAt-asc">Fecha (Más antiguo)</SelectItem>
+        <SelectItem value="name-asc">Nombre (A-Z)</SelectItem>
+        <SelectItem value="name-desc">Nombre (Z-A)</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
+  const typeSelect = (
+    <Select value={filterType} onValueChange={handleFilterChange}>
+      <SelectTrigger className="w-full sm:w-[180px]">
+        <SelectValue placeholder="Todos" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos</SelectItem>
+        <SelectItem value="image">Imágenes</SelectItem>
+        <SelectItem value="document">Documentos</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
   return (
     <Layout>
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold leading-none tracking-tight">
-            Administrador de Archivos
-          </h1>
-          {total !== undefined && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {total} archivo(s) en total
-            </p>
-          )}
-        </div>
-        <Button onClick={() => setUploadModalOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" />
-          Subir Archivos
-        </Button>
-      </header>
+      <div className="mb-4">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          Administrador de Archivos
+        </h1>
+        {total !== undefined && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {total} archivo(s) en total
+          </p>
+        )}
+      </div>
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[260px] sm:max-w-lg">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre de archivo..."
@@ -125,34 +169,62 @@ const FileManager = () => {
                 </Button>
               )}
             </div>
-            <Select
-              value={`${sortBy}-${sortOrder}`}
-              onValueChange={handleSortChange}
-            >
-              <SelectTrigger className="w-[220px]">
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <ArrowUpDown className="h-4 w-4 flex-shrink-0" />
-                  <SelectValue />
+            <Button className="shrink-0" onClick={() => setUploadModalOpen(true)}>
+              <Upload className="h-4 w-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Subir Archivos</span>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Drawer direction="bottom">
+              <DrawerTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 sm:hidden gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent>
+                <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                  <DrawerHeader>
+                    <DrawerTitle>Filtrar y ordenar archivos</DrawerTitle>
+                    <DrawerDescription>
+                      Ajusta el orden y filtra por tipo de archivo.
+                    </DrawerDescription>
+                  </DrawerHeader>
+                  <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Ordenar por</label>
+                      {sortSelect}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Tipo</label>
+                      {typeSelect}
+                    </div>
+                  </div>
+                  <DrawerFooter>
+                    <Button
+                      variant="outline"
+                      onClick={clearFilters}
+                      disabled={activeFilterCount === 0 && sortBy === 'createdAt' && sortOrder === 'desc'}
+                    >
+                      Limpiar filtros
+                    </Button>
+                    <DrawerClose asChild>
+                      <Button>Ver resultados</Button>
+                    </DrawerClose>
+                  </DrawerFooter>
                 </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt-desc">Fecha (Más reciente)</SelectItem>
-                <SelectItem value="createdAt-asc">Fecha (Más antiguo)</SelectItem>
-                <SelectItem value="name-asc">Nombre (A-Z)</SelectItem>
-                <SelectItem value="name-desc">Nombre (Z-A)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterType} onValueChange={handleFilterChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="image">Imágenes</SelectItem>
-                <SelectItem value="document">Documentos</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex border rounded-md">
+              </DrawerContent>
+            </Drawer>
+            <div className="hidden sm:flex sm:items-center sm:gap-3">
+              {sortSelect}
+              {typeSelect}
+            </div>
+            <div className="flex shrink-0 border rounded-md">
               <Button
                 variant={viewType === 'cards' ? 'default' : 'ghost'}
                 size="sm"
@@ -173,14 +245,16 @@ const FileManager = () => {
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0"
               onClick={handleRefresh}
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
               ) : (
-                'Actualizar'
+                <RefreshCw className="h-4 w-4 sm:mr-2" />
               )}
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Actualizar</span>
             </Button>
           </div>
         </div>

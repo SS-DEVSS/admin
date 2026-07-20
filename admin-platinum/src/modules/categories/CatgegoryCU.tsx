@@ -72,7 +72,9 @@ export interface formTypes {
   attributes: CategoryAtributes[];
 }
 
-const validateApplicationFilterRequiredPrefix = (attributes: CategoryAtributes[]): boolean => {
+const validateApplicationFilterRequiredPrefix = (
+  attributes: CategoryAtributes[],
+): boolean => {
   const applicationAttributes = attributes
     .filter((attr) => attr.scope === "APPLICATION")
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -86,7 +88,11 @@ const validateApplicationFilterRequiredPrefix = (attributes: CategoryAtributes[]
   return true;
 };
 
-const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) => {
+const CategoryCU = ({
+  category,
+  addCategory,
+  updateCategory,
+}: CategoryCUProps) => {
   const { selectedBrand } = useBrandContext();
   const { brands } = useBrands();
   const { uploadFile, uploading } = useS3FileManager();
@@ -94,7 +100,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
   const { toast } = useToast();
 
   const [selectedBrandIds, setSelectedBrandIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [image, setImage] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string>(category?.imgUrl || "");
@@ -135,7 +141,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
       if (category.attributes) {
         if (Array.isArray(category.attributes)) {
           attributesArray = category.attributes.map(
-            normalizeCategoryAttributeFromApi
+            normalizeCategoryAttributeFromApi,
           );
         } else if (typeof category.attributes === "object") {
           const attrsObj = category.attributes as {
@@ -155,7 +161,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
 
       setForm({
         ...category,
-        brands: category.brands?.map(b => b.id).filter((id): id is string => !!id) || [],
+        brands:
+          category.brands
+            ?.map((b) => b.id)
+            .filter((id): id is string => !!id) || [],
         attributes: attributesArray,
       });
       // No establecer image.name con la URL, solo imageUrl
@@ -175,7 +184,12 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
 
   // Update imageUrl when image is uploaded
   useEffect(() => {
-    if (image && image.name && image.name !== category?.imgUrl && image instanceof File) {
+    if (
+      image &&
+      image.name &&
+      image.name !== category?.imgUrl &&
+      image instanceof File
+    ) {
       uploadFile(image, (_key: string, location: string) => {
         setImageUrl(location);
         setForm((prevForm) => ({
@@ -219,7 +233,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
       toast({
         title: "Error al eliminar imagen",
         variant: "destructive",
-        description: error.response?.data?.error || error.message || "Error desconocido",
+        description:
+          error.response?.data?.error || error.message || "Error desconocido",
       });
     }
   };
@@ -243,7 +258,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
   }, [image]);
 
   const handleFormInput = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setForm({
@@ -257,7 +272,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
     const newSet = new Set(selectedBrandIds);
     if (isSelected) {
       newSet.delete(brandId);
-      setForm((f) => ({ ...f, brands: f.brands.filter((id) => id !== brandId) }));
+      setForm((f) => ({
+        ...f,
+        brands: f.brands.filter((id) => id !== brandId),
+      }));
     } else {
       newSet.add(brandId);
       setForm((f) => ({ ...f, brands: [...f.brands, brandId] }));
@@ -265,31 +283,29 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
     setSelectedBrandIds(newSet);
   };
 
-  const validateForm = useMemo(
-    () => {
-      // Validación básica: nombre y descripción siempre requeridos
-      const basicValidation = form.name.trim() !== "" && form.description.trim() !== "";
+  const validateForm = useMemo(() => {
+    // Validación básica: nombre y descripción siempre requeridos
+    const basicValidation =
+      form.name.trim() !== "" && form.description.trim() !== "";
 
-      // Si es una categoría nueva, requiere imagen, brands y attributes
-      if (!category) {
-        return (
-          basicValidation &&
-          (form.imgUrl?.trim() !== "" || imageUrl?.trim() !== "") &&
-          form.brands.length > 0 &&
-          form.attributes.length > 0
-        );
-      }
+    // Si es una categoría nueva, requiere imagen, brands y attributes
+    if (!category) {
+      return (
+        basicValidation &&
+        (form.imgUrl?.trim() !== "" || imageUrl?.trim() !== "") &&
+        form.brands.length > 0 &&
+        form.attributes.length > 0
+      );
+    }
 
-      // Si es edición, solo requiere nombre y descripción
-      // La imagen puede estar vacía si se eliminó, pero eso se maneja en el submit
-      return basicValidation;
-    },
-    [form, category, imageUrl]
-  );
+    // Si es edición, solo requiere nombre y descripción
+    // La imagen puede estar vacía si se eliminó, pero eso se maneja en el submit
+    return basicValidation;
+  }, [form, category, imageUrl]);
 
   const handleSubmit = async (
     form: formTypes,
-    options?: { skipAttributeConfirm?: boolean }
+    options?: { skipAttributeConfirm?: boolean },
   ) => {
     let abortedForAttributeConfirm = false;
     try {
@@ -307,17 +323,24 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
       setSavingStartTime(Date.now());
       if (category && updateCategory) {
         // Editing existing category - formato según Postman
-        const originalBrandIds = category.brands?.map(b => b.id).filter((id): id is string => !!id) || [];
+        const originalBrandIds =
+          category.brands
+            ?.map((b) => b.id)
+            .filter((id): id is string => !!id) || [];
         const currentBrandIds = form.brands;
-        const brandsToAdd = currentBrandIds.filter(id => !originalBrandIds.includes(id));
-        const brandsToDelete = originalBrandIds.filter(id => !currentBrandIds.includes(id));
+        const brandsToAdd = currentBrandIds.filter(
+          (id) => !originalBrandIds.includes(id),
+        );
+        const brandsToDelete = originalBrandIds.filter(
+          (id) => !currentBrandIds.includes(id),
+        );
 
         // Transformar attributes de objeto a array si es necesario
         let originalAttributesArray: CategoryAtributes[] = [];
         if (category.attributes) {
           if (Array.isArray(category.attributes)) {
             originalAttributesArray = category.attributes;
-          } else if (typeof category.attributes === 'object') {
+          } else if (typeof category.attributes === "object") {
             // Es un objeto con product, variant, application, etc.
             const attrsObj = category.attributes as any;
             originalAttributesArray = [
@@ -329,11 +352,15 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           }
         }
 
-        const originalAttributeIds = originalAttributesArray.map(attr => attr.id).filter((id): id is string => !!id);
-        const currentAttributeIds = form.attributes.map(attr => attr.id).filter((id): id is string => !!id);
+        const originalAttributeIds = originalAttributesArray
+          .map((attr) => attr.id)
+          .filter((id): id is string => !!id);
+        const currentAttributeIds = form.attributes
+          .map((attr) => attr.id)
+          .filter((id): id is string => !!id);
         const attributesToAdd = form.attributes
-          .filter(attr => !attr.id || !originalAttributeIds.includes(attr.id))
-          .map(attr => ({
+          .filter((attr) => !attr.id || !originalAttributeIds.includes(attr.id))
+          .map((attr) => ({
             name: attr.display_name || attr.name,
             csvName: attr.csv_name || attr.name,
             displayName: attr.display_name || attr.name,
@@ -347,29 +374,40 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               ? { filterRequired: attr.filterRequired !== false }
               : {}),
           }));
-        const attributesToDelete = originalAttributeIds.filter(id => !currentAttributeIds.includes(id));
+        const attributesToDelete = originalAttributeIds.filter(
+          (id) => !currentAttributeIds.includes(id),
+        );
 
         const attributesToUpdate = form.attributes
-          .filter((attr): attr is CategoryAtributes & { id: string } =>
-            !!attr.id && originalAttributeIds.includes(attr.id)
+          .filter(
+            (attr): attr is CategoryAtributes & { id: string } =>
+              !!attr.id && originalAttributeIds.includes(attr.id),
           )
           .map((attr) => {
-            const rawOrig = originalAttributesArray.find((a) => a.id === attr.id);
+            const rawOrig = originalAttributesArray.find(
+              (a) => a.id === attr.id,
+            );
             if (!rawOrig) return null;
-            const orig = normalizeCategoryAttributeFromApi(rawOrig as CategoryAttributeApi);
+            const orig = normalizeCategoryAttributeFromApi(
+              rawOrig as CategoryAttributeApi,
+            );
             const formDisplay = (attr.display_name || "").trim();
             const origDisplay = (orig.display_name || orig.name || "").trim();
             const formCsv = (attr.csv_name || "").trim();
             const origCsv = (orig.csv_name || "").trim();
             const typeMatch =
-              String(attr.type).toLowerCase() === String(orig.type).toLowerCase();
+              String(attr.type).toLowerCase() ===
+              String(orig.type).toLowerCase();
             const catalogMatch =
-              (attr.visibleInCatalog ?? true) === (orig.visibleInCatalog ?? true);
+              (attr.visibleInCatalog ?? true) ===
+              (orig.visibleInCatalog ?? true);
             const detailMatch =
-              (attr.visibleInProductDetail ?? true) === (orig.visibleInProductDetail ?? true);
+              (attr.visibleInProductDetail ?? true) ===
+              (orig.visibleInProductDetail ?? true);
             const filterRequiredMatch =
               attr.scope !== "APPLICATION" ||
-              (attr.filterRequired !== false) === (orig.filterRequired !== false);
+              (attr.filterRequired !== false) ===
+                (orig.filterRequired !== false);
             if (
               formDisplay === origDisplay &&
               formCsv === origCsv &&
@@ -384,7 +422,8 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
               return null;
             }
             const label =
-              (attr.display_name || attr.name || orig.name || "").trim() || orig.name;
+              (attr.display_name || attr.name || orig.name || "").trim() ||
+              orig.name;
             return {
               id: attr.id,
               name: label,
@@ -401,9 +440,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                 : {}),
             };
           })
-          .filter(
-            (x): x is NonNullable<typeof x> => x !== null
-          );
+          .filter((x): x is NonNullable<typeof x> => x !== null);
 
         const updatePayload: Record<string, unknown> = {
           name: form.name,
@@ -429,13 +466,16 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
         ) {
           updatePayload.attributes = {};
           if (attributesToAdd.length > 0) {
-            (updatePayload.attributes as { add: unknown[] }).add = attributesToAdd;
+            (updatePayload.attributes as { add: unknown[] }).add =
+              attributesToAdd;
           }
           if (attributesToUpdate.length > 0) {
-            (updatePayload.attributes as { update: unknown[] }).update = attributesToUpdate;
+            (updatePayload.attributes as { update: unknown[] }).update =
+              attributesToUpdate;
           }
           if (attributesToDelete.length > 0) {
-            (updatePayload.attributes as { delete: string[] }).delete = attributesToDelete;
+            (updatePayload.attributes as { delete: string[] }).delete =
+              attributesToDelete;
           }
         }
 
@@ -452,7 +492,12 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
         }
 
         // Si hay una nueva imagen (File object), subirla primero
-        if (image && image instanceof File && image.name && image.name !== category.imgUrl) {
+        if (
+          image &&
+          image instanceof File &&
+          image.name &&
+          image.name !== category.imgUrl
+        ) {
           await new Promise<void>((resolve, reject) => {
             uploadFile(image, async (_, location) => {
               try {
@@ -494,7 +539,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                 description: form.description,
                 imgUrl: location,
                 brands: form.brands, // Array de strings (IDs)
-                attributes: form.attributes.map(attr => ({
+                attributes: form.attributes.map((attr) => ({
                   name: attr.display_name || attr.name,
                   csvName: attr.csv_name || attr.name,
                   displayName: attr.display_name || attr.name,
@@ -510,7 +555,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                 })),
               };
 
-              const response = (await addCategory(createPayload as any)) as { id: string } | undefined;
+              const response = (await addCategory(createPayload as any)) as
+                | { id: string }
+                | undefined;
               if (response && response.id) {
                 navigate("/dashboard/categorias");
               }
@@ -552,9 +599,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
 
   return (
     <>
-      {isSubmitting && (
-        <Loader fullScreen message="Guardando cambios..." />
-      )}
+      {isSubmitting && <Loader fullScreen message="Guardando cambios..." />}
       <AlertDialog
         open={attributeConfirmOpen}
         onOpenChange={(open) => {
@@ -568,9 +613,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar cambios en atributos</AlertDialogTitle>
             <AlertDialogDescription className="text-left">
-              Los cambios en atributos (producto o aplicación) no se pueden deshacer. Si eliminas un
-              atributo, se borrarán todos los valores guardados en productos y aplicaciones de esta
-              categoría. Cambiar tipo u orden puede afectar datos ya cargados.
+              Los cambios en atributos (producto o aplicación) no se pueden
+              deshacer. Si eliminas un atributo, se borrarán todos los valores
+              guardados en productos y aplicaciones de esta categoría. Cambiar
+              tipo u orden puede afectar datos ya cargados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -586,7 +632,7 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <main className="max-w-4xl mx-auto px-4 md:px-6">
+      <main className="max-w-4xl mx-auto px-0 md:px-6">
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
             <Link to="/dashboard/categorias">
@@ -619,7 +665,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>El nombre de la categoría que se mostrará en el sistema</p>
+                            <p>
+                              El nombre de la categoría que se mostrará en el
+                              sistema
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -644,7 +693,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Una descripción breve de la categoría y su propósito</p>
+                            <p>
+                              Una descripción breve de la categoría y su
+                              propósito
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -668,7 +720,11 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Las marcas asociadas a esta categoría. Los productos de estas marcas podrán usar esta categoría como template.</p>
+                            <p>
+                              Las marcas asociadas a esta categoría. Los
+                              productos de estas marcas podrán usar esta
+                              categoría como template.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -681,7 +737,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                             key={brand.id}
                             className="text-sm font-medium px-4 py-2 flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
                           >
-                            <span className="capitalize">{brand.name.toLowerCase()}</span>
+                            <span className="capitalize">
+                              {brand.name.toLowerCase()}
+                            </span>
                             <XCircleIcon
                               onClick={() => toggleBrandSelection(brand.id!)}
                               className="h-3.5 w-3.5 hover:scale-110 transition-transform"
@@ -696,10 +754,16 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                         className="flex-1 min-w-[180px] border-0 bg-transparent shadow-none focus-visible:ring-0"
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground">Selecciona las marcas a asociar con esta categoría.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona las marcas a asociar con esta categoría.
+                    </p>
                     {(() => {
                       const unselectedBrands = brands.filter(
-                        (b) => !selectedBrandIds.has(b.id!) && b.name?.toLowerCase().includes(brandSearchQuery.trim().toLowerCase())
+                        (b) =>
+                          !selectedBrandIds.has(b.id!) &&
+                          b.name
+                            ?.toLowerCase()
+                            .includes(brandSearchQuery.trim().toLowerCase()),
                       );
                       if (unselectedBrands.length === 0) return null;
                       return (
@@ -711,7 +775,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                               className="text-sm font-medium px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-secondary/80"
                               onClick={() => toggleBrandSelection(brand.id!)}
                             >
-                              <span className="capitalize">{brand.name.toLowerCase()}</span>
+                              <span className="capitalize">
+                                {brand.name.toLowerCase()}
+                              </span>
                               <PlusCircleIcon className="h-3.5 w-3.5" />
                             </Badge>
                           ))}
@@ -738,7 +804,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                         fileSetter={setImage}
                         type="image"
                         className="p-8 min-h-[200px] border-2 border-dashed border-gray-200 rounded-lg bg-white"
-                        currentImageUrl={imageUrl && !image ? imageUrl : undefined}
+                        currentImageUrl={
+                          imageUrl && !image ? imageUrl : undefined
+                        }
                         onImageClick={() => {
                           if (imageUrl && !image) {
                             handlePreviewImage(imageUrl);
@@ -769,7 +837,9 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
                       )}
                     </div>
                     {uploading && (
-                      <p className="text-sm text-muted-foreground mt-2">Subiendo imagen...</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Subiendo imagen...
+                      </p>
                     )}
                   </div>
                 </div>
@@ -789,9 +859,10 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
           {category?.id ? (
             <Alert variant="warning">
               <AlertDescription>
-                Al guardar, los cambios en atributos de producto o aplicación no se pueden deshacer.
-                Quitar un atributo elimina todos los valores guardados en productos y aplicaciones de
-                esta categoría. Los atributos nuevos aparecen vacíos hasta completarlos en cada
+                Al guardar, los cambios en atributos de producto o aplicación no
+                se pueden deshacer. Quitar un atributo elimina todos los valores
+                guardados en productos y aplicaciones de esta categoría. Los
+                atributos nuevos aparecen vacíos hasta completarlos en cada
                 registro.
               </AlertDescription>
             </Alert>
@@ -800,13 +871,17 @@ const CategoryCU = ({ category, addCategory, updateCategory }: CategoryCUProps) 
             form={form}
             setForm={setForm}
             title={"Atributos de Producto"}
-            description={"Ingresa los atributos de producto para esta categoría"}
+            description={
+              "Ingresa los atributos de producto para esta categoría"
+            }
           />
           <CardAtributesVariants
             form={form}
             setForm={setForm}
             title={"Atributos de Aplicaciones"}
-            description={"Ingresa los atributos de aplicación para esta categoría"}
+            description={
+              "Ingresa los atributos de aplicación para esta categoría"
+            }
           />
         </section>
         <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
