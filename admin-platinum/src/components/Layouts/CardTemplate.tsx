@@ -170,6 +170,9 @@ const CardTemplate = ({
     try {
       await deleteBrand(brand.id);
       setBrandDeleteOpen(false);
+      // useBrands() tiene estado por instancia: el getBrands() interno del hook
+      // refresca la instancia de esta card, no la de la página. Hay que avisarle al padre.
+      getItems?.();
     } catch {
       /* toast handled in hook */
     } finally {
