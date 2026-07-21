@@ -35,6 +35,7 @@ import ConfirmActionDialog from "@/components/ConfirmActionDialog";
 import { useAxiosClient } from "@/hooks/useAxiosClient";
 import { toast } from "@/hooks/use-toast";
 import { useBrands } from "@/hooks/useBrands";
+import { useCategoryContext } from "@/context/categories-context";
 
 type CategoryDeletePreview = {
   productCount: number;
@@ -59,6 +60,7 @@ const CardTemplate = ({
 }: CardTemplateProps) => {
   const { setSelectedBrand, openModal: openModalBrand } = useBrandContext();
   const { brands, deleteBrand } = useBrands();
+  const { getCategories } = useCategoryContext();
   const client = useAxiosClient();
   const location = useLocation();
   const { pathname } = location;
@@ -127,6 +129,7 @@ const CardTemplate = ({
       await client.delete(`/categories/${category.id}`);
       toast({ title: "Categoría eliminada", variant: "success" });
       setCategoryDeleteOpen(false);
+      await getCategories(true);
       getItems?.();
     } catch (error: unknown) {
       const msg =
@@ -146,6 +149,7 @@ const CardTemplate = ({
     try {
       const { data } = await client.post(`/categories/${category.id}/duplicate`);
       toast({ title: "Categoría duplicada", variant: "success" });
+      await getCategories(true);
       getItems?.();
       if (data?.id) {
         navigate(`/dashboard/categorias/editar/${data.id}`);

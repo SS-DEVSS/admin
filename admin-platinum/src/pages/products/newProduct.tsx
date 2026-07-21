@@ -672,12 +672,6 @@ const NewProduct = () => {
               {isEditMode ? "Editar Producto" : "Nuevo Producto"}
             </p>
           </div>
-          {isEditMode && (
-            <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar producto
-            </Button>
-          )}
         </header>
         <section className="flex flex-col gap-4 sm:mt-6 max-w-4xl mx-auto pb-24">
           <Details
@@ -700,20 +694,30 @@ const NewProduct = () => {
           )}
         </section>
         <section className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
-          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-end gap-3">
-            <Link to="/dashboard/productos">
-              <Button variant="outline">Cancelar</Button>
-            </Link>
-            <Button
-              disabled={!canContinue || isSubmitting}
-              onClick={handleSubmit}
-            >
-              {isSubmitting
-                ? "Guardando..."
-                : isEditMode
-                  ? "Actualizar Producto"
-                  : "Publicar Producto"}
-            </Button>
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+            {isEditMode ? (
+              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar producto
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Link to="/dashboard/productos">
+                <Button variant="outline">Cancelar</Button>
+              </Link>
+              <Button
+                disabled={!canContinue || isSubmitting}
+                onClick={handleSubmit}
+              >
+                {isSubmitting
+                  ? "Guardando..."
+                  : isEditMode
+                    ? "Actualizar Producto"
+                    : "Publicar Producto"}
+              </Button>
+            </div>
           </div>
         </section>
       </Layout>

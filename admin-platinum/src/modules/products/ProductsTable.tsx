@@ -105,6 +105,12 @@ const DataTable = ({
   const [deleteAllFiltered, setDeleteAllFiltered] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState({});
+
+  const clearAllSelection = useCallback(() => {
+    setDeleteAllFiltered(false);
+    setRowSelection({});
+  }, []);
 
   // Debounce search query
   useEffect(() => {
@@ -638,8 +644,15 @@ const DataTable = ({
         meta: { headClassName: "w-10 px-2", cellClassName: "w-10 px-2" },
         header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
           <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            checked={deleteAllFiltered || table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => {
+              if (!value) {
+                clearAllSelection();
+                table.toggleAllPageRowsSelected(false);
+                return;
+              }
+              table.toggleAllPageRowsSelected(true);
+            }}
             aria-label="Seleccionar todos"
           />
         ),
@@ -899,6 +912,8 @@ const DataTable = ({
     catalogVisibilityTargetIds,
     featureLoadingId,
     getProductById,
+    deleteAllFiltered,
+    clearAllSelection,
   ]);
 
   useEffect(() => {
@@ -922,7 +937,6 @@ const DataTable = ({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
 
   const table = useReactTable<Variant>({
     data: mappedData,
@@ -1015,14 +1029,18 @@ const DataTable = ({
   ]);
 
   const bulkDeleteCount = deleteAllFiltered ? totalItems : selectedProductIds.length;
+  const hasBulkSelection = deleteAllFiltered || selectedProductIds.length > 0;
 
   return (
     <div>
-      {selectedProductIds.length > 0 && (
+      {hasBulkSelection && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
           <span className="text-sm font-medium">
             {deleteAllFiltered ? totalItems : selectedProductIds.length} seleccionado(s)
           </span>
+          <Button size="sm" variant="ghost" onClick={clearAllSelection}>
+            Deseleccionar todo
+          </Button>
           {!deleteAllFiltered && totalItems > selectedProductIds.length && (
             <Button
               size="sm"
