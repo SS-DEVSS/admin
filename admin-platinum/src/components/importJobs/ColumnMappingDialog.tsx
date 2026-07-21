@@ -92,6 +92,38 @@ function targetMappingToCsvShape(
   return out;
 }
 
+type CsvColumnStatus = "unassigned" | "current" | "assigned-other";
+
+function getCsvColumnStatus(
+  csvHeader: string,
+  currentTargetId: string,
+  targetToCsv: Record<string, string | null>
+): CsvColumnStatus {
+  const assignedTargetId = Object.entries(targetToCsv).find(([, csv]) => csv === csvHeader)?.[0];
+  if (!assignedTargetId) return "unassigned";
+  if (assignedTargetId === currentTargetId) return "current";
+  return "assigned-other";
+}
+
+function sortHeadersForRow(
+  headers: string[],
+  currentTargetId: string,
+  targetToCsv: Record<string, string | null>
+): string[] {
+  const statusOrder: Record<CsvColumnStatus, number> = {
+    unassigned: 0,
+    current: 1,
+    "assigned-other": 2,
+  };
+
+  return [...headers].sort((a, b) => {
+    const statusA = getCsvColumnStatus(a, currentTargetId, targetToCsv);
+    const statusB = getCsvColumnStatus(b, currentTargetId, targetToCsv);
+    if (statusA !== statusB) return statusOrder[statusA] - statusOrder[statusB];
+    return a.localeCompare(b);
+  });
+}
+
 const ColumnMappingDialog = ({
   open,
   onOpenChange,
@@ -160,6 +192,26 @@ const ColumnMappingDialog = ({
 
   const allRequiredMapped = requiredAttributes.every((reqId) => Boolean(targetToCsv[reqId]));
 
+  const targetLabelById = useMemo(() => {
+    const labels = new Map<string, string>();
+    targetRows.forEach((row) => labels.set(row.targetId, row.label));
+    return labels;
+  }, [targetRows]);
+
+  const unassignedHeaders = useMemo(() => {
+    const assigned = new Set(
+      Object.values(targetToCsv).filter((csvColumn): csvColumn is string => Boolean(csvColumn))
+    );
+    return headers.filter((header) => !assigned.has(header));
+  }, [headers, targetToCsv]);
+
+  const getAssignedTargetLabel = (csvHeader: string, currentTargetId: string) => {
+    const assignedTargetId = Object.entries(targetToCsv).find(
+      ([targetId, csvColumn]) => csvColumn === csvHeader && targetId !== currentTargetId
+    )?.[0];
+    return assignedTargetId ? targetLabelById.get(assignedTargetId) : undefined;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -178,6 +230,17 @@ const ColumnMappingDialog = ({
               <span className="text-sm text-amber-800">
                 Asigna una columna CSV a todos los campos requeridos antes de continuar.
               </span>
+            </div>
+          )}
+
+          {unassignedHeaders.length > 0 && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-sm font-medium text-emerald-900">
+                Columnas del CSV sin asignar ({unassignedHeaders.length})
+              </p>
+              <p className="mt-1 text-sm text-emerald-800">
+                {unassignedHeaders.join(", ")}
+              </p>
             </div>
           )}
 
@@ -222,11 +285,38 @@ const ColumnMappingDialog = ({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">— Sin columna —</SelectItem>
-                            {headers.map((h) => (
-                              <SelectItem key={h} value={h}>
-                                {h}
-                              </SelectItem>
-                            ))}
+                            {sortHeadersForRow(headers, row.targetId, targetToCsv).map((header) => {
+                              const status = getCsvColumnStatus(header, row.targetId, targetToCsv);
+                              const assignedLabel = getAssignedTargetLabel(header, row.targetId);
+
+                              return (
+                                <SelectItem key={header} value={header}>
+                                  <div className="flex w-full items-center justify-between gap-3">
+                                    <span
+                                      className={
+                                        status === "unassigned"
+                                          ? "font-medium"
+                                          : status === "assigned-other"
+                                            ? "text-muted-foreground"
+                                            : undefined
+                                      }
+                                    >
+                                      {header}
+                                    </span>
+                                    {status === "unassigned" && (
+                                      <span className="text-xs text-emerald-600 shrink-0">
+                                        Disponible
+                                      </span>
+                                    )}
+                                    {status === "assigned-other" && assignedLabel && (
+                                      <span className="text-xs text-muted-foreground shrink-0">
+                                        Asignada a {assignedLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </TableCell>
