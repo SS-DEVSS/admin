@@ -7,4 +7,5 @@ export type Reference = {
   type: string;
   description: string | null;
   attributeValues?: any[];
+  isNew?: boolean;
 };

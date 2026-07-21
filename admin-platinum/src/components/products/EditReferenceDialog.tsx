@@ -31,6 +31,8 @@ type EditReferenceDialogProps = {
   onOpenChange: (open: boolean) => void;
   reference: Reference | null;
   categoryAttributes?: CategoryAtributes[];
+  productId?: string;
+  onLocalSave?: (previousId: string, updatedReference: Reference) => void;
   onSuccess?: () => void;
 };
 
@@ -39,6 +41,8 @@ const EditReferenceDialog = ({
   onOpenChange,
   reference,
   categoryAttributes = [],
+  productId,
+  onLocalSave,
   onSuccess,
 }: EditReferenceDialogProps) => {
   const { toast } = useToast();
@@ -110,11 +114,16 @@ const EditReferenceDialog = ({
     if (!reference || !reference.id) return;
 
     try {
-      // Convert attributeValues object back to array format
       const attributes = referenceAttributes.map((attr) => {
         const value = formData.attributeValues[attr.name];
 
-        const attributeValue: any = {
+        const attributeValue: {
+          idAttribute: string;
+          valueString: string | null;
+          valueNumber: number | null;
+          valueBoolean: boolean | null;
+          valueDate: Date | null;
+        } = {
           idAttribute: attr.id!,
           valueString: null,
           valueNumber: null,
@@ -122,7 +131,6 @@ const EditReferenceDialog = ({
           valueDate: null,
         };
 
-        // Set the appropriate value based on attribute type
         if (value !== undefined && value !== null && value !== "") {
           if (attr.type === CategoryAttributesTypes.STRING) {
             attributeValue.valueString = String(value);
@@ -138,29 +146,54 @@ const EditReferenceDialog = ({
         return attributeValue;
       });
 
-      const updateData = {
+      const payload = {
         referenceBrand: formData.referenceBrand || null,
         referenceNumber: formData.referenceNumber,
         typeOfPart: formData.typeOfPart || null,
         type: formData.type,
         description: formData.description || null,
-        attributes: attributes,
+        attributes,
       };
 
-      await client.patch(`/references/${reference.id}`, updateData);
+      const isNewReference = reference.isNew === true;
 
-      toast({
-        title: "Referencia actualizada",
-        variant: "success",
-      });
+      if (isNewReference && productId) {
+        const response = await client.post("/references", {
+          ...payload,
+          idProduct: productId,
+        });
+        const createdReference = response.data?.reference as Reference;
+        onLocalSave?.(reference.id, { ...createdReference, isNew: false });
+        toast({
+          title: "Referencia creada",
+          variant: "success",
+        });
+      } else if (isNewReference) {
+        onLocalSave?.(reference.id, {
+          ...reference,
+          ...payload,
+          isNew: true,
+        });
+        toast({
+          title: "Referencia actualizada",
+          variant: "success",
+        });
+      } else {
+        await client.patch(`/references/${reference.id}`, payload);
+        toast({
+          title: "Referencia actualizada",
+          variant: "success",
+        });
+      }
 
       onOpenChange(false);
       onSuccess?.();
-    } catch (error: any) {
-      console.error("Error updating reference:", error);
+    } catch (error: unknown) {
+      console.error("Error saving reference:", error);
+      const apiError = error as { response?: { data?: { error?: string } }; message?: string };
       toast({
-        title: "Error al actualizar referencia",
-        description: error.response?.data?.error || error.message || "Error desconocido",
+        title: reference.isNew ? "Error al crear referencia" : "Error al actualizar referencia",
+        description: apiError.response?.data?.error || apiError.message || "Error desconocido",
         variant: "destructive",
       });
     }
@@ -182,9 +215,11 @@ const EditReferenceDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Referencia</DialogTitle>
+          <DialogTitle>{reference.isNew ? "Nueva Referencia" : "Editar Referencia"}</DialogTitle>
           <DialogDescription>
-            Edita la información de la referencia. Todos los campos son editables.
+            {reference.isNew
+              ? "Completa la información de la referencia. Se guardará al confirmar."
+              : "Edita la información de la referencia. Todos los campos son editables."}
           </DialogDescription>
         </DialogHeader>
 
@@ -308,7 +343,7 @@ const EditReferenceDialog = ({
             onClick={handleSave}
             disabled={!formData.referenceNumber || !formData.type}
           >
-            Guardar Cambios
+            {reference.isNew ? "Crear Referencia" : "Guardar Cambios"}
           </Button>
         </DialogFooter>
       </DialogContent>
