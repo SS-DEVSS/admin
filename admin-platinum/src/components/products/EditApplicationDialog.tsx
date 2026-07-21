@@ -23,6 +23,30 @@ import { useMemo, useState, useEffect } from "react";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
 import { translateAttributeName } from "@/utils/attributeTranslations";
+import { Loader2 } from "lucide-react";
+
+type AttributeFormValues = Record<string, string | number | boolean | Date | undefined>;
+
+type AttributePayload = {
+  idAttribute: string;
+  valueString: string | null;
+  valueNumber: number | null;
+  valueBoolean: boolean | null;
+  valueDate: Date | null;
+};
+
+type YearFieldState = { start: string };
+
+const isYearAttributeName = (name: string): boolean => {
+  const lower = name.toLowerCase();
+  return lower.includes("año") || lower.includes("anio") || lower.includes("year");
+};
+
+const hasAttributeValue = (value: string | number | boolean | Date | undefined): boolean => {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  return true;
+};
 
 type EditApplicationDialogProps = {
   open: boolean;
@@ -43,6 +67,7 @@ const EditApplicationDialog = ({
 }: EditApplicationDialogProps) => {
   const { toast } = useToast();
   const client = axiosClient();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Get application attributes from category
   const applicationAttributes = useMemo(() => {
@@ -66,11 +91,10 @@ const EditApplicationDialog = ({
   // Initialize form state from application
   const [formData, setFormData] = useState({
     origin: "Nueva aplicación",
-    attributeValues: {} as Record<string, any>,
+    attributeValues: {} as AttributeFormValues,
   });
-  
-  // Local state for year fields to allow free editing
-  const [yearFields, setYearFields] = useState<Record<string, { start: string; end: string }>>({});
+
+  const [yearFields, setYearFields] = useState<Record<string, YearFieldState>>({});
 
   // Update form data when application changes
   useEffect(() => {
@@ -84,14 +108,12 @@ const EditApplicationDialog = ({
     }
 
     // Convert attributeValues array to object by attribute name
-    const attributeValuesObj: Record<string, any> = {};
-    const newYearFields: Record<string, { start: string; end: string }> = {};
+    const attributeValuesObj: AttributeFormValues = {};
+    const newYearFields: Record<string, YearFieldState> = {};
 
     if (application.attributeValues && applicationAttributes.length > 0) {
       applicationAttributes.forEach((attr) => {
-        const isYearAttribute = attr.name.toLowerCase().includes("año") || 
-                               attr.name.toLowerCase().includes("anio") || 
-                               attr.name.toLowerCase().includes("year");
+        const isYearAttribute = isYearAttributeName(attr.name);
         
         // Try to find the attribute value by ID first, then by name (case-insensitive)
         const attrValue = application.attributeValues?.find((av: any) => {
@@ -180,20 +202,20 @@ const EditApplicationDialog = ({
             if (typeof value === "string" && value) {
               const match = value.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
               if (match) {
-                newYearFields[attr.name] = { start: match[1], end: "" };
+                newYearFields[attr.name] = { start: match[1] };
               } else if (/^\d{4}$/.test(value.trim())) {
-                newYearFields[attr.name] = { start: value.trim(), end: "" };
+                newYearFields[attr.name] = { start: value.trim() };
               } else {
-                newYearFields[attr.name] = { start: "", end: "" };
+                newYearFields[attr.name] = { start: "" };
               }
             } else if (typeof value === "number") {
-              newYearFields[attr.name] = { start: value.toString(), end: "" };
+              newYearFields[attr.name] = { start: value.toString() };
             } else {
-              newYearFields[attr.name] = { start: "", end: "" };
+              newYearFields[attr.name] = { start: "" };
             }
           }
         } else if (isYearAttribute) {
-          newYearFields[attr.name] = { start: "", end: "" };
+          newYearFields[attr.name] = { start: "" };
         }
       });
     }
@@ -205,7 +227,84 @@ const EditApplicationDialog = ({
     setYearFields(newYearFields);
   }, [application, applicationAttributes]);
 
+  useEffect(() => {
+    if (!open) {
+      setIsSaving(false);
+    }
+  }, [open]);
+
+  const validateRequiredFields = (): string | null => {
+    for (const attr of applicationAttributes) {
+      if (!attr.required) continue;
+
+      if (isYearAttributeName(attr.name)) {
+        const yearState = yearFields[attr.name] || { start: "" };
+        const startYear = parseInt(yearState.start, 10);
+        if (!yearState.start.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
+          return `El campo "${translateAttributeName(attr.name, false)}" es obligatorio (año válido entre 1900 y 2100).`;
+        }
+        continue;
+      }
+
+      const value = formData.attributeValues[attr.name];
+      if (!hasAttributeValue(value)) {
+        return `El campo "${translateAttributeName(attr.name, false)}" es obligatorio.`;
+      }
+    }
+    return null;
+  };
+
+  const buildCreateAttributes = (yearValue?: number): AttributePayload[] => {
+    return applicationAttributes
+      .map((attr) => {
+        const isYearAttr = isYearAttributeName(attr.name);
+        const attributeValue: AttributePayload = {
+          idAttribute: attr.id!,
+          valueString: null,
+          valueNumber: null,
+          valueBoolean: null,
+          valueDate: null,
+        };
+
+        if (isYearAttr && yearValue !== undefined) {
+          attributeValue.valueDate = new Date(yearValue, 0, 1);
+          return attributeValue;
+        }
+
+        const value = formData.attributeValues[attr.name];
+        if (!hasAttributeValue(value)) return attributeValue;
+
+        if (attr.type === CategoryAttributesTypes.STRING) {
+          attributeValue.valueString = String(value);
+        } else if (attr.type === CategoryAttributesTypes.NUMERIC) {
+          attributeValue.valueNumber = Number(value);
+        } else if (attr.type === CategoryAttributesTypes.BOOLEAN) {
+          attributeValue.valueBoolean = Boolean(value);
+        } else if (attr.type === CategoryAttributesTypes.DATE) {
+          if (value instanceof Date) {
+            attributeValue.valueDate = value;
+          } else if (typeof value === "string") {
+            const date = new Date(value);
+            if (!isNaN(date.getTime())) {
+              attributeValue.valueDate = date;
+            }
+          }
+        }
+
+        return attributeValue;
+      })
+      .filter(
+        (attr) =>
+          attr.valueString !== null ||
+          attr.valueNumber !== null ||
+          attr.valueBoolean !== null ||
+          attr.valueDate !== null
+      );
+  };
+
   const handleSave = async () => {
+    if (isSaving) return;
+
     if (!productId) {
       toast({
         title: "Error",
@@ -215,291 +314,210 @@ const EditApplicationDialog = ({
       return;
     }
 
-    // If creating new application (application is null)
-    if (!application) {
-      // Find year attribute to check for range
-      const yearAttribute = applicationAttributes.find(
-        (attr) =>
-          attr.name.toLowerCase().includes("año") ||
-          attr.name.toLowerCase().includes("anio") ||
-          attr.name.toLowerCase().includes("year")
-      );
-
-      if (yearAttribute) {
-        const yearState = yearFields[yearAttribute.name] || { start: "", end: "" };
-        const startYear = parseInt(yearState.start, 10);
-        const endYear = yearState.end ? parseInt(yearState.end, 10) : null;
-
-        // Validate years
-        if (isNaN(startYear) || startYear < 1900 || startYear > 2100) {
-          toast({
-            title: "Error",
-            description: "Por favor, ingresa un año de inicio válido (1900-2100).",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (endYear !== null && (isNaN(endYear) || endYear < 1900 || endYear > 2100 || endYear < startYear)) {
-          toast({
-            title: "Error",
-            description: "Por favor, ingresa un año de fin válido (debe ser mayor o igual al año de inicio).",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Determine years to create
-        const yearsToCreate: number[] = [];
-        if (endYear !== null && endYear !== startYear) {
-          // Create applications for each year in the range
-          for (let year = startYear; year <= endYear; year++) {
-            yearsToCreate.push(year);
-          }
-        } else {
-          // Single year
-          yearsToCreate.push(startYear);
-        }
-
-        try {
-          // Get product SKU
-          const productResponse = await client.get(`/products/${productId}`);
-          const productSku = productResponse.data?.sku;
-
-          if (!productSku) {
-            toast({
-              title: "Error",
-              description: "No se pudo obtener el SKU del producto.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          // Create applications for each year
-          const createdApplications = [];
-          for (const year of yearsToCreate) {
-            // Build attributes array
-            const attributes = applicationAttributes.map((attr) => {
-              const isYearAttr =
-                attr.name.toLowerCase().includes("año") ||
-                attr.name.toLowerCase().includes("anio") ||
-                attr.name.toLowerCase().includes("year");
-
-              const attributeValue: any = {
-                idAttribute: attr.id!,
-                valueString: null,
-                valueNumber: null,
-                valueBoolean: null,
-                valueDate: null,
-              };
-
-              if (isYearAttr) {
-                // Set the year as valueDate
-                attributeValue.valueDate = new Date(year, 0, 1);
-              } else {
-                // Get value from formData
-                const value = formData.attributeValues[attr.name];
-                if (value !== undefined && value !== null && value !== "") {
-                  if (attr.type === CategoryAttributesTypes.STRING) {
-                    attributeValue.valueString = String(value);
-                  } else if (attr.type === CategoryAttributesTypes.NUMERIC) {
-                    attributeValue.valueNumber = Number(value);
-                  } else if (attr.type === CategoryAttributesTypes.BOOLEAN) {
-                    attributeValue.valueBoolean = Boolean(value);
-                  } else if (attr.type === CategoryAttributesTypes.DATE) {
-                    if (value instanceof Date) {
-                      attributeValue.valueDate = value;
-                    } else if (typeof value === "string") {
-                      const date = new Date(value);
-                      if (!isNaN(date.getTime())) {
-                        attributeValue.valueDate = date;
-                      }
-                    }
-                  }
-                }
-              }
-
-              return attributeValue;
-            });
-
-            // Create application
-            // Include all attributes, even if empty (backend will handle null values)
-            const attributesToSend = attributes.map((attr) => attr);
-
-            const createData = {
-              sku: productSku,
-              origin: formData.origin || "Nueva aplicación",
-              idProduct: productId,
-              attributes: attributesToSend.filter(
-                (attr) =>
-                  attr.valueString !== null ||
-                  attr.valueNumber !== null ||
-                  attr.valueBoolean !== null ||
-                  attr.valueDate !== null
-              ),
-            };
-
-            const response = await client.post("/applications", createData);
-            createdApplications.push(response.data);
-          }
-
-          toast({
-            title: "Aplicaciones creadas",
-            description: `Se ${createdApplications.length === 1 ? "creó" : "crearon"} ${createdApplications.length} aplicación${createdApplications.length === 1 ? "" : "es"} exitosamente. ${endYear !== null && endYear !== startYear ? "Se integrarán automáticamente a los grupos correspondientes si coinciden." : ""}`,
-            variant: "success",
-          });
-
-          onOpenChange(false);
-          onSuccess?.();
-          return;
-        } catch (error: any) {
-          toast({
-            title: "Error al crear aplicaciones",
-            description: error.response?.data?.error || error.message || "Error desconocido.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
+    const validationError = validateRequiredFields();
+    if (validationError) {
+      toast({
+        title: "Campos incompletos",
+        description: validationError,
+        variant: "destructive",
+      });
+      return;
     }
 
-    // If updating existing application
-    if (!application || !application.id) return;
+    if (!application) {
+      setIsSaving(true);
+      try {
+        const productResponse = await client.get(`/products/${productId}`);
+        const productSku = productResponse.data?.sku as string | undefined;
 
+        if (!productSku) {
+          toast({
+            title: "Error",
+            description: "No se pudo obtener el SKU del producto.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const yearAttribute = applicationAttributes.find((attr) =>
+          isYearAttributeName(attr.name)
+        );
+        let yearValue: number | undefined;
+        if (yearAttribute) {
+          const yearState = yearFields[yearAttribute.name] || { start: "" };
+          yearValue = parseInt(yearState.start, 10);
+        }
+
+        const createData = {
+          sku: productSku,
+          origin: formData.origin || "Nueva aplicación",
+          idProduct: productId,
+          attributes: buildCreateAttributes(yearValue),
+        };
+
+        await client.post("/applications", createData);
+
+        toast({
+          title: "Aplicación creada",
+          description: "La aplicación se creó exitosamente.",
+          variant: "success",
+        });
+
+        onOpenChange(false);
+        onSuccess?.();
+      } catch (error: unknown) {
+        const apiError = error as { response?: { data?: { error?: string } }; message?: string };
+        toast({
+          title: "Error al crear aplicación",
+          description:
+            apiError.response?.data?.error ||
+            apiError.message ||
+            "Error desconocido.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    if (!application.id) return;
+
+    setIsSaving(true);
     try {
-      // Get existing attribute values from the application to preserve unchanged ones
-      const existingAttrMap = new Map<string, any>();
+      const existingAttrMap = new Map<string, Record<string, unknown>>();
       if (application.attributeValues) {
-        application.attributeValues.forEach((av: any) => {
-          const attrId = av.idAttribute || av.attribute?.id;
+        application.attributeValues.forEach((av) => {
+          const avRecord = av as Record<string, unknown>;
+          const attrId =
+            (avRecord.idAttribute as string | undefined) ||
+            ((avRecord.attribute as { id?: string } | undefined)?.id);
           if (attrId) {
-            existingAttrMap.set(attrId, av);
+            existingAttrMap.set(attrId, avRecord);
           }
         });
       }
 
-      // Build attributes: include ALL attributes, using formData if changed, otherwise existing values
-      const attributesToSend = applicationAttributes.map((attr) => {
-        const formValue = formData.attributeValues[attr.name];
-        const existingAttr = existingAttrMap.get(attr.id!);
+      const attributesToSend = applicationAttributes
+        .map((attr) => {
+          const formValue = formData.attributeValues[attr.name];
+          const existingAttr = existingAttrMap.get(attr.id!);
 
-        const attributeValue: any = {
-          idAttribute: attr.id!,
-          valueString: null,
-          valueNumber: null,
-          valueBoolean: null,
-          valueDate: null,
-        };
+          const attributeValue: AttributePayload = {
+            idAttribute: attr.id!,
+            valueString: null,
+            valueNumber: null,
+            valueBoolean: null,
+            valueDate: null,
+          };
 
-        const isYearAttribute =
-          attr.name.toLowerCase().includes("año") ||
-          attr.name.toLowerCase().includes("anio") ||
-          attr.name.toLowerCase().includes("year");
+          const isYearAttribute = isYearAttributeName(attr.name);
 
-        // Check if form has a value (including 0 for numbers, false for booleans)
-        // IMPORTANT: Always use formValue if it exists, even if it's the same as existing
-        // This ensures user changes are saved even if they type the same value
-        // For strings: must not be empty after trim
-        // For numbers: 0 is valid
-        // For booleans: false is valid
-        let hasFormValue = false;
-        if (formValue !== undefined && formValue !== null) {
-          if (typeof formValue === "string") {
-            hasFormValue = formValue.trim() !== "";
-          } else {
-            // For numbers (including 0), booleans (including false), and other types
-            hasFormValue = true;
-          }
-        }
-        
-        // If form has a value, ALWAYS use it (user may have changed it)
-        if (hasFormValue) {
-          if (isYearAttribute) {
-            const yearString = typeof formValue === "string" ? formValue : String(formValue);
-            const match = yearString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
-            const yearToSave = match ? parseInt(match[1], 10) : parseInt(yearString, 10);
-            if (!isNaN(yearToSave) && yearToSave >= 1900 && yearToSave <= 2100) {
-              attributeValue.valueNumber = yearToSave; // store year as number
+          let hasFormValue = false;
+          if (formValue !== undefined && formValue !== null) {
+            if (typeof formValue === "string") {
+              hasFormValue = formValue.trim() !== "";
+            } else {
+              hasFormValue = true;
             }
-          } else {
-            // Normalize attr.type to handle case-insensitive comparison
-            const normalizedType = String(attr.type || '').toLowerCase();
-            
-            if (normalizedType === "string" || normalizedType === CategoryAttributesTypes.STRING) {
-              attributeValue.valueString = String(formValue);
-            } else if (normalizedType === "number" || normalizedType === "numeric" || normalizedType === CategoryAttributesTypes.NUMERIC) {
-              // Convert to number - handle both string and number inputs
-              let numValue: number;
-              if (typeof formValue === "string") {
-                // Remove any whitespace and parse
-                numValue = parseFloat(formValue.trim());
-              } else {
-                numValue = Number(formValue);
+          }
+
+          if (hasFormValue) {
+            if (isYearAttribute) {
+              const yearString =
+                typeof formValue === "string" ? formValue : String(formValue);
+              const match = yearString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+              const yearToSave = match
+                ? parseInt(match[1], 10)
+                : parseInt(yearString, 10);
+              if (!isNaN(yearToSave) && yearToSave >= 1900 && yearToSave <= 2100) {
+                attributeValue.valueNumber = yearToSave;
               }
-              // Allow 0, negative numbers, and decimals
-              if (!isNaN(numValue) && isFinite(numValue)) {
-                attributeValue.valueNumber = numValue;
-              } else {
-                // If conversion failed, try to preserve as string if it's a valid numeric string
-                const strValue = String(formValue).trim();
-                if (strValue && !isNaN(Number(strValue))) {
-                  attributeValue.valueNumber = Number(strValue);
+            } else {
+              const normalizedType = String(attr.type || "").toLowerCase();
+
+              if (
+                normalizedType === "string" ||
+                normalizedType === CategoryAttributesTypes.STRING
+              ) {
+                attributeValue.valueString = String(formValue);
+              } else if (
+                normalizedType === "number" ||
+                normalizedType === "numeric" ||
+                normalizedType === CategoryAttributesTypes.NUMERIC
+              ) {
+                let numValue: number;
+                if (typeof formValue === "string") {
+                  numValue = parseFloat(formValue.trim());
                 } else {
-                  console.warn(`⚠️ Failed to convert "${formValue}" to number`);
+                  numValue = Number(formValue);
                 }
+                if (!isNaN(numValue) && isFinite(numValue)) {
+                  attributeValue.valueNumber = numValue;
+                } else {
+                  const strValue = String(formValue).trim();
+                  if (strValue && !isNaN(Number(strValue))) {
+                    attributeValue.valueNumber = Number(strValue);
+                  }
+                }
+              } else if (
+                normalizedType === "boolean" ||
+                normalizedType === CategoryAttributesTypes.BOOLEAN
+              ) {
+                attributeValue.valueBoolean = Boolean(formValue);
+              } else if (
+                normalizedType === "date" ||
+                normalizedType === CategoryAttributesTypes.DATE
+              ) {
+                if (formValue instanceof Date) {
+                  attributeValue.valueDate = formValue;
+                } else if (typeof formValue === "string") {
+                  const date = new Date(formValue);
+                  if (!isNaN(date.getTime())) {
+                    attributeValue.valueDate = date;
+                  }
+                }
+              } else {
+                attributeValue.valueString = String(formValue);
               }
-            } else if (normalizedType === "boolean" || normalizedType === CategoryAttributesTypes.BOOLEAN) {
-              attributeValue.valueBoolean = Boolean(formValue);
-            } else if (normalizedType === "date" || normalizedType === CategoryAttributesTypes.DATE) {
-              if (formValue instanceof Date) {
-                attributeValue.valueDate = formValue;
-              } else if (typeof formValue === "string") {
-                const date = new Date(formValue);
+            }
+          } else if (existingAttr) {
+            if (isYearAttribute) {
+              if (
+                existingAttr.valueNumber !== null &&
+                existingAttr.valueNumber !== undefined
+              ) {
+                attributeValue.valueNumber = existingAttr.valueNumber as number;
+              } else if (existingAttr.valueString) {
+                const num = parseInt(String(existingAttr.valueString), 10);
+                if (!isNaN(num)) attributeValue.valueNumber = num;
+              } else if (existingAttr.valueDate) {
+                const date = new Date(String(existingAttr.valueDate));
                 if (!isNaN(date.getTime())) {
-                  attributeValue.valueDate = date;
+                  attributeValue.valueNumber = date.getFullYear();
                 }
               }
             } else {
-              console.warn(`⚠️ Unknown type: "${normalizedType}", defaulting to string`);
-              attributeValue.valueString = String(formValue);
+              attributeValue.valueString =
+                (existingAttr.valueString as string | null) ?? null;
+              attributeValue.valueNumber =
+                (existingAttr.valueNumber as number | null) ?? null;
+              attributeValue.valueBoolean =
+                (existingAttr.valueBoolean as boolean | null) ?? null;
+              attributeValue.valueDate =
+                (existingAttr.valueDate as Date | null) ?? null;
             }
           }
-        } else if (existingAttr) {
-          // Preserve existing value if form doesn't have it
-          if (isYearAttribute) {
-            // Prefer number; if only date exists, convert to year number
-            if (existingAttr.valueNumber !== null && existingAttr.valueNumber !== undefined) {
-              attributeValue.valueNumber = existingAttr.valueNumber;
-            } else if (existingAttr.valueString) {
-              const num = parseInt(String(existingAttr.valueString), 10);
-              if (!isNaN(num)) attributeValue.valueNumber = num;
-            } else if (existingAttr.valueDate) {
-              const date = new Date(existingAttr.valueDate);
-              if (!isNaN(date.getTime())) {
-                attributeValue.valueNumber = date.getFullYear();
-              }
-            }
-          } else {
-            attributeValue.valueString = existingAttr.valueString ?? null;
-            attributeValue.valueNumber = existingAttr.valueNumber ?? null;
-            attributeValue.valueBoolean = existingAttr.valueBoolean ?? null;
-            attributeValue.valueDate = existingAttr.valueDate ?? null;
-          }
-        }
 
-        return attributeValue;
-      })
-      // Only include attributes that have at least one value set
-      .filter((attr) => {
-        const hasValue = attr.valueString !== null ||
-          attr.valueNumber !== null ||
-          attr.valueBoolean !== null ||
-          attr.valueDate !== null;
-        if (!hasValue) {
-          console.warn(`⚠️ Filtering out attribute (no value):`, attr);
-        }
-        return hasValue;
-      });
+          return attributeValue;
+        })
+        .filter(
+          (attr) =>
+            attr.valueString !== null ||
+            attr.valueNumber !== null ||
+            attr.valueBoolean !== null ||
+            attr.valueDate !== null
+        );
 
       const updateData = {
         origin: formData.origin || null,
@@ -510,21 +528,31 @@ const EditApplicationDialog = ({
 
       toast({
         title: "Aplicación actualizada",
+        description: "Los cambios se guardaron correctamente.",
         variant: "success",
       });
 
       onOpenChange(false);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { error?: string } }; message?: string };
       toast({
         title: "Error al actualizar aplicación",
-        description: error.response?.data?.error || error.message || "Error desconocido. Nota: El endpoint de actualización de aplicaciones aún no está implementado en el backend.",
+        description:
+          apiError.response?.data?.error ||
+          apiError.message ||
+          "Error desconocido.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleAttributeChange = (attrName: string, value: any) => {
+  const handleAttributeChange = (
+    attrName: string,
+    value: string | number | boolean | Date | undefined
+  ) => {
     setFormData((prev) => ({
       ...prev,
       attributeValues: {
@@ -541,8 +569,8 @@ const EditApplicationDialog = ({
           <DialogTitle>{application ? "Editar Aplicación" : "Agregar Aplicación"}</DialogTitle>
           <DialogDescription>
             {application
-              ? "Edita la información de la aplicación. Todos los campos son editables."
-              : "Completa la información para crear una nueva aplicación. Puedes especificar un rango de años para crear múltiples aplicaciones que se integrarán automáticamente a los grupos correspondientes."}
+              ? "Edita la información de la aplicación."
+              : "Completa la información para crear una nueva aplicación. Los campos marcados con * son obligatorios."}
           </DialogDescription>
         </DialogHeader>
 
@@ -550,6 +578,7 @@ const EditApplicationDialog = ({
           <div className="space-y-2">
             <Label htmlFor="origin">
               Origen <span className="text-red-500">*</span>
+              <span className="text-muted-foreground font-normal ml-1">(obligatorio)</span>
             </Label>
             <Select
               value={formData.origin}
@@ -568,73 +597,50 @@ const EditApplicationDialog = ({
 
           {/* Dynamic Attributes */}
           {applicationAttributes.length > 0 && (
-            <div className="space-y-4 pt-4 border-t">
-              <h3 className="text-sm font-semibold">Información del Vehículo</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3 pt-4 border-t">
+              <div>
+                <h3 className="text-sm font-semibold">Información del Vehículo</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="text-red-500">*</span> obligatorio · sin asterisco = opcional
+                </p>
+              </div>
+              <div className="flex flex-col gap-4 max-h-[min(50vh,420px)] overflow-y-auto pr-1">
                 {applicationAttributes.map((attr) => (
                   <div key={attr.id} className="space-y-2">
                     <Label>
-                      {attr.required && <span className="text-red-500 mr-1">*</span>}
                       {translateAttributeName(attr.name, false)}
+                      {attr.required ? (
+                        <span className="text-red-500 ml-1">*</span>
+                      ) : (
+                        <span className="text-muted-foreground font-normal ml-1">(opcional)</span>
+                      )}
                     </Label>
                     {(() => {
-                      const isYearAttribute =
-                        attr.name.toLowerCase().includes("año") ||
-                        attr.name.toLowerCase().includes("anio") ||
-                        attr.name.toLowerCase().includes("year");
+                      const isYearAttribute = isYearAttributeName(attr.name);
 
                       if (isYearAttribute) {
-                        // Get current year state or initialize with empty values
-                        const currentYearState = yearFields[attr.name] || { start: "", end: "" };
+                        const currentYearState = yearFields[attr.name] || { start: "" };
 
-                        const handleYearChange = (field: "start" | "end", newValue: string) => {
-                          // Update local year fields state
-                          const updatedState = {
-                            start: field === "start" ? newValue : currentYearState.start,
-                            end: field === "end" ? newValue : currentYearState.end,
-                          };
-                          
+                        const handleYearChange = (newValue: string) => {
                           setYearFields({
                             ...yearFields,
-                            [attr.name]: updatedState,
+                            [attr.name]: { start: newValue },
                           });
-                          
-                          // For now, save the start year (the range will be handled in handleSave)
-                          // If both start and end are provided, we'll create multiple applications
-                          handleAttributeChange(attr.name, updatedState.start);
+                          handleAttributeChange(attr.name, newValue);
                         };
 
-                        // Year range input (allows creating multiple applications)
                         return (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">Año Inicio</Label>
-                                <Input
-                                  type="number"
-                                  min="1900"
-                                  max="2100"
-                                  value={currentYearState.start}
-                                  onChange={(e) => handleYearChange("start", e.target.value)}
-                                  placeholder="1998"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">Año Fin (opcional)</Label>
-                                <Input
-                                  type="number"
-                                  min="1900"
-                                  max="2100"
-                                  value={currentYearState.end}
-                                  onChange={(e) => handleYearChange("end", e.target.value)}
-                                  placeholder="2024"
-                                />
-                              </div>
-                            </div>
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              min="1900"
+                              max="2100"
+                              value={currentYearState.start}
+                              onChange={(e) => handleYearChange(e.target.value)}
+                              placeholder="1998"
+                            />
                             <p className="text-xs text-muted-foreground">
-                              {currentYearState.end && currentYearState.end !== "" 
-                                ? `Se crearán aplicaciones para cada año desde ${currentYearState.start} hasta ${currentYearState.end}. Si coinciden con un grupo existente, se integrarán automáticamente.`
-                                : `Se creará una aplicación para el año ${currentYearState.start || "especificado"}. Si coincide con un grupo existente, se integrará automáticamente.`}
+                              Se creará una aplicación para el año indicado.
                             </p>
                           </div>
                         );
@@ -664,11 +670,20 @@ const EditApplicationDialog = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={!formData.origin}>
-            {application ? "Guardar Cambios" : "Crear Aplicación(es)"}
+          <Button onClick={handleSave} disabled={!formData.origin || isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {application ? "Guardando..." : "Creando..."}
+              </>
+            ) : application ? (
+              "Guardar Cambios"
+            ) : (
+              "Crear Aplicación"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
