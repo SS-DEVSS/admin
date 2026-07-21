@@ -185,4 +185,46 @@ export const productService = {
     });
     return response.data;
   },
+
+  bulkDeleteProducts: async (payload: {
+    productIds?: string[];
+    selectAll?: boolean;
+    filters?: {
+      categoryId?: string;
+      subcategoryId?: string;
+      search?: string;
+      catalogVisibility?: CatalogVisibilityFilter;
+      includeHidden?: boolean;
+    };
+  }): Promise<{ deletedCount: number; failed: { id: string; reason: string }[] }> => {
+    const client = axiosClient();
+    const response = await client.post<{ deletedCount: number; failed: { id: string; reason: string }[] }>(
+      "/products/bulk/delete",
+      payload,
+      { timeout: LIST_REQUEST_TIMEOUT_MS }
+    );
+    return response.data;
+  },
+
+  previewBulkImages: async (files: File[]) => {
+    const client = axiosClient();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("images", file));
+    const response = await client.post("/products/bulk/images/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: LIST_REQUEST_TIMEOUT_MS,
+    });
+    return response.data;
+  },
+
+  uploadBulkImages: async (files: File[]) => {
+    const client = axiosClient();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("images", file));
+    const response = await client.post("/products/bulk/images", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: LIST_REQUEST_TIMEOUT_MS,
+    });
+    return response.data;
+  },
 };

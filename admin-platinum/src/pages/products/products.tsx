@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Search,
   SlidersHorizontal,
+  ImageIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
+import BulkImageUploadDialog from "@/components/products/BulkImageUploadDialog";
 
 type DrillLevel =
   | { type: "category"; category: Category }
@@ -102,6 +104,8 @@ const Products = () => {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([]);
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
     useState<CatalogVisibilityFilter>("all");
+  const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
+  const [tableRefreshKey, setTableRefreshKey] = useState(0);
 
   const isDesktopFilters = useMediaQuery("(min-width: 1024px)");
   const activeProductFilterCount =
@@ -617,6 +621,15 @@ const Products = () => {
                   </Button>
                 </div>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-10 px-4"
+                onClick={() => setBulkImagesOpen(true)}
+              >
+                <ImageIcon className="h-3.5 w-3.5 mr-2" />
+                Carga masiva de imágenes
+              </Button>
               <Link
                 to="/dashboard/producto/new-product"
                 className="flex flex-1 sm:flex-none"
@@ -635,6 +648,7 @@ const Products = () => {
               <Loader message="Cargando categorías..." />
             ) : (
               <DataTable
+                key={tableRefreshKey}
                 category={category}
                 searchFilter={searchFilter}
                 subcategoryId={subcategoryId}
@@ -644,6 +658,12 @@ const Products = () => {
           </div>
         </Card>
       </div>
+
+      <BulkImageUploadDialog
+        open={bulkImagesOpen}
+        onOpenChange={setBulkImagesOpen}
+        onComplete={() => setTableRefreshKey((k) => k + 1)}
+      />
     </Layout>
   );
 };

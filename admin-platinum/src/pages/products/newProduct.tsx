@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { useFormState } from "@/hooks/useFormProduct";
 import AdditionalInfo from "@/modules/products/AdditionalInfo";
 import Details from "@/modules/products/Details";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Trash2 } from "lucide-react";
+import ConfirmActionDialog from "@/components/ConfirmActionDialog";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/context/categories-context";
 import { useToast } from "@/hooks/use-toast";
@@ -18,12 +19,14 @@ const NewProduct = () => {
   const { id } = useParams();
   const isEditMode = !!id;
   const navigate = useNavigate();
-  const { getProductById, createProduct, updateProduct } = useProducts();
+  const { getProductById, createProduct, updateProduct, deleteProduct } = useProducts();
   const { categories } = useCategoryContext();
   const { toast } = useToast();
   const [currentProduct, setCurrentProduct] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const savingStartTimeRef = useRef<number | null>(null);
 
   const {
@@ -632,6 +635,24 @@ const NewProduct = () => {
     }
   };
 
+  const handleDeleteProduct = async () => {
+    if (!id) return;
+    setDeleteLoading(true);
+    try {
+      await deleteProduct(id);
+      toast({ title: "Producto eliminado", variant: "success" });
+      navigate("/dashboard/productos");
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al eliminar producto";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleteLoading(false);
+      setDeleteOpen(false);
+    }
+  };
+
   if (isLoadingProduct) {
     return <Loader fullScreen message="Cargando producto..." />;
   }
@@ -673,23 +694,46 @@ const NewProduct = () => {
           )}
         </section>
         <section className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
-          <div className="max-w-4xl mx-auto px-4 py-4 flex justify-end gap-3">
-            <Link to="/dashboard/productos">
-              <Button variant="outline">Cancelar</Button>
-            </Link>
-            <Button
-              disabled={!canContinue || isSubmitting}
-              onClick={handleSubmit}
-            >
-              {isSubmitting
-                ? "Guardando..."
-                : isEditMode
-                  ? "Actualizar Producto"
-                  : "Publicar Producto"}
-            </Button>
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+            {isEditMode ? (
+              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar producto
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Link to="/dashboard/productos">
+                <Button variant="outline">Cancelar</Button>
+              </Link>
+              <Button
+                disabled={!canContinue || isSubmitting}
+                onClick={handleSubmit}
+              >
+                {isSubmitting
+                  ? "Guardando..."
+                  : isEditMode
+                    ? "Actualizar Producto"
+                    : "Publicar Producto"}
+              </Button>
+            </div>
           </div>
         </section>
       </Layout>
+
+      <ConfirmActionDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Eliminar producto"
+        description="Se eliminará este producto de forma permanente."
+        consequences={[
+          "Imágenes, aplicaciones, referencias y variantes asociadas.",
+          "Esta acción no se puede deshacer.",
+        ]}
+        loading={deleteLoading}
+        onConfirm={handleDeleteProduct}
+      />
     </>
   );
 };

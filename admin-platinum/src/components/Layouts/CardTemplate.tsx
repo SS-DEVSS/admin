@@ -31,6 +31,18 @@ import {
   isMissingImageUrl,
   onImageErrorFallback,
 } from "@/utils/imagePlaceholder";
+import ConfirmActionDialog from "@/components/ConfirmActionDialog";
+import { useAxiosClient } from "@/hooks/useAxiosClient";
+import { toast } from "@/hooks/use-toast";
+import { useBrands } from "@/hooks/useBrands";
+import { useCategoryContext } from "@/context/categories-context";
+
+type CategoryDeletePreview = {
+  productCount: number;
+  subcategoryCount: number;
+  attributeCount: number;
+  canDelete: boolean;
+};
 
 type CardTemplateProps = {
   category?: Category;
@@ -44,11 +56,23 @@ const CardTemplate = ({
   brand,
   category,
   getBrandById,
+  getItems,
 }: CardTemplateProps) => {
   const { setSelectedBrand, openModal: openModalBrand } = useBrandContext();
+  const { brands, deleteBrand } = useBrands();
+  const { getCategories } = useCategoryContext();
+  const client = useAxiosClient();
   const location = useLocation();
   const { pathname } = location;
   const navigate = useNavigate();
+
+  const [categoryDeleteOpen, setCategoryDeleteOpen] = useState(false);
+  const [categoryDeletePreview, setCategoryDeletePreview] = useState<CategoryDeletePreview | null>(null);
+  const [categoryDeleteLoading, setCategoryDeleteLoading] = useState(false);
+  const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
+  const [brandDeleteOpen, setBrandDeleteOpen] = useState(false);
+  const [brandDeleteLoading, setBrandDeleteLoading] = useState(false);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
 
   const viewCategoriesFromBrand = (id: Brand["id"]) => {
     setSelectedBrand(id);
@@ -68,6 +92,88 @@ const CardTemplate = ({
         description: "Edita la marca seleccionada.",
         action: "",
       });
+    }
+  };
+
+  const handleCategoryDeleteClick = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!category?.id) return;
+    try {
+      const { data } = await client.get<CategoryDeletePreview>(
+        `/categories/${category.id}/delete-preview`
+      );
+      if (!data.canDelete) {
+        toast({
+          title: "No se puede eliminar la categoría",
+          description: `Tiene ${data.productCount} producto(s) asociado(s). Elimínalos primero desde Productos.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      setCategoryDeletePreview(data);
+      setCategoryDeleteError(null);
+      setCategoryDeleteOpen(true);
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al verificar la categoría";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleCategoryDeleteConfirm = async () => {
+    if (!category?.id) return;
+    setCategoryDeleteLoading(true);
+    setCategoryDeleteError(null);
+    try {
+      await client.delete(`/categories/${category.id}`);
+      toast({ title: "Categoría eliminada", variant: "success" });
+      setCategoryDeleteOpen(false);
+      await getCategories(true);
+      getItems?.();
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al eliminar categoría";
+      setCategoryDeleteError(msg);
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setCategoryDeleteLoading(false);
+    }
+  };
+
+  const handleDuplicateCategory = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!category?.id) return;
+    setDuplicateLoading(true);
+    try {
+      const { data } = await client.post(`/categories/${category.id}/duplicate`);
+      toast({ title: "Categoría duplicada", variant: "success" });
+      await getCategories(true);
+      getItems?.();
+      if (data?.id) {
+        navigate(`/dashboard/categorias/editar/${data.id}`);
+      }
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al duplicar categoría";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDuplicateLoading(false);
+    }
+  };
+
+  const handleBrandDeleteConfirm = async () => {
+    if (!brand?.id) return;
+    setBrandDeleteLoading(true);
+    try {
+      await deleteBrand(brand.id);
+      setBrandDeleteOpen(false);
+    } catch {
+      /* toast handled in hook */
+    } finally {
+      setBrandDeleteLoading(false);
     }
   };
 
@@ -188,6 +294,44 @@ const CardTemplate = ({
                     <DropdownMenuItem onClick={handleEditBrand}>
                       Editar Marca
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={brands.length <= 1}
+                      onClick={() => setBrandDeleteOpen(true)}
+                    >
+                      Eliminar Marca
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {isCategoryListCard && category && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-md p-1 outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Acciones"
+                  >
+                    <MoreVertical className="hover:cursor-pointer w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-44" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      disabled={duplicateLoading}
+                      onClick={(e) => void handleDuplicateCategory(e)}
+                    >
+                      Duplicar categoría
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => void handleCategoryDeleteClick(e)}
+                    >
+                      Eliminar categoría
+                    </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -251,6 +395,36 @@ const CardTemplate = ({
           </CardContent>
         )}
       </Card>
+
+      <ConfirmActionDialog
+        open={categoryDeleteOpen}
+        onOpenChange={setCategoryDeleteOpen}
+        title="Eliminar categoría"
+        description={`Se eliminará la categoría "${category?.name}".`}
+        consequences={[
+          `Se eliminarán ${categoryDeletePreview?.subcategoryCount ?? 0} subcategoría(s).`,
+          `Se eliminarán ${categoryDeletePreview?.attributeCount ?? 0} atributo(s) del template.`,
+          "Los productos no se eliminan (la categoría debe estar vacía).",
+          "Esta acción no se puede deshacer.",
+        ]}
+        loading={categoryDeleteLoading}
+        error={categoryDeleteError}
+        onConfirm={handleCategoryDeleteConfirm}
+      />
+
+      <ConfirmActionDialog
+        open={brandDeleteOpen}
+        onOpenChange={setBrandDeleteOpen}
+        title="Eliminar marca"
+        description={`Se eliminará la marca "${brand?.name}".`}
+        consequences={[
+          "Los productos y categorías permanecerán en el sistema.",
+          "Solo se quitará la vinculación con esta marca.",
+          "Debe existir al menos una marca en el sistema.",
+        ]}
+        loading={brandDeleteLoading}
+        onConfirm={handleBrandDeleteConfirm}
+      />
     </>
   );
 };

@@ -8,7 +8,9 @@ import {
 } from "@/components/ui/card";
 import { Product } from "@/models/product";
 import { Application } from "@/models/application";
-import { PlusCircle, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { PlusCircle, Pencil, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import ConfirmActionDialog from "@/components/ConfirmActionDialog";
+import { toast } from "@/hooks/use-toast";
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import NoData from "../NoData";
@@ -57,6 +59,8 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // Always use table view - list view removed
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Get category attributes (only application attributes)
   const categoryAttributes = useMemo(() => {
@@ -106,6 +110,26 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   const handleEditApplication = (application: Application) => {
     setEditingApplication(application);
     setIsEditDialogOpen(true);
+  };
+
+  const confirmDeleteApplication = async () => {
+    if (!deleteTarget?.id) return;
+    setDeleteLoading(true);
+    try {
+      await axiosClient().delete(`/applications/${deleteTarget.id}`);
+      setState((prev) => ({
+        applications: prev.applications.filter((app) => app.id !== deleteTarget.id),
+      }));
+      toast({ title: "Aplicación eliminada", variant: "success" });
+      setDeleteTarget(null);
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al eliminar aplicación";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   // Helper function to format applications (same logic as newProduct.tsx)
@@ -706,6 +730,10 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                                             onClick={() => handleEditApplication(app)}
                                             className="cursor-pointer w-4 h-4 hover:text-blue-600 transition-colors"
                                           />
+                                          <Trash2
+                                            onClick={() => setDeleteTarget(app)}
+                                            className="cursor-pointer w-4 h-4 hover:text-red-600 transition-colors"
+                                          />
                                         </div>
                                       </div>
                                     ))}
@@ -743,6 +771,16 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
         categoryAttributes={categoryAttributes}
         productId={product?.id}
         onSuccess={handleEditSuccess}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Eliminar aplicación"
+        description="Se eliminará esta aplicación del producto."
+        consequences={["La aplicación y sus atributos asociados se eliminarán permanentemente."]}
+        loading={deleteLoading}
+        onConfirm={confirmDeleteApplication}
       />
     </Card>
   );
