@@ -35,11 +35,54 @@ type AttributePayload = {
   valueDate: Date | null;
 };
 
-type YearFieldState = { start: string };
+type YearFieldState = { start: string; end: string };
+
+const isDateAttribute = (attr: CategoryAtributes): boolean => {
+  const normalizedType = String(attr.type || "").toLowerCase();
+  return normalizedType === "date" || normalizedType === CategoryAttributesTypes.DATE;
+};
 
 const isYearAttributeName = (name: string): boolean => {
   const lower = name.toLowerCase();
   return lower.includes("año") || lower.includes("anio") || lower.includes("year");
+};
+
+const findDateAttributeForYearRange = (
+  attributes: CategoryAtributes[]
+): CategoryAtributes | undefined => {
+  const yearNamed = attributes.find(
+    (attr) => isDateAttribute(attr) && isYearAttributeName(attr.name)
+  );
+  if (yearNamed) return yearNamed;
+  return attributes.find((attr) => isDateAttribute(attr));
+};
+
+const resolveYearsToCreate = (
+  startStr: string,
+  endStr: string
+): { years: number[] } | { error: string } => {
+  const startYear = parseInt(startStr, 10);
+  if (!startStr.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
+    return { error: "Ingresa un año de inicio válido (1900-2100)." };
+  }
+
+  if (!endStr.trim()) {
+    return { years: [startYear] };
+  }
+
+  const endYear = parseInt(endStr, 10);
+  if (isNaN(endYear) || endYear < 1900 || endYear > 2100) {
+    return { error: "Ingresa un año de fin válido (1900-2100)." };
+  }
+  if (endYear < startYear) {
+    return { error: "El año de fin debe ser mayor o igual al año de inicio." };
+  }
+
+  const years: number[] = [];
+  for (let year = startYear; year <= endYear; year++) {
+    years.push(year);
+  }
+  return { years };
 };
 
 const hasAttributeValue = (value: string | number | boolean | Date | undefined): boolean => {
@@ -88,6 +131,11 @@ const EditApplicationDialog = ({
     return [];
   }, [categoryAttributes]);
 
+  const yearRangeDateAttribute = useMemo(
+    () => findDateAttributeForYearRange(applicationAttributes),
+    [applicationAttributes]
+  );
+
   // Initialize form state from application
   const [formData, setFormData] = useState({
     origin: "Nueva aplicación",
@@ -114,6 +162,9 @@ const EditApplicationDialog = ({
     if (application.attributeValues && applicationAttributes.length > 0) {
       applicationAttributes.forEach((attr) => {
         const isYearAttribute = isYearAttributeName(attr.name);
+        const isDateYearField =
+          isDateAttribute(attr) &&
+          yearRangeDateAttribute?.id === attr.id;
         
         // Try to find the attribute value by ID first, then by name (case-insensitive)
         const attrValue = application.attributeValues?.find((av: any) => {
@@ -198,24 +249,24 @@ const EditApplicationDialog = ({
             attributeValuesObj[attr.name] = value;
           }
 
-          if (isYearAttribute) {
+          if (isDateYearField || isYearAttribute) {
             if (typeof value === "string" && value) {
               const match = value.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
               if (match) {
-                newYearFields[attr.name] = { start: match[1] };
+                newYearFields[attr.name] = { start: match[1], end: match[2] };
               } else if (/^\d{4}$/.test(value.trim())) {
-                newYearFields[attr.name] = { start: value.trim() };
+                newYearFields[attr.name] = { start: value.trim(), end: "" };
               } else {
-                newYearFields[attr.name] = { start: "" };
+                newYearFields[attr.name] = { start: "", end: "" };
               }
             } else if (typeof value === "number") {
-              newYearFields[attr.name] = { start: value.toString() };
+              newYearFields[attr.name] = { start: value.toString(), end: "" };
             } else {
-              newYearFields[attr.name] = { start: "" };
+              newYearFields[attr.name] = { start: "", end: "" };
             }
           }
-        } else if (isYearAttribute) {
-          newYearFields[attr.name] = { start: "" };
+        } else if (isDateYearField) {
+          newYearFields[attr.name] = { start: "", end: "" };
         }
       });
     }
@@ -225,7 +276,7 @@ const EditApplicationDialog = ({
       attributeValues: attributeValuesObj,
     });
     setYearFields(newYearFields);
-  }, [application, applicationAttributes]);
+  }, [application, applicationAttributes, yearRangeDateAttribute?.id]);
 
   useEffect(() => {
     if (!open) {
@@ -237,11 +288,20 @@ const EditApplicationDialog = ({
     for (const attr of applicationAttributes) {
       if (!attr.required) continue;
 
-      if (isYearAttributeName(attr.name)) {
-        const yearState = yearFields[attr.name] || { start: "" };
+      const isDateYearField =
+        isDateAttribute(attr) && yearRangeDateAttribute?.id === attr.id;
+
+      if (isDateYearField) {
+        const yearState = yearFields[attr.name] || { start: "", end: "" };
         const startYear = parseInt(yearState.start, 10);
         if (!yearState.start.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
           return `El campo "${translateAttributeName(attr.name, false)}" es obligatorio (año válido entre 1900 y 2100).`;
+        }
+        if (yearState.end.trim()) {
+          const endYear = parseInt(yearState.end, 10);
+          if (isNaN(endYear) || endYear < 1900 || endYear > 2100 || endYear < startYear) {
+            return `El año de fin de "${translateAttributeName(attr.name, false)}" no es válido.`;
+          }
         }
         continue;
       }
@@ -254,10 +314,12 @@ const EditApplicationDialog = ({
     return null;
   };
 
-  const buildCreateAttributes = (yearValue?: number): AttributePayload[] => {
+  const buildCreateAttributes = (
+    yearValue: number | undefined,
+    yearAttrId: string | undefined
+  ): AttributePayload[] => {
     return applicationAttributes
       .map((attr) => {
-        const isYearAttr = isYearAttributeName(attr.name);
         const attributeValue: AttributePayload = {
           idAttribute: attr.id!,
           valueString: null,
@@ -266,7 +328,12 @@ const EditApplicationDialog = ({
           valueDate: null,
         };
 
-        if (isYearAttr && yearValue !== undefined) {
+        if (
+          yearValue !== undefined &&
+          yearAttrId !== undefined &&
+          attr.id === yearAttrId &&
+          isDateAttribute(attr)
+        ) {
           attributeValue.valueDate = new Date(yearValue, 0, 1);
           return attributeValue;
         }
@@ -280,7 +347,7 @@ const EditApplicationDialog = ({
           attributeValue.valueNumber = Number(value);
         } else if (attr.type === CategoryAttributesTypes.BOOLEAN) {
           attributeValue.valueBoolean = Boolean(value);
-        } else if (attr.type === CategoryAttributesTypes.DATE) {
+        } else if (isDateAttribute(attr)) {
           if (value instanceof Date) {
             attributeValue.valueDate = value;
           } else if (typeof value === "string") {
@@ -339,27 +406,54 @@ const EditApplicationDialog = ({
           return;
         }
 
-        const yearAttribute = applicationAttributes.find((attr) =>
-          isYearAttributeName(attr.name)
-        );
-        let yearValue: number | undefined;
-        if (yearAttribute) {
-          const yearState = yearFields[yearAttribute.name] || { start: "" };
-          yearValue = parseInt(yearState.start, 10);
+        let yearsToCreate: number[] | null = null;
+        let yearAttrId: string | undefined;
+
+        if (yearRangeDateAttribute?.id) {
+          yearAttrId = yearRangeDateAttribute.id;
+          const yearState = yearFields[yearRangeDateAttribute.name] || {
+            start: "",
+            end: "",
+          };
+          const resolved = resolveYearsToCreate(yearState.start, yearState.end);
+          if ("error" in resolved) {
+            toast({
+              title: "Año no válido",
+              description: resolved.error,
+              variant: "destructive",
+            });
+            return;
+          }
+          yearsToCreate = resolved.years;
         }
 
-        const createData = {
-          sku: productSku,
-          origin: formData.origin || "Nueva aplicación",
-          idProduct: productId,
-          attributes: buildCreateAttributes(yearValue),
+        let createdCount = 0;
+
+        const createOneApplication = async (year?: number) => {
+          const createData = {
+            sku: productSku,
+            origin: formData.origin || "Nueva aplicación",
+            idProduct: productId,
+            attributes: buildCreateAttributes(year, yearAttrId),
+          };
+          await client.post("/applications", createData);
+          createdCount += 1;
         };
 
-        await client.post("/applications", createData);
+        if (yearsToCreate) {
+          for (const year of yearsToCreate) {
+            await createOneApplication(year);
+          }
+        } else {
+          await createOneApplication(undefined);
+        }
 
+        const isRange = createdCount > 1;
         toast({
-          title: "Aplicación creada",
-          description: "La aplicación se creó exitosamente.",
+          title: isRange ? "Aplicaciones creadas" : "Aplicación creada",
+          description: isRange
+            ? `Se crearon ${createdCount} aplicaciones (una por año). Si coinciden con un grupo existente, se integrarán automáticamente.`
+            : "La aplicación se creó exitosamente.",
           variant: "success",
         });
 
@@ -564,16 +658,17 @@ const EditApplicationDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{application ? "Editar Aplicación" : "Agregar Aplicación"}</DialogTitle>
           <DialogDescription>
             {application
               ? "Edita la información de la aplicación."
-              : "Completa la información para crear una nueva aplicación. Los campos marcados con * son obligatorios."}
+              : "Completa la información para crear una nueva aplicación. Si el atributo de fecha tiene rango de años, se creará una aplicación por cada año."}
           </DialogDescription>
         </DialogHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto -mx-6 px-6">
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="origin">
@@ -604,7 +699,7 @@ const EditApplicationDialog = ({
                   <span className="text-red-500">*</span> obligatorio · sin asterisco = opcional
                 </p>
               </div>
-              <div className="flex flex-col gap-4 max-h-[min(50vh,420px)] overflow-y-auto pr-1">
+              <div className="flex flex-col gap-4">
                 {applicationAttributes.map((attr) => (
                   <div key={attr.id} className="space-y-2">
                     <Label>
@@ -616,18 +711,93 @@ const EditApplicationDialog = ({
                       )}
                     </Label>
                     {(() => {
-                      const isYearAttribute = isYearAttributeName(attr.name);
+                      const isDateYearField =
+                        isDateAttribute(attr) &&
+                        yearRangeDateAttribute?.id === attr.id;
 
-                      if (isYearAttribute) {
-                        const currentYearState = yearFields[attr.name] || { start: "" };
+                      if (isDateYearField) {
+                        const currentYearState = yearFields[attr.name] || {
+                          start: "",
+                          end: "",
+                        };
 
-                        const handleYearChange = (newValue: string) => {
+                        const handleYearChange = (
+                          field: "start" | "end",
+                          newValue: string
+                        ) => {
+                          const updatedState = {
+                            start:
+                              field === "start" ? newValue : currentYearState.start,
+                            end: field === "end" ? newValue : currentYearState.end,
+                          };
                           setYearFields({
                             ...yearFields,
-                            [attr.name]: { start: newValue },
+                            [attr.name]: updatedState,
                           });
-                          handleAttributeChange(attr.name, newValue);
+                          handleAttributeChange(attr.name, updatedState.start);
                         };
+
+                        if (!application) {
+                          const endYear = currentYearState.end.trim()
+                            ? parseInt(currentYearState.end, 10)
+                            : null;
+                          const startYear = currentYearState.start.trim()
+                            ? parseInt(currentYearState.start, 10)
+                            : null;
+                          const appsToCreate =
+                            startYear &&
+                            endYear &&
+                            !isNaN(startYear) &&
+                            !isNaN(endYear) &&
+                            endYear >= startYear
+                              ? endYear - startYear + 1
+                              : 1;
+
+                          return (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">
+                                    Año inicio
+                                    {attr.required && (
+                                      <span className="text-red-500 ml-0.5">*</span>
+                                    )}
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="1900"
+                                    max="2100"
+                                    value={currentYearState.start}
+                                    onChange={(e) =>
+                                      handleYearChange("start", e.target.value)
+                                    }
+                                    placeholder="2001"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">
+                                    Año fin (opcional)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="1900"
+                                    max="2100"
+                                    value={currentYearState.end}
+                                    onChange={(e) =>
+                                      handleYearChange("end", e.target.value)
+                                    }
+                                    placeholder="2017"
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {currentYearState.end.trim()
+                                  ? `Se crearán ${appsToCreate} aplicación(es), una por cada año, con los mismos datos y solo cambiando el año.`
+                                  : "Se creará una aplicación para el año indicado. Agrega año fin para crear una por cada año del rango."}
+                              </p>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div className="space-y-1">
@@ -636,12 +806,9 @@ const EditApplicationDialog = ({
                               min="1900"
                               max="2100"
                               value={currentYearState.start}
-                              onChange={(e) => handleYearChange(e.target.value)}
+                              onChange={(e) => handleYearChange("start", e.target.value)}
                               placeholder="1998"
                             />
-                            <p className="text-xs text-muted-foreground">
-                              Se creará una aplicación para el año indicado.
-                            </p>
                           </div>
                         );
                       }
@@ -668,8 +835,9 @@ const EditApplicationDialog = ({
             </p>
           )}
         </div>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancelar
           </Button>
@@ -681,6 +849,8 @@ const EditApplicationDialog = ({
               </>
             ) : application ? (
               "Guardar Cambios"
+            ) : yearRangeDateAttribute ? (
+              "Crear Aplicación(es)"
             ) : (
               "Crear Aplicación"
             )}

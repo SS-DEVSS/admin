@@ -26,9 +26,11 @@ type ReferencesCardProps = {
   };
   setState: React.Dispatch<React.SetStateAction<{ references: Reference[] }>>;
   product?: Product | null;
+  layout?: "default" | "sidebar";
 };
 
-const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
+const ReferencesCard = ({ state, setState, product, layout = "default" }: ReferencesCardProps) => {
+  const isSidebar = layout === "sidebar";
   const { categories } = useCategoryContext();
   const [showInput, setShowInput] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
@@ -162,9 +164,9 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
   };
 
   return (
-    <Card className="w-full flex flex-col mt-5">
-      <CardHeader>
-        <CardTitle>Referencias</CardTitle>
+    <Card className="w-full flex flex-col">
+      <CardHeader className={isSidebar ? "pb-3" : undefined}>
+        <CardTitle className="text-base">Referencias</CardTitle>
         <CardDescription>
           Ingrese los números de referencia asociados al producto.
         </CardDescription>
@@ -177,11 +179,13 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
             </p>
           </NoData>
         ) : (
-          <section className="flex gap-3 flex-wrap">
+          <section className={isSidebar ? "flex flex-col gap-2" : "flex gap-3 flex-wrap"}>
             {state.references.map((reference) => (
               <div
                 key={reference.id}
-                className="bg-primary/10 border border-primary/20 text-foreground rounded-full px-4 py-2 flex items-center gap-3 transition-all duration-200 group"
+                className={`bg-primary/10 border border-primary/20 text-foreground rounded-full px-4 py-2 flex items-center gap-3 transition-all duration-200 group ${
+                  isSidebar ? "w-full rounded-lg" : ""
+                }`}
               >
                 <span className="flex-1 text-sm font-medium">
                   {reference.referenceBrand && (
@@ -205,17 +209,17 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
         )}
         {showInput && (
           <div className="flex flex-col gap-2 mt-4">
-            <div className="flex gap-2">
+            <div className={isSidebar ? "flex flex-col gap-2" : "flex gap-2"}>
               <Input
                 type="text"
-                className="w-1/3"
+                className={isSidebar ? "w-full" : "w-1/3"}
                 placeholder="Marca de Intercambio (Ej. LUK)"
                 value={referenceBrand}
                 onChange={(e) => setReferenceBrand(e.target.value)}
               />
               <Input
                 type="text"
-                className="w-2/3"
+                className={isSidebar ? "w-full" : "w-2/3"}
                 placeholder="Intercambio"
                 value={referenceNumber || ""}
                 onChange={(e) => setReferenceNumber(e.target.value)}

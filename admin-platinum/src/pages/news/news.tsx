@@ -3,13 +3,7 @@ import { AlertTriangle, PlusCircle, Search } from "lucide-react";
 import Layout from "@/components/Layouts/Layout";
 import CardSectionLayout from "@/components/Layouts/CardSectionLayout";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import { Input } from "@/components/ui/input";
 import { BlogPost } from "@/models/news";
 import CardBlogPost from "@/components/CardBlogPost";
@@ -38,15 +32,11 @@ const News = () => {
 
   return (
     <Layout>
-      <Card className="border-0 shadow-none">
-        <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0 pb-6">
-          <div className="flex flex-col gap-3">
-            <CardTitle>Noticias</CardTitle>
-            <CardDescription>
-              Maneja tus noticias creadas en la aplicación
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
+      <DashboardPageShell
+        title="Noticias"
+        description="Maneja tus noticias creadas en la aplicación"
+        filters={
+          <>
             <div className="relative flex-1 md:grow-0">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -65,9 +55,9 @@ const News = () => {
                 </span>
               </Button>
             </Link>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
+          </>
+        }
+      >
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="flex flex-col items-center gap-2">
@@ -101,8 +91,7 @@ const News = () => {
               ))}
             </CardSectionLayout>
           )}
-        </CardContent>
-      </Card>
+      </DashboardPageShell>
     </Layout>
   );
 };

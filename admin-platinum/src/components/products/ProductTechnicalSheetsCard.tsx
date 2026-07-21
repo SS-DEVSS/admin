@@ -46,7 +46,7 @@ const ProductTechnicalSheetsCard = ({ productId }: ProductTechnicalSheetsCardPro
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Boletines técnicos</CardTitle>
+        <CardTitle className="text-base">Boletines técnicos</CardTitle>
         <CardDescription>Boletines vinculados a este producto.</CardDescription>
       </CardHeader>
       <CardContent>

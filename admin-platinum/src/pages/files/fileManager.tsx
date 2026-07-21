@@ -136,129 +136,164 @@ const FileManager = () => {
 
   return (
     <Layout>
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
-          Administrador de Archivos
-        </h1>
-        {total !== undefined && (
-          <p className="text-sm text-muted-foreground mt-1">
-            {total} archivo(s) en total
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[260px] sm:max-w-lg">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre de archivo..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
-                  onClick={handleClearSearch}
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </Button>
+      <div className="w-full max-w-full">
+        <div className="flex flex-col gap-4 pb-6 w-full">
+          <div className="flex flex-row flex-wrap items-center justify-between gap-4 w-full">
+            <div>
+              <h1 className="text-2xl font-semibold leading-none tracking-tight">
+                Administrador de Archivos
+              </h1>
+              {total !== undefined && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {total} archivo(s) en total
+                </p>
               )}
             </div>
-            <Button className="shrink-0" onClick={() => setUploadModalOpen(true)}>
-              <Upload className="h-4 w-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Subir Archivos</span>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <Button
+                className="h-10 px-4 gap-2 flex-1 sm:flex-none"
+                onClick={() => setUploadModalOpen(true)}
+              >
+                <Upload className="h-4 w-4 shrink-0" />
+                Subir Archivos
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 px-4 gap-2 flex-1 sm:flex-none bg-[#F4F4F5] hover:bg-[#E4E4E7] hover:text-foreground"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 shrink-0" />
+                )}
+                Actualizar
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Drawer direction="bottom">
-              <DrawerTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-1 sm:hidden gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent>
-                <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
-                  <DrawerHeader>
-                    <DrawerTitle>Filtrar y ordenar archivos</DrawerTitle>
-                    <DrawerDescription>
-                      Ajusta el orden y filtra por tipo de archivo.
-                    </DrawerDescription>
-                  </DrawerHeader>
-                  <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Ordenar por</label>
-                      {sortSelect}
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center w-full">
+            <div className="flex items-center gap-2 w-full lg:w-auto flex-1">
+              <div className="relative flex-1 lg:max-w-[336px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre de archivo..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg bg-background pl-8 pr-10"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
+                    onClick={handleClearSearch}
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+              <Drawer direction="bottom">
+                <DrawerTrigger asChild>
+                  <Button variant="outline" className="gap-2 shrink-0 lg:hidden">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filtros
+                    {activeFilterCount > 0 && (
+                      <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent>
+                  <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                    <DrawerHeader>
+                      <DrawerTitle>Filtrar y ordenar archivos</DrawerTitle>
+                      <DrawerDescription>
+                        Ajusta el orden y filtra por tipo de archivo.
+                      </DrawerDescription>
+                    </DrawerHeader>
+                    <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium">Ordenar por</label>
+                        {sortSelect}
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium">Tipo</label>
+                        {typeSelect}
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium">Vista</label>
+                        <div className="flex border rounded-md w-fit">
+                          <Button
+                            variant={viewType === 'cards' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="rounded-r-none"
+                            onClick={() => setViewType('cards')}
+                          >
+                            <Grid3x3 className="h-4 w-4 mr-2" />
+                            Tarjetas
+                          </Button>
+                          <Button
+                            variant={viewType === 'table' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="rounded-l-none"
+                            onClick={() => setViewType('table')}
+                          >
+                            <List className="h-4 w-4 mr-2" />
+                            Tabla
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Tipo</label>
-                      {typeSelect}
-                    </div>
+                    <DrawerFooter>
+                      <Button
+                        variant="outline"
+                        onClick={clearFilters}
+                        disabled={
+                          activeFilterCount === 0 &&
+                          sortBy === 'createdAt' &&
+                          sortOrder === 'desc'
+                        }
+                      >
+                        Limpiar filtros
+                      </Button>
+                      <DrawerClose asChild>
+                        <Button>Ver resultados</Button>
+                      </DrawerClose>
+                    </DrawerFooter>
                   </div>
-                  <DrawerFooter>
-                    <Button
-                      variant="outline"
-                      onClick={clearFilters}
-                      disabled={activeFilterCount === 0 && sortBy === 'createdAt' && sortOrder === 'desc'}
-                    >
-                      Limpiar filtros
-                    </Button>
-                    <DrawerClose asChild>
-                      <Button>Ver resultados</Button>
-                    </DrawerClose>
-                  </DrawerFooter>
-                </div>
-              </DrawerContent>
-            </Drawer>
-            <div className="hidden sm:flex sm:items-center sm:gap-3">
+                </DrawerContent>
+              </Drawer>
+            </div>
+            <div className="hidden lg:flex lg:items-center lg:gap-2">
               {sortSelect}
               {typeSelect}
+              <div className="flex shrink-0 border rounded-md">
+                <Button
+                  variant={viewType === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-r-none h-10"
+                  onClick={() => setViewType('cards')}
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewType === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-l-none h-10"
+                  onClick={() => setViewType('table')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex shrink-0 border rounded-md">
-              <Button
-                variant={viewType === 'cards' ? 'default' : 'ghost'}
-                size="sm"
-                className="rounded-r-none"
-                onClick={() => setViewType('cards')}
-              >
-                <Grid3x3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewType === 'table' ? 'default' : 'ghost'}
-                size="sm"
-                className="rounded-l-none"
-                onClick={() => setViewType('table')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 sm:mr-2" />
-              )}
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Actualizar</span>
-            </Button>
           </div>
         </div>
 
+        <div className="space-y-6">
         {loading && files.length === 0 ? (
           <div className="py-12 text-center">
             <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
@@ -302,6 +337,7 @@ const FileManager = () => {
             )}
           </>
         )}
+        </div>
       </div>
 
       <FileUploadModal

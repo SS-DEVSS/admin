@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Drawer,
@@ -423,9 +422,9 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
 
   return (
     <div className="w-full max-w-full">
-      <Card className="border-0 shadow-none w-full">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 p-0 m-0 pb-6 w-full">
-          <CardTitle>Importaciones</CardTitle>
+      <div className="flex flex-col gap-4 pb-6 w-full">
+        <div className="flex flex-row flex-wrap items-center justify-between gap-3 w-full">
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">Importaciones</h1>
           <div className="flex items-center gap-3 w-full lg:w-auto lg:ml-auto">
             <Drawer direction="bottom">
               <DrawerTrigger asChild>
@@ -483,8 +482,9 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
             </div>
             {headerActions}
           </div>
-        </CardHeader>
-        <div>
+        </div>
+      </div>
+      <div>
           {loading ? (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -674,7 +674,6 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
             </>
           )}
         </div>
-      </Card>
 
       {/* Dialog de Detalles */}
       <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>

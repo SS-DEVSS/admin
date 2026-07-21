@@ -632,7 +632,7 @@ const CategoryCU = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <main className="max-w-4xl mx-auto px-0 md:px-6">
+      <main className="w-full max-w-full px-0 md:px-0">
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -916,7 +916,7 @@ const CategoryCU = ({
         />
       </main>
       <section className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 flex justify-end gap-3">
+        <div className="w-full max-w-full px-4 md:px-6 py-4 flex justify-end gap-3">
           <Button
             variant={"outline"}
             type="button"
