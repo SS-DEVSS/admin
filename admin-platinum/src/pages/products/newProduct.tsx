@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { resolveProductNameForSave } from "@/utils/adminFieldVisibility";
 import Loader from "@/components/Loader";
 import { Reference } from "@/models/reference";
+import { persistNewReferences } from "@/services/referenceService";
 
 function normalizeAttributeValue(value: unknown): unknown {
   if (value === undefined || value === null || value === "") return null;
@@ -39,7 +40,7 @@ function buildFormSnapshot(
   const referenceKeys = references
     .map(
       (reference) =>
-        `${reference.id ?? ""}|${reference.referenceBrand ?? ""}|${reference.referenceNumber ?? ""}|${reference.description ?? ""}`,
+        `${reference.id ?? ""}|${reference.referenceBrand ?? ""}|${reference.referenceNumber ?? ""}|${reference.type ?? ""}|${reference.description ?? ""}`,
     )
     .sort();
 
@@ -593,54 +594,37 @@ const NewProduct = () => {
         detailsState.sku,
       );
 
-      // Format references - compare with existing to only send changes
+      // Format references - new refs are persisted via POST /references (full metadata)
       const currentReferenceIds = referencesState.references
         .map((ref) => ref.id)
         .filter((id): id is string => !!id);
 
       if (isEditMode && id) {
+        await persistNewReferences(id, referencesState.references);
+
         const idSubcategory = detailsState.subcategory?.id ?? null;
-        const productPayload: any = {
+        const productPayload: Record<string, unknown> = {
           name: productName,
           description: detailsState.description || null,
           idSubcategory,
           visibleInCatalog: detailsState.visibleInCatalog,
         };
 
-        // Compare references with existing product to only send changes
         if (existingProduct && existingProduct.references) {
           const existingReferenceIds = existingProduct.references
-            .map((ref: any) => ref.id)
-            .filter((id: any): id is string => !!id);
+            .map((ref: { id?: string }) => ref.id)
+            .filter((refId: string | undefined): refId is string => !!refId);
 
-          // Find references to add (in current but not in existing) - use IDs for new references
-          const referencesToAdd = currentReferenceIds.filter(
-            (id: string) => !existingReferenceIds.includes(id),
-          );
-
-          // Find references to remove (in existing but not in current) - use referenceNumbers for removal
           const referencesToRemoveIds = existingReferenceIds.filter(
-            (id: string) => !currentReferenceIds.includes(id),
+            (refId: string) => !currentReferenceIds.includes(refId),
           );
-          // Map the IDs to referenceNumbers for the backend
           const referencesToRemove = existingProduct.references
-            .filter((ref: any) => referencesToRemoveIds.includes(ref.id))
-            .map((ref: any) => ref.referenceNumber)
-            .filter((num: any): num is string => !!num);
+            .filter((ref: { id?: string }) => referencesToRemoveIds.includes(ref.id))
+            .map((ref: { referenceNumber?: string }) => ref.referenceNumber)
+            .filter((num: string | undefined): num is string => !!num);
 
-          // Only include references if there are new ones to add (use IDs)
-          if (referencesToAdd.length > 0) {
-            productPayload.references = referencesToAdd;
-          }
-
-          // Include removeReferences if there are any to remove (use referenceNumbers)
           if (referencesToRemove.length > 0) {
             productPayload.removeReferences = referencesToRemove;
-          }
-        } else {
-          // If no existing product or no existing references, send all current references (use IDs)
-          if (currentReferenceIds.length > 0) {
-            productPayload.references = currentReferenceIds;
           }
         }
 
@@ -715,13 +699,20 @@ const NewProduct = () => {
           }
         }
 
-        await createProduct(productPayload);
+        const created = await createProduct(productPayload);
+
+        const createdProductId =
+          (created as { id?: string; product?: { id?: string } })?.id ??
+          (created as { product?: { id?: string } })?.product?.id;
+
+        if (createdProductId && referencesState.references.length > 0) {
+          await persistNewReferences(createdProductId, referencesState.references);
+        }
 
         toast({
           title: "Producto creado",
           variant: "success",
-          description:
-            "El producto se ha creado correctamente. Puedes importar referencias y aplicaciones desde las secciones de importación.",
+          description: "El producto se ha creado correctamente.",
         });
       }
 
