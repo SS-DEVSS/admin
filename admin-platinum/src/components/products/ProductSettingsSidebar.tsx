@@ -32,6 +32,7 @@ import { useSubcategories } from "@/hooks/useSubcategories";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
 import { detailsType } from "@/hooks/useFormProduct";
 import { Product } from "@/models/product";
+import { Application } from "@/models/application";
 import FeatureProductModal from "./FeatureProductModal";
 
 type ProductSettingsSidebarProps = {
@@ -404,7 +405,7 @@ const ProductSettingsSidebar = ({
         open={featureModalOpen}
         onOpenChange={setFeatureModalOpen}
         product={product || null}
-        applications={(product as { applications?: unknown[] })?.applications || []}
+        applications={(product?.applications ?? []) as Application[]}
         isCurrentlyFeatured={product?.isFeatured || false}
         currentFeaturedApplicationId={product?.featuredApplicationId || null}
         onSuccess={() => {

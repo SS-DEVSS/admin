@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '@/components/Layouts/Layout';
 import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { productService, FeaturedProduct } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Star, Plus, Search, MoreVertical, Edit, Trash2 } from 'lucide-react';

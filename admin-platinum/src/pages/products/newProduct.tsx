@@ -31,8 +31,8 @@ function buildFormSnapshot(
 
   const normalizedAttributes = Object.fromEntries(
     Object.entries(attributes)
-      .map(([key, value]) => [key, normalizeAttributeValue(value)])
-      .filter(([, value]) => value !== null)
+      .map(([key, value]): [string, unknown] => [key, normalizeAttributeValue(value)])
+      .filter((entry): entry is [string, unknown] => entry[1] !== null)
       .sort(([a], [b]) => a.localeCompare(b)),
   );
 
