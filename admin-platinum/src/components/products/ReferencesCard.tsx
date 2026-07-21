@@ -93,12 +93,13 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
     if (referenceNumber && referenceBrand) {
       const newReference: Reference = {
         id: crypto.randomUUID(),
-        sku: "", // SKU will be linked to product on save
+        sku: "",
         referenceBrand: referenceBrand,
         referenceNumber: referenceNumber,
         typeOfPart: null,
-        type: "Aftermarket", // Default
+        type: "Aftermarket",
         description: referenceDescription || null,
+        isNew: true,
       };
       setState((prevForm) => ({
         ...prevForm,
@@ -112,7 +113,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
   };
 
   const handleRemoveReference = async (reference: Reference) => {
-    if (product?.id && reference.id) {
+    if (product?.id && reference.id && !reference.isNew) {
       setDeleteTarget(reference);
       return;
     }
@@ -146,6 +147,14 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
   const handleEditReference = (reference: Reference) => {
     setEditingReference(reference);
     setIsEditDialogOpen(true);
+  };
+
+  const handleLocalSave = (previousId: string, updatedReference: Reference) => {
+    setState((prev) => ({
+      references: prev.references.map((ref) =>
+        ref.id === previousId ? updatedReference : ref
+      ),
+    }));
   };
 
   const handleEditSuccess = async () => {
@@ -259,6 +268,8 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
         onOpenChange={setIsEditDialogOpen}
         reference={editingReference}
         categoryAttributes={categoryAttributes}
+        productId={product?.id}
+        onLocalSave={handleLocalSave}
         onSuccess={handleEditSuccess}
       />
 
