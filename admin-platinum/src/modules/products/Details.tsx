@@ -1,4 +1,5 @@
 import DetailsCard from "@/components/products/DetailsCard";
+import ProductSettingsSidebar from "@/components/products/ProductSettingsSidebar";
 import ReferencesCard from "@/components/products/ReferencesCard";
 import ApplicationsCard from "@/components/products/ApplicationsCard";
 import Attributes from "@/modules/products/Attributes";
@@ -30,6 +31,7 @@ type DetailsInterface = {
   setAttributesState?: React.Dispatch<React.SetStateAction<any>>;
   setCanContinue?: React.Dispatch<React.SetStateAction<boolean>>;
 };
+
 const Details = ({
   detailsState,
   setDetailsState,
@@ -44,47 +46,42 @@ const Details = ({
 }: DetailsInterface) => {
   const isEditMode = !!product;
 
+  const attributesSection =
+    attributesState && setAttributesState && setCanContinue ? (
+      <Attributes
+        embedded
+        setCanContinue={setCanContinue}
+        categoryId={
+          typeof detailsState.category === "string"
+            ? detailsState.category
+            : detailsState.category?.id || undefined
+        }
+        attributesState={attributesState}
+        setAttributesState={setAttributesState}
+      />
+    ) : null;
+
   return (
-    <section className="flex flex-col gap-3 w-full">
-      <DetailsCard state={detailsState} setState={setDetailsState} product={product} />
-      
-      {attributesState && setAttributesState && setCanContinue && (
-        <Attributes
-          setCanContinue={setCanContinue}
-          categoryId={typeof detailsState.category === 'string' ? detailsState.category : detailsState.category?.id || undefined}
-          attributesState={attributesState}
-          setAttributesState={setAttributesState}
-        />
-      )}
-      
-      {isEditMode ? (
-        <>
-          <ReferencesCard state={referencesState} setState={setReferencesState} product={product} />
-          <ApplicationsCard state={applicationsState} setState={setApplicationsState} product={product} />
-          <ProductTechnicalSheetsCard productId={product?.id} />
-        </>
-      ) : (
-        <>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] gap-5 w-full items-start">
+      <section className="flex flex-col gap-5 min-w-0 w-full">
+        <DetailsCard
+          state={detailsState}
+          setState={setDetailsState}
+          product={product}
+        >
+          {attributesSection}
+        </DetailsCard>
+
+        {isEditMode ? (
+          <ApplicationsCard
+            state={applicationsState}
+            setState={setApplicationsState}
+            product={product}
+          />
+        ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-blue-500" />
-                Referencias
-              </CardTitle>
-              <CardDescription>
-                Las referencias se deben importar después de crear el producto
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Una vez que hayas creado el producto, podrás importar las referencias desde la sección de importación de referencias.
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Info className="h-5 w-5 text-blue-500" />
                 Aplicaciones
               </CardTitle>
@@ -94,13 +91,52 @@ const Details = ({
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Una vez que hayas creado el producto, podrás importar las aplicaciones desde la sección de importación de aplicaciones.
+                Una vez que hayas creado el producto, podrás importar las aplicaciones desde la
+                sección de importación de aplicaciones.
               </p>
             </CardContent>
           </Card>
-        </>
-      )}
-    </section>
+        )}
+      </section>
+
+      <aside className="flex flex-col gap-5 min-w-0 w-full">
+        <ProductSettingsSidebar
+          state={detailsState}
+          setState={setDetailsState}
+          product={product}
+        />
+
+        {isEditMode ? (
+          <>
+            <ReferencesCard
+              layout="sidebar"
+              state={referencesState}
+              setState={setReferencesState}
+              product={product}
+            />
+            <ProductTechnicalSheetsCard productId={product?.id} />
+          </>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Info className="h-5 w-5 text-blue-500" />
+                Referencias
+              </CardTitle>
+              <CardDescription>
+                Las referencias se deben importar después de crear el producto
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Una vez que hayas creado el producto, podrás importar las referencias desde la
+                sección de importación de referencias.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </aside>
+    </div>
   );
 };
 

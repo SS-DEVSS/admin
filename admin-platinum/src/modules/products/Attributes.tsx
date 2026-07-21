@@ -19,6 +19,7 @@ type AttributesProps = {
   categoryId?: string;
   attributesState: any;
   setAttributesState: React.Dispatch<React.SetStateAction<any>>;
+  embedded?: boolean;
 };
 
 const Attributes = ({
@@ -26,6 +27,7 @@ const Attributes = ({
   categoryId,
   attributesState,
   setAttributesState,
+  embedded = false,
 }: AttributesProps) => {
   const { categories } = useCategoryContext();
 
@@ -79,8 +81,9 @@ const Attributes = ({
   }, [attributesState, getProductAttributes, setCanContinue]);
 
   if (!categoryId) {
+    if (embedded) return null;
     return (
-      <Card className="w-full flex flex-col mt-5">
+      <Card className="w-full flex flex-col">
         <CardContent className="py-10 text-center">
           <p>Por favor selecciona una categoría en el paso anterior.</p>
         </CardContent>
@@ -88,37 +91,57 @@ const Attributes = ({
     );
   }
 
+  const fields = (
+    <>
+      {getProductAttributes.map((attribute: CategoryAtributes) => (
+        <div key={attribute.id} className="basis-full sm:basis-[48%]">
+          <Label className="mb-2 block">
+            {attribute.required && <span className="text-red-500 mr-1">*</span>}
+            {translateAttributeName(attribute.name, false)}
+          </Label>
+          <DynamicComponent
+            type={attribute.type}
+            name={attribute.name}
+            required={attribute.required}
+            value={attributesState[attribute.name] || ""}
+            onChange={(value) => handleAttributeChange(attribute.name, value)}
+          />
+        </div>
+      ))}
+      {getProductAttributes.length === 0 && (
+        <p className="text-muted-foreground w-full text-center">
+          Esta categoría no tiene atributos definidos.
+        </p>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold">
+            Atributos{selectedCategory?.name ? `: ${selectedCategory.name}` : ""}
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Ingrese los atributos asociados a la categoría
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-between gap-4">{fields}</div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="w-full flex flex-col mt-5">
+    <Card className="w-full flex flex-col">
       <CardHeader>
-        <CardTitle>Atributos de Categoría: {selectedCategory?.name}</CardTitle>
+        <CardTitle className="text-base">Atributos de Categoría: {selectedCategory?.name}</CardTitle>
         <CardDescription>
           Ingrese los atributos asociados a la categoría
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap justify-between gap-4">
-        {getProductAttributes.map(
-          (attribute: CategoryAtributes) => (
-            <div key={attribute.id} className="basis-full sm:basis-[48%]">
-              <Label className="mb-2 block">
-                {attribute.required && <span className="text-red-500 mr-1">*</span>}
-                {translateAttributeName(attribute.name, false)}
-              </Label>
-              <DynamicComponent
-                type={attribute.type}
-                name={attribute.name}
-                required={attribute.required}
-                value={attributesState[attribute.name] || ""}
-                onChange={(value) => handleAttributeChange(attribute.name, value)}
-              />
-            </div>
-          )
-        )}
-        {getProductAttributes.length === 0 && (
-            <p className="text-muted-foreground w-full text-center">
-              Esta categoría no tiene atributos definidos.
-            </p>
-          )}
+        {fields}
       </CardContent>
     </Card>
   );

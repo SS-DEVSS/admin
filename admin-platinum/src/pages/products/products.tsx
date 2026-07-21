@@ -1,6 +1,5 @@
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   ChevronDown,
@@ -88,10 +87,7 @@ const Products = () => {
   const [searchParams] = useSearchParams();
   const { categories = [], loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
-  const [searchFilter, setSearchFilter] = useState(() => {
-    const saved = localStorage.getItem("products-search-filter");
-    return saved || "";
-  });
+  const [searchFilter, setSearchFilter] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [subcategoryTreeByCategory, setSubcategoryTreeByCategory] = useState<
@@ -152,13 +148,7 @@ const Products = () => {
   }, [filterMenuOpen, categories, getTree]);
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchFilter(value);
-    if (value) {
-      localStorage.setItem("products-search-filter", value);
-    } else {
-      localStorage.removeItem("products-search-filter");
-    }
+    setSearchFilter(e.target.value);
   };
 
   const selectCategoryAndSubcategory = (
@@ -167,11 +157,6 @@ const Products = () => {
   ) => {
     setCategory(cat);
     setSubcategoryId(subId);
-    if (cat?.id) {
-      localStorage.setItem("products-selected-category", cat.id);
-    } else {
-      localStorage.setItem("products-selected-category", "all");
-    }
     setFilterMenuOpen(false);
   };
 
@@ -212,31 +197,16 @@ const Products = () => {
         setCategory(cat);
         setSubcategoryId(subFromUrl || null);
       }
-      return;
-    }
-
-    const savedCategoryId = localStorage.getItem("products-selected-category");
-    if (savedCategoryId === "all") {
-      setCategory(null);
-      setSubcategoryId(null);
-      return;
-    }
-
-    const savedCategory = savedCategoryId
-      ? categories.find((cat) => cat.id === savedCategoryId)
-      : null;
-
-    if (savedCategory) {
-      setCategory(savedCategory);
-    } else if (!category?.id) {
-      setCategory(categories[0]);
-      localStorage.setItem(
-        "products-selected-category",
-        categories[0].id || "",
-      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories]);
+  }, [categories, searchParams]);
+
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem("products-search-filter");
+      localStorage.removeItem("products-selected-category");
+    };
+  }, []);
 
   const getSelectedFilterLabel = () => {
     if (!category) return "Todas las categorías";
@@ -530,133 +500,121 @@ const Products = () => {
   return (
     <Layout>
       <div className="w-full max-w-full">
-        <Card className="border-0 shadow-none w-full">
-          <CardHeader className="flex flex-row flex-wrap items-end gap-4 p-0 m-0 pb-6 w-full">
-            <div className="flex flex-col gap-3 w-full lg:w-auto">
-              <CardTitle>Productos</CardTitle>
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="flex items-center gap-2 w-full lg:w-auto">
-                  <div className="relative flex-1 lg:flex-none lg:grow-0">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="search"
-                      placeholder="Buscar Producto..."
-                      value={searchFilter}
-                      onChange={handleSearchFilter}
-                      className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                    />
-                  </div>
-                  {!isDesktopFilters && (
-                    <Drawer direction="bottom">
-                      <DrawerTrigger asChild>
-                        <Button variant="outline" className="gap-2 shrink-0">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          Filtros
-                          {activeProductFilterCount > 0 && (
-                            <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
-                              {activeProductFilterCount}
-                            </Badge>
-                          )}
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent>
-                        <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
-                          <DrawerHeader>
-                            <DrawerTitle>Filtrar productos</DrawerTitle>
-                            <DrawerDescription>
-                              Filtra por categoría y visibilidad en catálogo.
-                            </DrawerDescription>
-                          </DrawerHeader>
-                          <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium">
-                                Categoría
-                              </label>
-                              {categoryFilterMenu}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium">
-                                Visibilidad en catálogo
-                              </label>
-                              {catalogVisibilitySelect}
-                            </div>
-                          </div>
-                          <DrawerFooter>
-                            <Button
-                              variant="outline"
-                              onClick={clearProductFilters}
-                              disabled={activeProductFilterCount === 0}
-                            >
-                              Limpiar filtros
-                            </Button>
-                            <DrawerClose asChild>
-                              <Button>Ver resultados</Button>
-                            </DrawerClose>
-                          </DrawerFooter>
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-                  )}
+        <div className="flex flex-col gap-4 pb-6 w-full">
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4 w-full">
+              <h1 className="text-2xl font-semibold leading-none tracking-tight">Productos</h1>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 px-4 gap-2 flex-1 sm:flex-none bg-[#F4F4F5] hover:bg-[#E4E4E7] hover:text-foreground"
+                  onClick={() => navigate("/dashboard/importaciones")}
+                >
+                  <Import className="h-4 w-4 shrink-0" />
+                  Importar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 px-4 gap-2 flex-1 sm:flex-none bg-[#F4F4F5] hover:bg-[#E4E4E7] hover:text-foreground"
+                  onClick={() => setBulkImagesOpen(true)}
+                >
+                  <ImageIcon className="h-4 w-4 shrink-0" />
+                  Carga masiva de imágenes
+                </Button>
+                <Button asChild className="h-10 px-4 gap-2 flex-1 sm:flex-none">
+                  <Link to="/dashboard/producto/new-product">
+                    <PlusCircle className="h-4 w-4 shrink-0" />
+                    Agregar Producto
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center w-full">
+              <div className="flex items-center gap-2 w-full lg:w-auto">
+                <div className="relative flex-1 lg:flex-none lg:grow-0">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Buscar Producto..."
+                    value={searchFilter}
+                    onChange={handleSearchFilter}
+                    className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                  />
                 </div>
-                {isDesktopFilters && (
-                  <>
-                    {categoryFilterMenu}
-                    {catalogVisibilitySelect}
-                  </>
+                {!isDesktopFilters && (
+                  <Drawer direction="bottom">
+                    <DrawerTrigger asChild>
+                      <Button variant="outline" className="gap-2 shrink-0">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Filtros
+                        {activeProductFilterCount > 0 && (
+                          <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                            {activeProductFilterCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </DrawerTrigger>
+                    <DrawerContent>
+                      <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                        <DrawerHeader>
+                          <DrawerTitle>Filtrar productos</DrawerTitle>
+                          <DrawerDescription>
+                            Filtra por categoría y visibilidad en catálogo.
+                          </DrawerDescription>
+                        </DrawerHeader>
+                        <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium">
+                              Categoría
+                            </label>
+                            {categoryFilterMenu}
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium">
+                              Visibilidad en catálogo
+                            </label>
+                            {catalogVisibilitySelect}
+                          </div>
+                        </div>
+                        <DrawerFooter>
+                          <Button
+                            variant="outline"
+                            onClick={clearProductFilters}
+                            disabled={activeProductFilterCount === 0}
+                          >
+                            Limpiar filtros
+                          </Button>
+                          <DrawerClose asChild>
+                            <Button>Ver resultados</Button>
+                          </DrawerClose>
+                        </DrawerFooter>
+                      </div>
+                    </DrawerContent>
+                  </Drawer>
                 )}
               </div>
+              {isDesktopFilters && (
+                <>
+                  {categoryFilterMenu}
+                  {catalogVisibilitySelect}
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
-              <div className="rounded-lg flex flex-1 sm:flex-none bg-[#F4F4F5]">
-                <div
-                  onClick={() => navigate("/dashboard/importaciones")}
-                  className="flex w-full justify-center hover:cursor-pointer gap-3 items-center hover:bg-primary hover:text-white hover:[&>svg]:text-white rounded-lg px-3"
-                >
-                  <Import />
-                  <Button
-                    className="hover:bg-transparent hover:text-white"
-                    variant={"ghost"}
-                  >
-                    Importar
-                  </Button>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-10 px-4"
-                onClick={() => setBulkImagesOpen(true)}
-              >
-                <ImageIcon className="h-3.5 w-3.5 mr-2" />
-                Carga masiva de imágenes
-              </Button>
-              <Link
-                to="/dashboard/producto/new-product"
-                className="flex flex-1 sm:flex-none"
-              >
-                <Button size="sm" className="h-10 px-6 gap-1 w-full sm:w-auto">
-                  <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Agregar Producto
-                  </span>
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <div>
-            {categoriesLoading && categories.length === 0 ? (
-              <Loader message="Cargando categorías..." />
-            ) : (
-              <DataTable
-                key={tableRefreshKey}
-                category={category}
-                searchFilter={searchFilter}
-                subcategoryId={subcategoryId}
-                catalogVisibilityFilter={catalogVisibilityFilter}
-              />
-            )}
-          </div>
-        </Card>
+        </div>
+        <div>
+          {categoriesLoading && categories.length === 0 ? (
+            <Loader message="Cargando categorías..." />
+          ) : (
+            <DataTable
+              key={tableRefreshKey}
+              category={category}
+              searchFilter={searchFilter}
+              subcategoryId={subcategoryId}
+              catalogVisibilityFilter={catalogVisibilityFilter}
+            />
+          )}
+        </div>
       </div>
 
       <BulkImageUploadDialog

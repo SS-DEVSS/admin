@@ -152,7 +152,8 @@ const ImportProduct = () => {
 
   return (
     <Layout>
-      <header className="flex justify-between">
+      <div className="w-full max-w-full">
+      <header className="flex flex-row flex-wrap items-center justify-between gap-4 pb-6">
         <div className="flex items-center gap-4">
           <Link to="/dashboard/productos">
             <Card className="p-2">
@@ -335,6 +336,7 @@ const ImportProduct = () => {
           initialMapping={columnMapping || undefined}
         />
       )}
+      </div>
     </Layout>
   );
 };

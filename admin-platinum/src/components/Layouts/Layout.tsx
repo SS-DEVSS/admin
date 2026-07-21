@@ -177,43 +177,20 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           !menuLarge ? "w-14 overflow-x-hidden" : "w-[280px]"
         } hidden border-r border-white/10 bg-[#002858] md:block shrink-0`}
       >
-        <div className="flex h-full max-h-screen flex-col gap-2">
+        <div className="flex h-full max-h-screen flex-col overflow-hidden">
           <div
             className={`${!menuLarge ? "mx-auto px-0" : "px-4 lg:px-6"
-              } flex h-14 items-center border-b border-white/10 lg:h-[60px]`}
+              } flex h-14 shrink-0 items-center border-b border-white/10 lg:h-[60px]`}
           >
             <BrandLogo showLabel={menuLarge} variant="light" />
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <nav
-              className={`${!menuLarge ? "items-center flex flex-col" : "px-2 lg:px-4"
-                } text-sm font-medium flex flex-col gap-5 h-full`}
-            >
+          <nav
+            className={`${!menuLarge ? "items-center flex flex-col" : "px-2 lg:px-4"
+              } text-sm font-medium flex flex-1 min-h-0 flex-col`}
+          >
               <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={
-                        menuLarge
-                          ? `flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer ${sidebarNavIdle}`
-                          : `flex h-9 w-9 items-center justify-center rounded-lg my-1 cursor-pointer ${sidebarNavIdle}`
-                      }
-                      onClick={() => setMenuLarge(!menuLarge)}
-                    >
-                      {menuLarge ? (
-                        <PanelLeftClose className="h-4 w-4" />
-                      ) : (
-                        <PanelLeftOpen className="h-4 w-4" />
-                      )}
-                      {menuLarge && <p>Colapsar Menú</p>}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{menuLarge ? "Colapsar menú lateral" : "Expandir menú lateral"}</p>
-                  </TooltipContent>
-                </Tooltip>
                 <section
-                  className={`flex-1 min-h-0 overflow-y-auto py-1 ${
+                  className={`flex-1 py-1 ${
                     !menuLarge ? "flex flex-col items-center px-1" : ""
                   }`}
                 >
@@ -240,8 +217,32 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     )}
                   </div>
                 </section>
-                <div className="my-auto py-4 shrink-0">
-                  {!menuLarge && (
+                <div
+                  className={`mt-auto shrink-0 ${menuLarge ? "p-4 pt-0" : "flex flex-col items-center py-4"}`}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={
+                          menuLarge
+                            ? `flex items-center gap-3 rounded-lg px-3 py-3 my-2 cursor-pointer ${sidebarNavIdle}`
+                            : `flex h-9 w-9 items-center justify-center rounded-lg my-1 cursor-pointer ${sidebarNavIdle}`
+                        }
+                        onClick={() => setMenuLarge(!menuLarge)}
+                      >
+                        {menuLarge ? (
+                          <PanelLeftClose className="h-4 w-4" />
+                        ) : (
+                          <PanelLeftOpen className="h-4 w-4" />
+                        )}
+                        {menuLarge && <p>Colapsar Menú</p>}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{menuLarge ? "Colapsar menú lateral" : "Expandir menú lateral"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {!menuLarge ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
@@ -255,24 +256,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         <p>Cerrar Sesión</p>
                       </TooltipContent>
                     </Tooltip>
+                  ) : (
+                    <div
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-white/70 transition-all hover:bg-white/10 hover:text-red-300 cursor-pointer"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <p>Cerrar Sesión</p>
+                    </div>
                   )}
                 </div>
               </TooltipProvider>
-            </nav>
-          </div>
-          {!menuLarge ? (
-            <></>
-          ) : (
-            <div className="mt-auto p-4">
-              <div
-                className="flex items-center gap-3 rounded-lg px-3 py-3 my-2 text-white/70 transition-all hover:bg-white/10 hover:text-red-300 cursor-pointer"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4" />
-                <p>Cerrar Sesión</p>
-              </div>
-            </div>
-          )}
+          </nav>
         </div>
       </div>
       <header className="p-3 md:p-0">

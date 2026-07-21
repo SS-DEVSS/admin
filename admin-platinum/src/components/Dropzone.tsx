@@ -1,6 +1,6 @@
 import { Dispatch, useCallback, useState, useEffect } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
-import { CheckCircle2, FileText, X } from "lucide-react";
+import { CheckCircle2, FileText, Plus, X } from "lucide-react";
 import {
   getDropzoneRejectionMessage,
   IMAGE_UPLOAD_ACCEPT,
@@ -22,6 +22,8 @@ interface MyDropzoneProps {
   imageOverlayRemove?: boolean;
   /** Texto cuando ya hay imagen guardada (modo edición). */
   currentImageLabel?: string;
+  /** Cuadrado compacto con ícono + para reemplazar imagen. */
+  variant?: "default" | "compact";
 }
 
 const MyDropzone = ({
@@ -35,6 +37,7 @@ const MyDropzone = ({
   emptyTextStyle = "default",
   imageOverlayRemove = false,
   currentImageLabel = "Imagen actual adjunta",
+  variant = "default",
 }: MyDropzoneProps) => {
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -128,7 +131,7 @@ const MyDropzone = ({
     );
 
   // Vista previa cuando ya hay imagen guardada: mismo recuadro con la imagen
-  if (showCurrentImagePreview) {
+  if (showCurrentImagePreview && variant !== "compact") {
     return (
       <div
         {...getRootProps()}
@@ -154,6 +157,34 @@ const MyDropzone = ({
           Arrastra otra imagen o haz clic para reemplazar la portada
         </p>
         {error && <p className="text-center text-red-500 mt-2">{error}</p>}
+      </div>
+    );
+  }
+
+  if (variant === "compact") {
+    return (
+      <div
+        {...getRootProps()}
+        className={`border border-dashed rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
+          isDragActive
+            ? "bg-[#F5F9FD] border-[#0bbff4]"
+            : showPreview
+              ? "bg-green-50 border-green-400"
+              : "border-muted-foreground/30 hover:bg-muted/40 hover:border-muted-foreground/50"
+        } ${className ?? ""}`}
+      >
+        <input {...getInputProps()} />
+        {showPreview && previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Vista previa"
+            className="h-full w-full object-contain rounded-lg p-1"
+          />
+        ) : (
+          <Plus className="h-6 w-6 text-muted-foreground" aria-hidden />
+        )}
+        <span className="sr-only">Agregar o reemplazar imagen</span>
+        {error && <p className="sr-only">{error}</p>}
       </div>
     );
   }

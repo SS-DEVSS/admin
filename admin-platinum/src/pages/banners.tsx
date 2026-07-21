@@ -219,8 +219,8 @@ const Banners = () => {
 
   return (
     <Layout>
-      <section className="max-w-[1000px] mx-auto">
-        <h1 className="text-2xl font-semibold mb-4">Banners</h1>
+      <section className="w-full max-w-full">
+        <h1 className="text-2xl font-semibold mb-6">Banners</h1>
         <Card>
           <CardHeader>
             <CardTitle>Agregar nuevo banner</CardTitle>

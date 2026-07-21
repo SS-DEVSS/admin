@@ -10,12 +10,33 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Upload, Image as ImageIcon, FileText, Loader2, X } from 'lucide-react';
 import { useFilesContext } from '@/context/files-context';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeImageFile } from '@/utils/imageUpload';
+import { productService } from '@/services/productService';
+import { fileService } from '@/services/fileService';
+import BulkImageMatchPreview from '@/components/products/BulkImageMatchPreview';
 
 type FileType = 'image' | 'document';
+
+type BulkImageRow = {
+  status: string;
+  sku: string;
+  file: string;
+  reason?: string;
+  productId?: string;
+};
+
+type BulkImageResult = {
+  total: number;
+  matched: number;
+  uploaded: number;
+  skipped: number;
+  errors: number;
+  rows: BulkImageRow[];
+};
 
 interface FileUploadModalProps {
   open: boolean;
@@ -28,7 +49,10 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
   const [selectedFiles, setSelectedFiles] = useState<globalThis.File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const { uploadFiles } = useFilesContext();
+  const [matchProductsBySku, setMatchProductsBySku] = useState(false);
+  const [productPreview, setProductPreview] = useState<BulkImageResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const { getFiles, filterType } = useFilesContext();
   const { toast } = useToast();
 
   const acceptedFileTypes = {
@@ -42,6 +66,12 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
     },
   };
 
+  const resetProductMatchState = () => {
+    setMatchProductsBySku(false);
+    setProductPreview(null);
+    setPreviewLoading(false);
+  };
+
   const onDrop = useCallback(
     (acceptedFiles: globalThis.File[]) => {
       if (acceptedFiles.length > 0) {
@@ -50,6 +80,7 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
             ? acceptedFiles.map((file) => normalizeImageFile(file))
             : acceptedFiles;
         setSelectedFiles((prev) => [...prev, ...next]);
+        setProductPreview(null);
       }
     },
     [fileType]
@@ -64,6 +95,50 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
 
   const handleRemoveFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setProductPreview(null);
+  };
+
+  const handleFileTypeChange = (value: FileType) => {
+    setFileType(value);
+    setSelectedFiles([]);
+    setProductPreview(null);
+    if (value !== 'image') {
+      setMatchProductsBySku(false);
+    }
+  };
+
+  const handleMatchToggle = (checked: boolean) => {
+    setMatchProductsBySku(checked);
+    setProductPreview(null);
+  };
+
+  const handlePreviewProductMatches = async () => {
+    const imageFiles = selectedFiles.filter((f) => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      toast({
+        title: 'Sin imágenes',
+        description: 'Selecciona al menos una imagen para analizar coincidencias.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const result = await productService.previewBulkImages(imageFiles);
+      setProductPreview(result as BulkImageResult);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      toast({
+        title: 'Error al analizar',
+        description:
+          axiosErr.response?.data?.error ??
+          (err instanceof Error ? err.message : 'No se pudieron analizar las coincidencias'),
+        variant: 'destructive',
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -76,18 +151,44 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
       return;
     }
 
+    const imageFiles = selectedFiles.filter((f) => f.type.startsWith('image/'));
+
+    if (matchProductsBySku && imageFiles.length === 0) {
+      toast({
+        title: 'Sin imágenes',
+        description: 'La asociación por SKU solo aplica a archivos de imagen.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      await uploadFiles(selectedFiles, fileType, (progress) => {
+      await fileService.uploadFiles(selectedFiles, fileType, (progress) => {
         setUploadProgress(progress);
       });
+
+      const currentType = filterType === 'all' ? undefined : filterType;
+      await getFiles(currentType, 1);
+
+      let productMatchMessage = '';
+      if (matchProductsBySku && imageFiles.length > 0) {
+        const result = (await productService.uploadBulkImages(imageFiles)) as BulkImageResult;
+        productMatchMessage = ` Productos: ${result.uploaded} imagen(es) asociada(s), ${result.skipped} omitida(s), ${result.errors} error(es).`;
+      }
+
+      toast({
+        title: 'Éxito',
+        description: `${selectedFiles.length} archivo(s) subido(s) correctamente.${productMatchMessage}`,
+        variant: 'success',
+      });
+
       setSelectedFiles([]);
       setUploadProgress(0);
+      resetProductMatchState();
       onOpenChange(false);
-      if (onUploadComplete) {
-        onUploadComplete();
-      }
+      onUploadComplete?.();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string }; status?: number } };
       const errorMessage =
@@ -108,6 +209,7 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
     if (!isUploading) {
       setSelectedFiles([]);
       setUploadProgress(0);
+      resetProductMatchState();
       onOpenChange(false);
     }
   };
@@ -130,7 +232,7 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
             <Label htmlFor="fileType">
               Tipo de Archivo<span className="text-red-500">*</span>
             </Label>
-            <Select value={fileType} onValueChange={(value) => setFileType(value as FileType)}>
+            <Select value={fileType} onValueChange={(value) => handleFileTypeChange(value as FileType)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona el tipo de archivo" />
               </SelectTrigger>
@@ -150,6 +252,26 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
               </SelectContent>
             </Select>
           </div>
+
+          {fileType === 'image' && (
+            <div className="flex items-start gap-3 rounded-lg border p-3">
+              <Checkbox
+                id="match-products-sku"
+                checked={matchProductsBySku}
+                onCheckedChange={(checked) => handleMatchToggle(checked === true)}
+                disabled={isUploading}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="match-products-sku" className="cursor-pointer font-medium">
+                  Asociar imágenes a productos por SKU
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  El nombre del archivo (sin extensión) debe coincidir con el SKU del producto.
+                  Las imágenes también se subirán al administrador de archivos.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-3">
             <Label>Archivos</Label>
@@ -185,6 +307,37 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
             </div>
           </div>
 
+          {matchProductsBySku && selectedFiles.length > 0 && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void handlePreviewProductMatches()}
+                disabled={previewLoading || isUploading}
+              >
+                {previewLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Analizando...
+                  </>
+                ) : (
+                  'Analizar coincidencias con productos'
+                )}
+              </Button>
+
+              {productPreview && (
+                <BulkImageMatchPreview
+                  total={productPreview.total}
+                  matched={productPreview.matched}
+                  skipped={productPreview.skipped}
+                  rows={productPreview.rows}
+                  maxRows={20}
+                />
+              )}
+            </div>
+          )}
+
           {selectedFiles.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -194,7 +347,10 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedFiles([])}
+                  onClick={() => {
+                    setSelectedFiles([]);
+                    setProductPreview(null);
+                  }}
                   disabled={isUploading}
                 >
                   Limpiar
@@ -263,6 +419,7 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
                     <>
                       <Upload className="h-4 w-4 mr-2" />
                       Subir {selectedFiles.length} archivo(s)
+                      {matchProductsBySku ? ' y asociar productos' : ''}
                     </>
                   )}
                 </Button>

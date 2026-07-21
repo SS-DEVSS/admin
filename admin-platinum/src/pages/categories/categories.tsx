@@ -1,11 +1,6 @@
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, PlusCircle, Search } from "lucide-react";
 import CardSectionLayout from "@/components/Layouts/CardSectionLayout";
@@ -71,52 +66,50 @@ const Categorias = () => {
 
   return (
     <Layout>
-      <div>
-        <Card className="border-0 shadow-none">
-          <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0 pb-6">
-            <div className="flex flex-col gap-3">
-              <CardTitle>Categorías</CardTitle>
-              <CardDescription>Maneja tus categorías.</CardDescription>
+      <DashboardPageShell
+        title="Categorías"
+        description="Maneja tus categorías."
+        filters={
+          <>
+            <div className="relative w-full lg:flex-1 lg:min-w-[140px] md:grow-0">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar Categoría..."
+                value={searchFilter}
+                onChange={handleSearchFilter}
+                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+              />
             </div>
-            <div className="flex flex-col gap-3 w-full lg:w-auto lg:ml-auto lg:flex-row lg:flex-wrap lg:items-center">
-              <div className="relative w-full lg:flex-1 lg:min-w-[140px] md:grow-0">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Buscar Categoría..."
-                  value={searchFilter}
-                  onChange={handleSearchFilter}
-                  className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                />
-              </div>
-              <div className="flex items-center gap-3 w-full lg:w-auto">
-                <Select value={brandFilter} onValueChange={setBrandFilter}>
-                  <SelectTrigger className="flex-1 min-w-[160px] md:w-[280px] lg:flex-none">
-                    <SelectValue placeholder="Selecciona una marca" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Marcas</SelectLabel>
-                      <SelectItem value={"-"}>Seleccionar</SelectItem>
-                      {brands.map((brand: Brand) => (
-                        <SelectItem key={brand.id} value={brand.id!}>
-                          {brand.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Link to="/dashboard/categorias/nueva" className="shrink-0">
-                  <Button size="sm" className="h-10 px-6 gap-1">
-                    <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                      Agregar Categoría
-                    </span>
-                  </Button>
-                </Link>
-              </div>
+            <div className="flex items-center gap-3 w-full lg:w-auto">
+              <Select value={brandFilter} onValueChange={setBrandFilter}>
+                <SelectTrigger className="flex-1 min-w-[160px] md:w-[280px] lg:flex-none">
+                  <SelectValue placeholder="Selecciona una marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Marcas</SelectLabel>
+                    <SelectItem value={"-"}>Seleccionar</SelectItem>
+                    {brands.map((brand: Brand) => (
+                      <SelectItem key={brand.id} value={brand.id!}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Link to="/dashboard/categorias/nueva" className="shrink-0">
+                <Button size="sm" className="h-10 px-6 gap-1">
+                  <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Agregar Categoría
+                  </span>
+                </Button>
+              </Link>
             </div>
-          </CardHeader>
+          </>
+        }
+      >
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="flex flex-col items-center gap-2">
@@ -150,8 +143,7 @@ const Categorias = () => {
               ))}
             </CardSectionLayout>
           )}
-        </Card>
-      </div>
+      </DashboardPageShell>
     </Layout>
   );
 };
