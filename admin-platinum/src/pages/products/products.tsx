@@ -87,7 +87,10 @@ const Products = () => {
   const [searchParams] = useSearchParams();
   const { categories = [], loading: categoriesLoading } = useCategoryContext();
   const { getTree } = useSubcategories();
-  const [searchFilter, setSearchFilter] = useState("");
+  const [searchFilter, setSearchFilter] = useState(() => {
+    const saved = localStorage.getItem("products-search-filter");
+    return saved || "";
+  });
   const [category, setCategory] = useState<Category | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [subcategoryTreeByCategory, setSubcategoryTreeByCategory] = useState<
@@ -99,7 +102,17 @@ const Products = () => {
   const filterMenuSearchDeferred = useDeferredValue(filterMenuSearch);
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([]);
   const [catalogVisibilityFilter, setCatalogVisibilityFilter] =
-    useState<CatalogVisibilityFilter>("all");
+    useState<CatalogVisibilityFilter>(() => {
+      const saved = localStorage.getItem("products-catalog-visibility");
+      if (
+        saved === "all" ||
+        saved === "visible" ||
+        saved === "hidden"
+      ) {
+        return saved;
+      }
+      return "all";
+    });
   const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
   const [tableRefreshKey, setTableRefreshKey] = useState(0);
 
@@ -109,6 +122,7 @@ const Products = () => {
   const clearProductFilters = () => {
     selectCategoryAndSubcategory(null, null);
     setCatalogVisibilityFilter("all");
+    localStorage.removeItem("products-catalog-visibility");
   };
 
   // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
@@ -148,7 +162,13 @@ const Products = () => {
   }, [filterMenuOpen, categories, getTree]);
 
   const handleSearchFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchFilter(e.target.value);
+    const value = e.target.value;
+    setSearchFilter(value);
+    if (value) {
+      localStorage.setItem("products-search-filter", value);
+    } else {
+      localStorage.removeItem("products-search-filter");
+    }
   };
 
   const selectCategoryAndSubcategory = (
@@ -157,6 +177,16 @@ const Products = () => {
   ) => {
     setCategory(cat);
     setSubcategoryId(subId);
+    if (cat?.id) {
+      localStorage.setItem("products-selected-category", cat.id);
+    } else {
+      localStorage.setItem("products-selected-category", "all");
+    }
+    if (subId) {
+      localStorage.setItem("products-selected-subcategory", subId);
+    } else {
+      localStorage.removeItem("products-selected-subcategory");
+    }
     setFilterMenuOpen(false);
   };
 
@@ -197,16 +227,29 @@ const Products = () => {
         setCategory(cat);
         setSubcategoryId(subFromUrl || null);
       }
+      return;
+    }
+
+    const savedCategoryId = localStorage.getItem("products-selected-category");
+    if (savedCategoryId === "all") {
+      setCategory(null);
+      setSubcategoryId(null);
+      return;
+    }
+
+    const savedCategory = savedCategoryId
+      ? categories.find((cat) => cat.id === savedCategoryId)
+      : null;
+
+    if (savedCategory) {
+      setCategory(savedCategory);
+      const savedSubcategoryId = localStorage.getItem(
+        "products-selected-subcategory",
+      );
+      setSubcategoryId(savedSubcategoryId || null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, searchParams]);
-
-  useEffect(() => {
-    return () => {
-      localStorage.removeItem("products-search-filter");
-      localStorage.removeItem("products-selected-category");
-    };
-  }, []);
 
   const getSelectedFilterLabel = () => {
     if (!category) return "Todas las categorías";
@@ -482,9 +525,15 @@ const Products = () => {
   const catalogVisibilitySelect = (
     <Select
       value={catalogVisibilityFilter}
-      onValueChange={(value) =>
-        setCatalogVisibilityFilter(value as CatalogVisibilityFilter)
-      }
+      onValueChange={(value) => {
+        const next = value as CatalogVisibilityFilter;
+        setCatalogVisibilityFilter(next);
+        if (next === "all") {
+          localStorage.removeItem("products-catalog-visibility");
+        } else {
+          localStorage.setItem("products-catalog-visibility", next);
+        }
+      }}
     >
       <SelectTrigger className="w-full lg:w-[220px]">
         <SelectValue placeholder="Visibilidad en catálogo" />
