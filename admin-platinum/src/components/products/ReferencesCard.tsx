@@ -7,6 +7,14 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Product } from "@/models/product";
 import { Reference } from "@/models/reference";
 import { PlusCircle, X, Pencil } from "lucide-react";
@@ -19,6 +27,7 @@ import EditReferenceDialog from "./EditReferenceDialog";
 import { CategoryAtributes } from "@/models/category";
 import { useCategoryContext } from "@/context/categories-context";
 import axiosClient from "@/services/axiosInstance";
+import { REFERENCE_FIELD_LABELS } from "@/constants/referenceFieldLabels";
 
 type ReferencesCardProps = {
   state: {
@@ -35,6 +44,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
   const [showInput, setShowInput] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
   const [referenceBrand, setReferenceBrand] = useState<string>("");
+  const [referenceType, setReferenceType] = useState<string>("Aftermarket");
   const [referenceDescription, setReferenceDescription] = useState<string>("");
   const [editingReference, setEditingReference] = useState<Reference | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -97,7 +107,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
         referenceBrand: referenceBrand,
         referenceNumber: referenceNumber,
         typeOfPart: null,
-        type: "Aftermarket",
+        type: referenceType,
         description: referenceDescription || null,
         isNew: true,
       };
@@ -107,6 +117,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
       }));
       setReferenceNumber("");
       setReferenceBrand("");
+      setReferenceType("Aftermarket");
       setReferenceDescription("");
       setShowInput(false);
     }
@@ -241,6 +252,21 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
               value={referenceDescription}
               onChange={(e) => setReferenceDescription(e.target.value)}
             />
+            <div className="space-y-2">
+              <Label htmlFor="inline-reference-type">
+                {REFERENCE_FIELD_LABELS.referenceType}{" "}
+                <span className="text-red-500">*</span>
+              </Label>
+              <Select value={referenceType} onValueChange={setReferenceType}>
+                <SelectTrigger id="inline-reference-type">
+                  <SelectValue placeholder="Selecciona un tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OEM">OEM</SelectItem>
+                  <SelectItem value="Aftermarket">Aftermarket</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex justify-end gap-2 mt-2">
               <Button variant="outline" onClick={handleAddClick}>
                 Cancelar
