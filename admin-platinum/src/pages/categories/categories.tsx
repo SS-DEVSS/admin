@@ -145,7 +145,7 @@ const Categorias = () => {
                 <CardTemplate
                   category={categoria}
                   key={categoria.id}
-                  getItems={getCategories}
+                  getItems={() => void getCategories(true)}
                 />
               ))}
             </CardSectionLayout>

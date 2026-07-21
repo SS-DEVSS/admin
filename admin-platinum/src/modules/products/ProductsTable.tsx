@@ -8,7 +8,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil } from "lucide-react";
+import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Trash2 } from "lucide-react";
+import ConfirmActionDialog from "@/components/ConfirmActionDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { productService } from "@/services/productService";
 
@@ -100,6 +101,16 @@ const DataTable = ({
   const [catalogVisibilityPending, setCatalogVisibilityPending] = useState(false);
   const [catalogVisibilityTargetIds, setCatalogVisibilityTargetIds] = useState<string[]>([]);
   const catalogVisibilityPendingRef = useRef(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAllFiltered, setDeleteAllFiltered] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState({});
+
+  const clearAllSelection = useCallback(() => {
+    setDeleteAllFiltered(false);
+    setRowSelection({});
+  }, []);
 
   // Debounce search query
   useEffect(() => {
@@ -633,8 +644,15 @@ const DataTable = ({
         meta: { headClassName: "w-10 px-2", cellClassName: "w-10 px-2" },
         header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
           <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            checked={deleteAllFiltered || table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => {
+              if (!value) {
+                clearAllSelection();
+                table.toggleAllPageRowsSelected(false);
+                return;
+              }
+              table.toggleAllPageRowsSelected(true);
+            }}
             aria-label="Seleccionar todos"
           />
         ),
@@ -894,6 +912,8 @@ const DataTable = ({
     catalogVisibilityTargetIds,
     featureLoadingId,
     getProductById,
+    deleteAllFiltered,
+    clearAllSelection,
   ]);
 
   useEffect(() => {
@@ -917,7 +937,6 @@ const DataTable = ({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
 
   const table = useReactTable<Variant>({
     data: mappedData,
@@ -957,13 +976,80 @@ const DataTable = ({
       .filter((id): id is string => !!id);
   }, [rowSelection, mappedData]);
 
+  const handleBulkDelete = useCallback(async () => {
+    setDeletePending(true);
+    setDeleteError(null);
+    try {
+      const payload = deleteAllFiltered
+        ? {
+          selectAll: true,
+          filters: {
+            categoryId: category?.id,
+            subcategoryId: subcategoryId ?? undefined,
+            search: debouncedSearch || undefined,
+            catalogVisibility: catalogVisibilityFilter,
+            includeHidden: true,
+          },
+        }
+        : { productIds: selectedProductIds };
+
+      const result = await productService.bulkDeleteProducts(payload);
+
+      const failedMsg =
+        result.failed.length > 0
+          ? ` ${result.failed.length} producto(s) no se pudieron eliminar.`
+          : "";
+
+      toast({
+        title: "Eliminación completada",
+        description: `${result.deletedCount} producto(s) eliminado(s).${failedMsg}`,
+        variant: result.failed.length > 0 ? "destructive" : "default",
+      });
+
+      setDeleteDialogOpen(false);
+      setDeleteAllFiltered(false);
+      setRowSelection({});
+      setRefreshKey((k) => k + 1);
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (error instanceof Error ? error.message : "Error al eliminar productos");
+      setDeleteError(msg);
+      toast({ title: "Error al eliminar", description: msg, variant: "destructive" });
+    } finally {
+      setDeletePending(false);
+    }
+  }, [
+    deleteAllFiltered,
+    category?.id,
+    subcategoryId,
+    debouncedSearch,
+    catalogVisibilityFilter,
+    selectedProductIds,
+  ]);
+
+  const bulkDeleteCount = deleteAllFiltered ? totalItems : selectedProductIds.length;
+  const hasBulkSelection = deleteAllFiltered || selectedProductIds.length > 0;
+
   return (
     <div>
-      {selectedProductIds.length > 0 && (
+      {hasBulkSelection && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
           <span className="text-sm font-medium">
-            {selectedProductIds.length} seleccionado(s)
+            {deleteAllFiltered ? totalItems : selectedProductIds.length} seleccionado(s)
           </span>
+          <Button size="sm" variant="ghost" onClick={clearAllSelection}>
+            Deseleccionar todo
+          </Button>
+          {!deleteAllFiltered && totalItems > selectedProductIds.length && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDeleteAllFiltered(true)}
+            >
+              Seleccionar los {totalItems} del filtro
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -990,8 +1076,37 @@ const DataTable = ({
             )}
             Ocultar del catálogo
           </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={deletePending}
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteDialogOpen(true);
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Eliminar
+          </Button>
         </div>
       )}
+
+      <ConfirmActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Eliminar productos"
+        description={`Se eliminarán ${bulkDeleteCount} producto(s) de forma permanente.`}
+        consequences={[
+          "Se eliminarán todas las imágenes asociadas a los productos.",
+          "Se eliminarán todas las aplicaciones asociadas.",
+          "Se eliminarán todas las referencias asociadas.",
+          "Se eliminarán variantes, notas y vínculos técnicos.",
+          "Esta acción no se puede deshacer.",
+        ]}
+        loading={deletePending}
+        error={deleteError}
+        onConfirm={handleBulkDelete}
+      />
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1161,12 +1276,12 @@ const DataTable = ({
                       | { cellClassName?: string }
                       | undefined;
                     return (
-                    <TableCell key={cell.id} className={meta?.cellClassName}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
+                      <TableCell key={cell.id} className={meta?.cellClassName}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
                     );
                   })}
                 </TableRow>
