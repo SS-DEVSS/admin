@@ -208,11 +208,8 @@ export const productService = {
 
   previewBulkImages: async (files: File[]) => {
     const client = axiosClient();
-    const formData = new FormData();
-    files.forEach((file) => formData.append("images", file));
-    const response = await client.post("/products/bulk/images/preview", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      timeout: LIST_REQUEST_TIMEOUT_MS,
+    const response = await client.post("/products/bulk/images/preview", {
+      filenames: files.map((file) => file.name),
     });
     return response.data;
   },
