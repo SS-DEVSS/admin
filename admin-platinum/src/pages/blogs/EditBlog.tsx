@@ -4,12 +4,6 @@ import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ChevronLeft } from "lucide-react";
 import { newsContext } from "@/context/news-context";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
@@ -143,20 +137,17 @@ const EditBlog = () => {
 
   return (
     <Layout>
-      <div className="w-full flex justify-center px-4">
-        <Card className="max-w-4xl w-full">
-        <CardHeader className="flex flex-row flex-wrap items-center gap-4">
+      <div className="w-full max-w-full">
+        <header className="flex flex-row flex-wrap items-center gap-4 pb-6">
           <Link
             to="/dashboard/blogs"
             className="rounded-lg p-2 border hover:bg-muted inline-flex"
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
-          <div>
-            <CardTitle>Editar blog</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">Editar blog</h1>
+        </header>
+        <div className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title">Título</Label>
             <Input
@@ -239,8 +230,7 @@ const EditBlog = () => {
             </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
       </div>
     </Layout>
   );

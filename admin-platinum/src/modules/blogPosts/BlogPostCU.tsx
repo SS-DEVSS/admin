@@ -169,7 +169,7 @@ const BlogPostCU = ({ blogPost }: BlogPostCUProps) => {
 
   return (
     <Layout>
-      <section className="max-w-[1000px] mx-auto">
+      <section className="w-full max-w-full">
         <header className="flex justify-between">
           <div className="flex items-center gap-4">
             <Link to="/dashboard/noticias">

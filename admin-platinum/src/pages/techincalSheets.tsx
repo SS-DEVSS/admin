@@ -4,13 +4,7 @@ import Layout from "@/components/Layouts/Layout";
 import NoData from "@/components/NoData";
 import TsCard from "@/components/TsCard";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import {
   Dialog,
   DialogContent,
@@ -347,20 +341,20 @@ const TechincalSheets = () => {
 
   return (
     <Layout>
-      <Card className="border-0 shadow-none flex flex-col">
-        <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0">
-          <div className="flex flex-col gap-3">
-            <CardTitle>Boletines</CardTitle>
-            <CardDescription>
-              Gestiona los boletines técnicos y asígnalos a productos.
-            </CardDescription>
+      <DashboardPageShell
+        title="Boletines"
+        description={
+          <>
+            Gestiona los boletines técnicos y asígnalos a productos.
             {!loading ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mt-1">
                 {listToShow.length} {listToShow.length === 1 ? "boletín" : "boletines"} en vista
               </p>
             ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto sm:ml-auto">
+          </>
+        }
+        filters={
+          <>
             <div className="relative flex-1 min-w-[200px] sm:max-w-[520px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -512,10 +506,9 @@ const TechincalSheets = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-
-        <CardContent className="flex flex-col flex-grow p-0 mt-4">
+          </>
+        }
+      >
           {showInitialLoading ? (
             <div className="flex justify-center items-center py-12">
               <div className="flex flex-col items-center gap-2">
@@ -559,8 +552,7 @@ const TechincalSheets = () => {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </DashboardPageShell>
     </Layout>
   );
 };

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { productService } from "@/services/productService";
 import { toast } from "@/hooks/use-toast";
 import ConfirmActionDialog from "@/components/ConfirmActionDialog";
+import BulkImageMatchPreview from "@/components/products/BulkImageMatchPreview";
 import { Loader2, Upload } from "lucide-react";
 
 type BulkImageRow = {
@@ -137,26 +138,12 @@ const BulkImageUploadDialog = ({ open, onOpenChange, onComplete }: BulkImageUplo
           )}
 
           {preview && (
-            <div className="rounded-md border p-3 text-sm space-y-2">
-              <p>
-                Total: {preview.total} | Coincidencias: {preview.matched} | Omitidos:{" "}
-                {preview.skipped}
-              </p>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {preview.rows.slice(0, 30).map((row) => (
-                  <div key={`${row.file}-${row.sku}`} className="text-xs">
-                    {row.status === "ok"
-                      ? `✓ ${row.file} → ${row.sku}`
-                      : `⊘ ${row.file} — ${row.reason ?? "omitido"}`}
-                  </div>
-                ))}
-                {preview.rows.length > 30 && (
-                  <p className="text-xs text-muted-foreground">
-                    ... y {preview.rows.length - 30} más
-                  </p>
-                )}
-              </div>
-            </div>
+            <BulkImageMatchPreview
+              total={preview.total}
+              matched={preview.matched}
+              skipped={preview.skipped}
+              rows={preview.rows}
+            />
           )}
 
           <DialogFooter className="gap-2">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Layout from '@/components/Layouts/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import { Button } from '@/components/ui/button';
 import { productService, FeaturedProduct } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -200,25 +200,20 @@ const FeaturedProducts = () => {
 
   return (
     <Layout>
-      <div className="w-full max-w-full">
-        <Card className="border-0 shadow-none w-full">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 p-0 m-0 pb-6 w-full">
-            <div className="flex flex-col gap-3">
-              <CardTitle>Productos Destacados</CardTitle>
-              <CardDescription>
-                Gestiona los productos destacados que se muestran en la página principal (máximo 6)
-              </CardDescription>
-            </div>
-            <Button
-              className="w-full sm:w-auto"
-              onClick={handleOpenProductSelect}
-              disabled={featuredProducts.length >= 6}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Producto
-            </Button>
-          </CardHeader>
-          <CardContent className="px-0">
+      <DashboardPageShell
+        title="Productos Destacados"
+        description="Gestiona los productos destacados que se muestran en la página principal (máximo 6)"
+        actions={
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleOpenProductSelect}
+            disabled={featuredProducts.length >= 6}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Producto
+          </Button>
+        }
+      >
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -307,9 +302,7 @@ const FeaturedProducts = () => {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
-      </div>
+      </DashboardPageShell>
       <FeatureProductModal
         open={featureModalOpen}
         onOpenChange={setFeatureModalOpen}

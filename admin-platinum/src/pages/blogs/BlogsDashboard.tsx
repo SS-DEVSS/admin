@@ -1,13 +1,7 @@
 import { PlusCircle, Search } from "lucide-react";
 import Layout from "@/components/Layouts/Layout";
 import CardSectionLayout from "@/components/Layouts/CardSectionLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -70,15 +64,11 @@ const BlogsDashboard = () => {
 
   return (
     <Layout>
-      <Card className="border-0 shadow-none">
-        <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0">
-          <div className="flex flex-col gap-3">
-            <CardTitle>Blogs</CardTitle>
-            <CardDescription>
-              Gestiona el contenido publicado y sus vínculos relacionados.
-            </CardDescription>
-          </div>
-          <div className="flex flex-col gap-3 w-full lg:w-auto lg:ml-auto lg:flex-row lg:flex-wrap lg:items-center">
+      <DashboardPageShell
+        title="Blogs"
+        description="Gestiona el contenido publicado y sus vínculos relacionados."
+        filters={
+          <>
             <div className="relative w-full lg:flex-1 lg:min-w-[140px] lg:max-w-[280px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -111,9 +101,9 @@ const BlogsDashboard = () => {
                 </Button>
               </Link>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 mt-4">
+          </>
+        }
+      >
           {!loading && (
             <div className="mb-3 text-sm text-muted-foreground">
               {listToShow.length} {listToShow.length === 1 ? "blog encontrado" : "blogs encontrados"}
@@ -152,8 +142,7 @@ const BlogsDashboard = () => {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </DashboardPageShell>
     </Layout>
   );
 };

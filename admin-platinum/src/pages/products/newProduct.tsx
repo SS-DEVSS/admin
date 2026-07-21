@@ -1,9 +1,8 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useFormState } from "@/hooks/useFormProduct";
+import { detailsType, stateSkeleton, useFormState } from "@/hooks/useFormProduct";
 import AdditionalInfo from "@/modules/products/AdditionalInfo";
 import Details from "@/modules/products/Details";
 import { ChevronLeft, Trash2 } from "lucide-react";
@@ -13,7 +12,68 @@ import { useCategoryContext } from "@/context/categories-context";
 import { useToast } from "@/hooks/use-toast";
 import { resolveProductNameForSave } from "@/utils/adminFieldVisibility";
 import Loader from "@/components/Loader";
-import { useRef } from "react";
+import { Reference } from "@/models/reference";
+
+function normalizeAttributeValue(value: unknown): unknown {
+  if (value === undefined || value === null || value === "") return null;
+  return value;
+}
+
+function buildFormSnapshot(
+  details: detailsType,
+  attributes: Record<string, unknown>,
+  references: Reference[],
+): string {
+  const categoryId =
+    typeof details.category === "string"
+      ? details.category
+      : details.category?.id ?? null;
+
+  const normalizedAttributes = Object.fromEntries(
+    Object.entries(attributes)
+      .map(([key, value]) => [key, normalizeAttributeValue(value)])
+      .filter(([, value]) => value !== null)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+
+  const referenceKeys = references
+    .map(
+      (reference) =>
+        `${reference.id ?? ""}|${reference.referenceBrand ?? ""}|${reference.referenceNumber ?? ""}|${reference.description ?? ""}`,
+    )
+    .sort();
+
+  return JSON.stringify({
+    details: {
+      sku: details.sku.trim(),
+      description: details.description.trim(),
+      imgUrl: details.imgUrl ?? "",
+      visibleInCatalog: details.visibleInCatalog,
+      categoryId,
+      subcategoryId: details.subcategory?.id ?? null,
+    },
+    attributes: normalizedAttributes,
+    referenceKeys,
+  });
+}
+
+type InitialFormData = {
+  details: detailsType;
+  attributes: Record<string, unknown>;
+  references: Reference[];
+};
+
+function cloneInitialFormData(data: InitialFormData): InitialFormData {
+  return {
+    details: {
+      ...data.details,
+      category: data.details.category ? { ...data.details.category } : null,
+      subcategory: data.details.subcategory ? { ...data.details.subcategory } : null,
+    },
+    attributes: { ...data.attributes },
+    references: data.references.map((reference) => ({ ...reference })),
+  };
+}
 
 const NewProduct = () => {
   const { id } = useParams();
@@ -28,6 +88,15 @@ const NewProduct = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const savingStartTimeRef = useRef<number | null>(null);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(() =>
+    id ? null : buildFormSnapshot(stateSkeleton, {}, []),
+  );
+  const initialFormDataRef = useRef<InitialFormData>({
+    details: { ...stateSkeleton },
+    attributes: {},
+    references: [],
+  });
+  const [formResetKey, setFormResetKey] = useState(0);
 
   const {
     detailsState,
@@ -95,7 +164,7 @@ const NewProduct = () => {
             description: product.description || "",
             category: fullCategory,
             subcategory: subcategoryFromProduct,
-            references: [], // Handled in referencesState
+            references: [],
             sku: product.sku || "",
             brand: brandId,
             imgUrl: firstImage,
@@ -105,6 +174,24 @@ const NewProduct = () => {
                 .visible_in_catalog ??
               true,
           });
+
+          const loadedDetails: detailsType = {
+            id: product.id,
+            name: product.name,
+            type: product.type,
+            description: product.description || "",
+            category: fullCategory,
+            subcategory: subcategoryFromProduct,
+            references: [],
+            sku: product.sku || "",
+            brand: brandId,
+            imgUrl: firstImage,
+            visibleInCatalog:
+              (product as { visibleInCatalog?: boolean }).visibleInCatalog ??
+              (product as { visible_in_catalog?: boolean })
+                .visible_in_catalog ??
+              true,
+          };
 
           // 2. Populate Attributes
           const attrs: any = {};
@@ -140,9 +227,19 @@ const NewProduct = () => {
           setAttributesState(attrs);
 
           // 3. Populate References
-          if (product.references) {
-            setReferencesState({ references: product.references });
+          const loadedReferences = product.references ?? [];
+          if (loadedReferences.length > 0) {
+            setReferencesState({ references: loadedReferences });
           }
+
+          setInitialSnapshot(
+            buildFormSnapshot(loadedDetails, attrs, loadedReferences),
+          );
+          initialFormDataRef.current = cloneInitialFormData({
+            details: loadedDetails,
+            attributes: attrs,
+            references: loadedReferences,
+          });
 
           // 4. Populate Applications
           // Convert backend applications to frontend format
@@ -319,6 +416,25 @@ const NewProduct = () => {
     }
   }, [isEditMode, id, categories]); // Depend on categories to ensure they are loaded first
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (initialSnapshot === null) return false;
+    return (
+      buildFormSnapshot(
+        detailsState,
+        attributesState,
+        referencesState.references,
+      ) !== initialSnapshot
+    );
+  }, [initialSnapshot, detailsState, attributesState, referencesState]);
+
+  const handleDiscard = () => {
+    const initial = cloneInitialFormData(initialFormDataRef.current);
+    setDetailsState(initial.details);
+    setAttributesState(initial.attributes);
+    setReferencesState({ references: initial.references });
+    setFormResetKey((key) => key + 1);
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return; // Prevent double submission
 
@@ -345,6 +461,8 @@ const NewProduct = () => {
           variant: "destructive",
           description: `Por favor completa los siguientes campos requeridos: ${missingFields.join(", ")}`,
         });
+        setIsSubmitting(false);
+        savingStartTimeRef.current = null;
         return;
       }
 
@@ -360,6 +478,8 @@ const NewProduct = () => {
           variant: "destructive",
           description: "Por favor selecciona una categoría",
         });
+        setIsSubmitting(false);
+        savingStartTimeRef.current = null;
         return;
       }
 
@@ -371,6 +491,8 @@ const NewProduct = () => {
           variant: "destructive",
           description: "Categoría no encontrada",
         });
+        setIsSubmitting(false);
+        savingStartTimeRef.current = null;
         return;
       }
 
@@ -661,20 +783,22 @@ const NewProduct = () => {
     <>
       {isSubmitting && <Loader fullScreen message="Guardando cambios..." />}
       <Layout>
-        <header className="flex justify-between">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto w-full max-w-[1400px]">
+        <header className="flex justify-between mb-5">
+          <div className="flex items-center gap-3">
             <Link to="/dashboard/productos">
-              <Card className="p-2">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
                 <ChevronLeft className="h-4 w-4" />
-              </Card>
+              </Button>
             </Link>
-            <p className="text-2xl font-semibold leading-none tracking-tight">
+            <p className="text-xl font-semibold leading-none tracking-tight">
               {isEditMode ? "Editar Producto" : "Nuevo Producto"}
             </p>
           </div>
         </header>
-        <section className="flex flex-col gap-4 sm:mt-6 max-w-4xl mx-auto pb-24">
+        <section className={`flex flex-col gap-5 w-full ${hasUnsavedChanges ? "pb-28" : "pb-5"}`}>
           <Details
+            key={formResetKey}
             detailsState={detailsState}
             setDetailsState={setDetailsState}
             referencesState={referencesState}
@@ -687,39 +811,45 @@ const NewProduct = () => {
             setCanContinue={setCanContinue}
           />
           {isEditMode && (
-            <AdditionalInfo
-              setCanContinue={setCanContinue}
-              product={currentProduct}
-            />
+            <>
+              <AdditionalInfo
+                setCanContinue={setCanContinue}
+                product={currentProduct}
+              />
+              <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+                <h2 className="text-base font-semibold text-destructive">Zona de peligro</h2>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  Eliminar este producto borrará de forma permanente imágenes, aplicaciones,
+                  referencias y variantes asociadas.
+                </p>
+                <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar producto
+                </Button>
+              </section>
+            </>
           )}
         </section>
-        <section className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
-          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
-            {isEditMode ? (
-              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar producto
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-3">
-              <Link to="/dashboard/productos">
-                <Button variant="outline">Cancelar</Button>
-              </Link>
-              <Button
-                disabled={!canContinue || isSubmitting}
-                onClick={handleSubmit}
-              >
-                {isSubmitting
-                  ? "Guardando..."
-                  : isEditMode
-                    ? "Actualizar Producto"
-                    : "Publicar Producto"}
-              </Button>
-            </div>
+        </div>
+        {hasUnsavedChanges && (
+        <section className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-t">
+          <div className="mx-auto w-full max-w-[1400px] px-4 md:px-6 py-4 flex items-center justify-end gap-3">
+            <Button variant="outline" onClick={handleDiscard} type="button">
+              Descartar
+            </Button>
+            <Button
+              disabled={!canContinue || isSubmitting}
+              onClick={handleSubmit}
+            >
+              {isSubmitting
+                ? "Guardando..."
+                : isEditMode
+                  ? "Guardar cambios"
+                  : "Publicar Producto"}
+            </Button>
           </div>
         </section>
+        )}
       </Layout>
 
       <ConfirmActionDialog

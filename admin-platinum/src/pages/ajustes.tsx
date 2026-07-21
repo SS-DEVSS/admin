@@ -1,20 +1,15 @@
 import Layout from "@/components/Layouts/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 
 const Ajustes = () => {
   return (
     <Layout>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Ajustes</CardTitle>
-          <CardDescription>
-            Configuración general de la aplicación.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Próximamente...</p>
-        </CardContent>
-      </Card>
+      <DashboardPageShell
+        title="Ajustes"
+        description="Configuración general de la aplicación."
+      >
+        <p className="text-muted-foreground">Próximamente...</p>
+      </DashboardPageShell>
     </Layout>
   );
 };

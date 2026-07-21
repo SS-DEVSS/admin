@@ -4,17 +4,23 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import { Product } from "@/models/product";
 import { Application } from "@/models/application";
-import { PlusCircle, Pencil, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { PlusCircle, Pencil, ChevronDown, ChevronUp, Trash2, MoreVertical, Info } from "lucide-react";
 import ConfirmActionDialog from "@/components/ConfirmActionDialog";
 import { toast } from "@/hooks/use-toast";
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import NoData from "../NoData";
 import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import EditApplicationDialog from "./EditApplicationDialog";
 import { CategoryAtributes } from "@/models/category";
 import { useCategoryContext } from "@/context/categories-context";
@@ -27,6 +33,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+const APPLICATIONS_NOTE =
+  'Cada aplicación muestra información del vehículo (Modelo, Submodelo, Año, etc.) seguida de un identificador único entre paréntesis. Este identificador corresponde a los últimos 8 caracteres del ID de la aplicación en la base de datos, lo que permite diferenciar cada aplicación y facilitar su búsqueda o referencia si es necesario. Si aparece "BASE" o "Aplicación", significa que esa aplicación no tiene información adicional de vehículo, pero el identificador único permite diferenciarla de las demás.';
 
 type ApplicationsCardProps = {
   state: {
@@ -52,6 +67,41 @@ type GroupedApplication = {
   motorDescripcion: string | null;
   especificaciones: string | null;
 };
+
+type ApplicationActionsMenuProps = {
+  application: Application;
+  onEdit: (application: Application) => void;
+  onDelete: (application: Application) => void;
+};
+
+const ApplicationActionsMenu = ({
+  application,
+  onEdit,
+  onDelete,
+}: ApplicationActionsMenuProps) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted/50">
+        <span className="sr-only">Abrir menú de acciones</span>
+        <MoreVertical className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+      <DropdownMenuItem onSelect={() => onEdit(application)}>
+        <Pencil className="mr-2 h-4 w-4" />
+        Editar
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        className="text-destructive focus:text-destructive"
+        onSelect={() => onDelete(application)}
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Eliminar
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
 
 const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) => {
   const { categories } = useCategoryContext();
@@ -601,18 +651,42 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   };
 
   return (
-    <Card className="w-full flex flex-col mt-5">
+    <Card className="w-full flex flex-col">
       <CardHeader>
-        <CardTitle>Aplicaciones</CardTitle>
-        <CardDescription>
-          Ingrese las aplicaciones asociadas al producto.
-        </CardDescription>
-        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
-            <strong>Nota:</strong> Cada aplicación muestra información del vehículo (Modelo, Submodelo, Año, etc.) seguida de un identificador único entre paréntesis.
-            Este identificador corresponde a los últimos 8 caracteres del ID de la aplicación en la base de datos, lo que permite diferenciar cada aplicación y facilitar su búsqueda o referencia si es necesario.
-            Si aparece "BASE" o "Aplicación", significa que esa aplicación no tiene información adicional de vehículo, pero el identificador único permite diferenciarla de las demás.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Aplicaciones</CardTitle>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Información sobre aplicaciones"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-sm text-left leading-relaxed">
+                    {APPLICATIONS_NOTE}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <CardDescription className="mt-1.5">
+              Ingrese las aplicaciones asociadas al producto.
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            type="button"
+            className="shrink-0 bg-brand-orange text-[#002858] hover:bg-[#D9680F] hover:text-[#002858]"
+            onClick={handleAddClick}
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Agregar Aplicación
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="flex-1">
@@ -626,23 +700,23 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
           // Table view with grouped applications
           (() => {
             return (
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-blue-600 hover:bg-blue-600">
-                      <TableHead className="text-white font-semibold">Origen</TableHead>
-                      <TableHead className="text-white font-semibold">Fabricante</TableHead>
-                      <TableHead className="text-white font-semibold">Modelo</TableHead>
-                      <TableHead className="text-white font-semibold">Submodelo</TableHead>
-                      <TableHead className="text-white font-semibold">Año</TableHead>
-                      <TableHead className="text-white font-semibold">Litros Motor</TableHead>
-                      <TableHead className="text-white font-semibold">CC Motor</TableHead>
-                      <TableHead className="text-white font-semibold">CID Motor</TableHead>
-                      <TableHead className="text-white font-semibold">Cilindros Motor</TableHead>
-                      <TableHead className="text-white font-semibold">Bloque Motor</TableHead>
-                      <TableHead className="text-white font-semibold">Motor Descripción</TableHead>
-                      <TableHead className="text-white font-semibold">Especificaciones</TableHead>
-                      <TableHead className="text-white font-semibold">Acciones</TableHead>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead>Origen</TableHead>
+                      <TableHead>Fabricante</TableHead>
+                      <TableHead>Modelo</TableHead>
+                      <TableHead>Submodelo</TableHead>
+                      <TableHead>Año</TableHead>
+                      <TableHead>Litros Motor</TableHead>
+                      <TableHead>CC Motor</TableHead>
+                      <TableHead>CID Motor</TableHead>
+                      <TableHead>Cilindros Motor</TableHead>
+                      <TableHead>Bloque Motor</TableHead>
+                      <TableHead>Motor Descripción</TableHead>
+                      <TableHead>Especificaciones</TableHead>
+                      <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -694,14 +768,13 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                             <TableCell>{group.motorDescripcion || "-"}</TableCell>
                             <TableCell>{group.especificaciones || "-"}</TableCell>
                             <TableCell>
-                              <div className="flex gap-2">
-                                {group.applications.length > 0 && (
-                                  <Pencil
-                                    onClick={() => handleEditApplication(group.applications[0])}
-                                    className="cursor-pointer w-4 h-4 hover:text-blue-600 transition-colors"
-                                  />
-                                )}
-                              </div>
+                              {group.applications.length > 0 && (
+                                <ApplicationActionsMenu
+                                  application={group.applications[0]}
+                                  onEdit={handleEditApplication}
+                                  onDelete={setDeleteTarget}
+                                />
+                              )}
                             </TableCell>
                           </TableRow>
                           {isExpanded && group.applications.length > 0 && (
@@ -725,16 +798,11 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                                             ID: {app.id.substring(app.id.length - 8).toUpperCase()}
                                           </p>
                                         </div>
-                                        <div className="flex gap-2">
-                                          <Pencil
-                                            onClick={() => handleEditApplication(app)}
-                                            className="cursor-pointer w-4 h-4 hover:text-blue-600 transition-colors"
-                                          />
-                                          <Trash2
-                                            onClick={() => setDeleteTarget(app)}
-                                            className="cursor-pointer w-4 h-4 hover:text-red-600 transition-colors"
-                                          />
-                                        </div>
+                                        <ApplicationActionsMenu
+                                          application={app}
+                                          onEdit={handleEditApplication}
+                                          onDelete={setDeleteTarget}
+                                        />
                                       </div>
                                     ))}
                                   </div>
@@ -752,17 +820,6 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
           })()
         )}
       </CardContent>
-      <CardFooter className="mt-auto border-t p-2 flex justify-end items-center">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="gap-1 hover:bg-slate-100 hover:text-black py-5"
-          onClick={handleAddClick}
-        >
-          <PlusCircle className="h-3.5 w-3.5 mr-2" />
-          Agregar Aplicación
-        </Button>
-      </CardFooter>
 
       <EditApplicationDialog
         open={isEditDialogOpen}

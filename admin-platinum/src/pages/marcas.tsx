@@ -1,12 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import DashboardPageShell from "@/components/Layouts/DashboardPageShell";
 import {
   Dialog,
   DialogContent,
@@ -213,27 +208,22 @@ const Marcas = () => {
         <Loader fullScreen message="Guardando cambios..." />
       )}
       <Layout>
-        <div>
-          <Card className="border-0 shadow-none">
-            <CardHeader className="flex flex-row flex-wrap items-center gap-4 p-0 m-0 pb-6">
-              <div className="flex flex-col gap-3">
-                <CardTitle>Marcas</CardTitle>
-                <CardDescription>
-                  Maneja tus marcas y las categorías asociadas a cada una de ellas
-                </CardDescription>
+        <DashboardPageShell
+          title="Marcas"
+          description="Maneja tus marcas y las categorías asociadas a cada una de ellas"
+          filters={
+            <>
+              <div className="relative flex-1 md:grow-0">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar Marca..."
+                  onChange={handleSearchFilter}
+                  value={filterBrandSearch}
+                  className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+                />
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
-                <div className="relative flex-1 md:grow-0">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Buscar Marca..."
-                    onChange={handleSearchFilter}
-                    value={filterBrandSearch}
-                    className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-                  />
-                </div>
-                <Dialog
+              <Dialog
                   open={isOpen}
                   onOpenChange={(open: boolean) => {
                     if (!open) {
@@ -339,8 +329,9 @@ const Marcas = () => {
                     )}
                   </DialogContent>
                 </Dialog>
-              </div>
-            </CardHeader>
+            </>
+          }
+        >
             {loading ? (
               <div className="flex justify-center items-center py-12">
                 <div className="flex flex-col items-center gap-2">
@@ -374,8 +365,7 @@ const Marcas = () => {
                 )}
               </CardSectionLayout>
             )}
-          </Card>
-        </div>
+        </DashboardPageShell>
       </Layout>
       <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
