@@ -18,7 +18,7 @@ import { detailsType } from "@/hooks/useFormProduct";
 import { Product } from "@/models/product";
 import MyDropzone from "@/components/Dropzone";
 import { useS3FileManager } from "@/hooks/useS3FileManager";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import axiosClient from "@/services/axiosInstance";
@@ -41,6 +41,7 @@ const DetailsCard = ({ state, setState, product, children }: DetailsCardProps) =
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const lastUploadedFileRef = useRef<string>("");
 
   useEffect(() => {
     if (state.imgUrl && !imageFile) setImageUrl(state.imgUrl);
@@ -64,19 +65,32 @@ const DetailsCard = ({ state, setState, product, children }: DetailsCardProps) =
     }));
   };
 
+  // Sube la imagen SOLO cuando cambia el archivo seleccionado.
+  // Ojo: state.imgUrl no puede ir en las dependencias porque este efecto lo escribe
+  // (provocaría re-subidas en bucle). El ref evita subir dos veces el mismo archivo.
   useEffect(() => {
-    if (imageFile && imageFile.name) {
-      uploadFile(imageFile, (_key: string, location: string) => {
-        setImageUrl(location);
-        setState((prevForm) => ({
-          ...prevForm,
-          imgUrl: location,
-        }));
-      });
-    } else if (!imageFile && !state.imgUrl) {
+    if (!imageFile || !imageFile.name) return;
+
+    const fileId = `${imageFile.name}-${imageFile.size}-${imageFile.lastModified}`;
+    if (lastUploadedFileRef.current === fileId) return;
+    lastUploadedFileRef.current = fileId;
+
+    uploadFile(imageFile, (_key: string, location: string) => {
+      setImageUrl(location);
+      setState((prevForm) => ({
+        ...prevForm,
+        imgUrl: location,
+      }));
+    });
+  }, [imageFile, uploadFile, setState]);
+
+  // Limpia la vista previa cuando no hay archivo ni imagen guardada.
+  useEffect(() => {
+    if (!imageFile && !state.imgUrl) {
+      lastUploadedFileRef.current = "";
       setImageUrl("");
     }
-  }, [imageFile, uploadFile, setState, state.imgUrl]);
+  }, [imageFile, state.imgUrl]);
 
   const handlePreviewImage = (url: string) => {
     setPreviewImageUrl(url);
