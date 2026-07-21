@@ -254,23 +254,30 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
           </div>
 
           {fileType === 'image' && (
-            <div className="flex items-start gap-3 rounded-lg border p-3">
-              <Checkbox
-                id="match-products-sku"
-                checked={matchProductsBySku}
-                onCheckedChange={(checked) => handleMatchToggle(checked === true)}
-                disabled={isUploading}
-              />
-              <div className="space-y-1">
-                <Label htmlFor="match-products-sku" className="cursor-pointer font-medium">
+            <label
+              htmlFor="match-products-sku"
+              className={`flex flex-col gap-1.5 rounded-lg border p-3 transition-colors ${
+                isUploading
+                  ? 'cursor-not-allowed opacity-60'
+                  : 'cursor-pointer hover:bg-muted/50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="match-products-sku"
+                  checked={matchProductsBySku}
+                  onCheckedChange={(checked) => handleMatchToggle(checked === true)}
+                  disabled={isUploading}
+                />
+                <span className="text-sm font-medium leading-none">
                   Asociar imágenes a productos por SKU
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  El nombre del archivo (sin extensión) debe coincidir con el SKU del producto.
-                  Las imágenes también se subirán al administrador de archivos.
-                </p>
+                </span>
               </div>
-            </div>
+              <p className="ml-7 text-xs text-muted-foreground">
+                El nombre del archivo (sin extensión) debe coincidir con el SKU del producto.
+                Las imágenes también se subirán al administrador de archivos.
+              </p>
+            </label>
           )}
 
           <div className="grid gap-3">

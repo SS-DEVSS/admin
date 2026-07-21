@@ -653,8 +653,8 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   return (
     <Card className="w-full flex flex-col">
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <CardTitle className="text-base">Aplicaciones</CardTitle>
               <TooltipProvider delayDuration={200}>
@@ -681,7 +681,7 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
           <Button
             size="sm"
             type="button"
-            className="shrink-0 bg-brand-orange text-[#002858] hover:bg-[#D9680F] hover:text-[#002858]"
+            className="w-full shrink-0 bg-brand-orange text-[#002858] hover:bg-[#D9680F] hover:text-[#002858] sm:w-auto"
             onClick={handleAddClick}
           >
             <PlusCircle className="h-4 w-4 mr-2" />

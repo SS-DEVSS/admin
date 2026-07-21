@@ -172,8 +172,8 @@ const DetailsCard = ({ state, setState, product, children }: DetailsCardProps) =
           </div>
 
           <div className="space-y-3 border-t pt-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <Label>Multimedia</Label>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Imagen principal del producto
@@ -184,7 +184,7 @@ const DetailsCard = ({ state, setState, product, children }: DetailsCardProps) =
                 size="sm"
                 onClick={() => setFilePickerOpen(true)}
                 type="button"
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
                 Buscar en archivos
