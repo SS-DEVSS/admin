@@ -14,6 +14,7 @@ import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import NoData from "../NoData";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,25 @@ import {
 
 const APPLICATIONS_NOTE =
   'Cada aplicación muestra información del vehículo (Modelo, Submodelo, Año, etc.) seguida de un identificador único entre paréntesis. Este identificador corresponde a los últimos 8 caracteres del ID de la aplicación en la base de datos, lo que permite diferenciar cada aplicación y facilitar su búsqueda o referencia si es necesario. Si aparece "BASE" o "Aplicación", significa que esa aplicación no tiene información adicional de vehículo, pero el identificador único permite diferenciarla de las demás.';
+
+function getApplicationIds(applications: Application[]): string[] {
+  return applications
+    .map((application) => application.id)
+    .filter((id): id is string => Boolean(id));
+}
+
+function getGroupSelectionState(
+  selectedIds: Set<string>,
+  applications: Application[]
+): boolean | "indeterminate" {
+  const ids = getApplicationIds(applications);
+  if (ids.length === 0) return false;
+
+  const selectedCount = ids.filter((id) => selectedIds.has(id)).length;
+  if (selectedCount === 0) return false;
+  if (selectedCount === ids.length) return true;
+  return "indeterminate";
+}
 
 type ApplicationsCardProps = {
   state: {
@@ -111,6 +131,54 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+  const allApplicationIds = useMemo(
+    () => getApplicationIds(state.applications),
+    [state.applications]
+  );
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === allApplicationIds.length) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(allApplicationIds));
+  };
+
+  const toggleSelectGroup = (applications: Application[]) => {
+    const ids = getApplicationIds(applications);
+    if (ids.length === 0) return;
+
+    const allSelected = ids.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => {
+        if (allSelected) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
 
   // Get category attributes (only application attributes)
   const categoryAttributes = useMemo(() => {
@@ -170,6 +238,11 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
       setState((prev) => ({
         applications: prev.applications.filter((app) => app.id !== deleteTarget.id),
       }));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id as string);
+        return next;
+      });
       toast({ title: "Aplicación eliminada", variant: "success" });
       setDeleteTarget(null);
     } catch (error: unknown) {
@@ -179,6 +252,48 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const confirmBulkDeleteApplications = async () => {
+    const applicationIds = Array.from(selectedIds);
+    if (applicationIds.length === 0) return;
+
+    setBulkDeleteLoading(true);
+    try {
+      const response = await axiosClient().delete("/applications/bulk", {
+        data: { applicationIds },
+      });
+      const deletedIds = new Set(applicationIds);
+      setState((prev) => ({
+        applications: prev.applications.filter(
+          (application) => !application.id || !deletedIds.has(application.id)
+        ),
+      }));
+      clearSelection();
+      setBulkDeleteOpen(false);
+
+      const deletedCount = response.data?.deletedCount ?? applicationIds.length;
+      toast({
+        title: "Aplicaciones eliminadas",
+        variant: "success",
+        description: `Se eliminaron ${deletedCount} aplicación(es).`,
+      });
+
+      if (response.data?.errors?.length) {
+        toast({
+          title: "Algunas aplicaciones no se eliminaron",
+          description: response.data.errors.join(" "),
+          variant: "destructive",
+        });
+      }
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al eliminar aplicaciones";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setBulkDeleteLoading(false);
     }
   };
 
@@ -690,6 +805,25 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
         </div>
       </CardHeader>
       <CardContent className="flex-1">
+        {selectedIds.size > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
+            <span className="text-sm font-medium">
+              {selectedIds.size} seleccionada(s)
+            </span>
+            <Button size="sm" variant="ghost" type="button" onClick={clearSelection}>
+              Deseleccionar todo
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              type="button"
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar seleccionadas
+            </Button>
+          </div>
+        )}
         {state.applications.length === 0 ? (
           <NoData>
             <p className="text-[#94A3B8] font-medium">
@@ -704,6 +838,20 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-10 px-2">
+                        <Checkbox
+                          checked={
+                            allApplicationIds.length > 0 &&
+                            selectedIds.size === allApplicationIds.length
+                              ? true
+                              : selectedIds.size > 0
+                                ? "indeterminate"
+                                : false
+                          }
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Seleccionar todas las aplicaciones"
+                        />
+                      </TableHead>
                       <TableHead>Origen</TableHead>
                       <TableHead>Fabricante</TableHead>
                       <TableHead>Modelo</TableHead>
@@ -725,6 +873,13 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                       return (
                         <React.Fragment key={index}>
                           <TableRow>
+                            <TableCell className="w-10 px-2">
+                              <Checkbox
+                                checked={getGroupSelectionState(selectedIds, group.applications)}
+                                onCheckedChange={() => toggleSelectGroup(group.applications)}
+                                aria-label="Seleccionar grupo de aplicaciones"
+                              />
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 {group.applications.length > 1 && (
@@ -779,7 +934,7 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                           </TableRow>
                           {isExpanded && group.applications.length > 0 && (
                             <TableRow className="bg-gray-50">
-                              <TableCell colSpan={13} className="p-4">
+                              <TableCell colSpan={14} className="p-4">
                                 <div className="space-y-2">
                                   <h4 className="font-semibold text-sm mb-3">
                                     Aplicaciones individuales en este grupo ({group.applications.length}):
@@ -788,9 +943,16 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                                     {group.applications.map((app) => (
                                       <div
                                         key={app.id}
-                                        className="bg-white border rounded-lg p-3 flex items-center justify-between gap-3 min-w-[200px]"
+                                        className="bg-white border rounded-lg p-3 flex items-center gap-3 min-w-[200px]"
                                       >
-                                        <div className="flex-1">
+                                        {app.id && (
+                                          <Checkbox
+                                            checked={selectedIds.has(app.id)}
+                                            onCheckedChange={() => toggleSelectOne(app.id as string)}
+                                            aria-label="Seleccionar aplicación"
+                                          />
+                                        )}
+                                        <div className="flex-1 min-w-0">
                                           <p className="text-sm font-medium">
                                             {getApplicationDisplayText(app)}
                                           </p>
@@ -838,6 +1000,19 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
         consequences={["La aplicación y sus atributos asociados se eliminarán permanentemente."]}
         loading={deleteLoading}
         onConfirm={confirmDeleteApplication}
+      />
+
+      <ConfirmActionDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title="Eliminar aplicaciones seleccionadas"
+        description={`Se eliminarán ${selectedIds.size} aplicación(es) de forma permanente.`}
+        consequences={[
+          "Las aplicaciones y sus atributos asociados se eliminarán del producto.",
+          "Esta acción no se puede deshacer.",
+        ]}
+        loading={bulkDeleteLoading}
+        onConfirm={confirmBulkDeleteApplications}
       />
     </Card>
   );
