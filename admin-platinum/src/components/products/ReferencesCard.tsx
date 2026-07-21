@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Product } from "@/models/product";
 import { Reference } from "@/models/reference";
 import { PlusCircle, X, Pencil } from "lucide-react";
+import ConfirmActionDialog from "@/components/ConfirmActionDialog";
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from "react";
 import NoData from "../NoData";
 import { Button } from "../ui/button";
@@ -34,6 +36,8 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
   const [referenceDescription, setReferenceDescription] = useState<string>("");
   const [editingReference, setEditingReference] = useState<Reference | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Reference | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Get category attributes
   const categoryAttributes = useMemo(() => {
@@ -105,11 +109,36 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
     }
   };
 
-  const handleRemoveReference = (id: string) => {
+  const handleRemoveReference = async (reference: Reference) => {
+    if (product?.id && reference.id) {
+      setDeleteTarget(reference);
+      return;
+    }
     setState((prevForm) => ({
       ...prevForm,
-      references: prevForm.references.filter((ref) => ref.id !== id),
+      references: prevForm.references.filter((ref) => ref.id !== reference.id),
     }));
+  };
+
+  const confirmDeleteReference = async () => {
+    if (!deleteTarget?.id) return;
+    setDeleteLoading(true);
+    try {
+      const client = axiosClient();
+      await client.delete(`/references/${deleteTarget.id}`);
+      setState((prev) => ({
+        references: prev.references.filter((ref) => ref.id !== deleteTarget.id),
+      }));
+      toast({ title: "Referencia eliminada", variant: "success" });
+      setDeleteTarget(null);
+    } catch (error: unknown) {
+      const msg =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Error al eliminar referencia";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleEditReference = (reference: Reference) => {
@@ -166,7 +195,7 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
                     className="cursor-pointer h-3.5 w-3.5 text-muted-foreground hover:text-primary hover:scale-110 transition-all duration-200"
                   />
                   <X
-                    onClick={() => handleRemoveReference(reference.id)}
+                    onClick={() => void handleRemoveReference(reference)}
                     className="cursor-pointer h-3.5 w-3.5 text-muted-foreground hover:text-red-500 hover:scale-110 transition-all duration-200"
                   />
                 </div>
@@ -227,6 +256,16 @@ const ReferencesCard = ({ state, setState, product }: ReferencesCardProps) => {
         reference={editingReference}
         categoryAttributes={categoryAttributes}
         onSuccess={handleEditSuccess}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Eliminar referencia"
+        description={`Se eliminará la referencia ${deleteTarget?.referenceNumber ?? ""}.`}
+        consequences={["La referencia se eliminará permanentemente del producto."]}
+        loading={deleteLoading}
+        onConfirm={confirmDeleteReference}
       />
     </Card>
   );
