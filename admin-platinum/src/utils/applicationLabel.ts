@@ -1,3 +1,5 @@
+import { extractYearFromDate } from "./applicationYear";
+
 type ApplicationLike = {
   id?: string;
   origin?: string | null;
@@ -33,8 +35,8 @@ export const getApplicationAttributeValue = (
       return attr.valueNumber;
     }
     if (attr.valueDate) {
-      const date = new Date(attr.valueDate);
-      if (!isNaN(date.getTime())) return date.getFullYear();
+      const year = extractYearFromDate(attr.valueDate);
+      if (year !== null) return year;
     }
     if (attr.valueString) {
       const str = String(attr.valueString);
@@ -53,8 +55,8 @@ export const getApplicationAttributeValue = (
   if (attr.valueNumber !== null && attr.valueNumber !== undefined) return attr.valueNumber;
   if (attr.valueBoolean !== null && attr.valueBoolean !== undefined) return attr.valueBoolean;
   if (attr.valueDate) {
-    const date = new Date(attr.valueDate);
-    if (!isNaN(date.getTime())) return date.getFullYear();
+    const year = extractYearFromDate(attr.valueDate);
+    if (year !== null) return year;
   }
   return null;
 };
@@ -71,8 +73,8 @@ export const extractApplicationYear = (application: ApplicationLike): number | n
         : parseInt(String(attr.valueNumber), 10);
     }
     if (attr.valueDate) {
-      const date = new Date(attr.valueDate);
-      if (!isNaN(date.getTime())) return date.getFullYear();
+      const year = extractYearFromDate(attr.valueDate);
+      if (year !== null) return year;
     }
     if (attr.valueString) {
       const str = String(attr.valueString);

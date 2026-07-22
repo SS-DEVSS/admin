@@ -100,6 +100,7 @@ const NewProduct = () => {
     references: [],
   });
   const [formResetKey, setFormResetKey] = useState(0);
+  const loadedProductIdRef = useRef<string | null>(null);
 
   const handleApplicationsChange = useCallback((applications: Application[]) => {
     setCurrentProduct((prev: { applications?: Application[] } | null) =>
@@ -121,12 +122,22 @@ const NewProduct = () => {
   } = useFormState();
 
   useEffect(() => {
+    loadedProductIdRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
     const loadProductData = async () => {
       if (isEditMode && id) {
+        const isInitialProductLoad = loadedProductIdRef.current !== id;
         setIsLoadingProduct(true);
         const product = await getProductById(id);
         if (product) {
-          setCurrentProduct(product); // Store product for passing to child components
+          setCurrentProduct((prev: { applications?: Application[] } | null) => {
+            if (isInitialProductLoad || !prev?.applications?.length) {
+              return product;
+            }
+            return { ...product, applications: prev.applications };
+          });
           // 1. Populate Details
           // Find the category object from context based on product.category.id
           const categoryId = product.category?.id || product.category;
@@ -250,7 +261,8 @@ const NewProduct = () => {
             references: loadedReferences,
           });
 
-          // 4. Populate Applications
+          // 4. Populate Applications (only on initial load for this product)
+          if (isInitialProductLoad) {
           // Convert backend applications to frontend format
           // Backend applications have: id, sku, origin, attributeValues
           // Frontend expects: id, referenceBrand, referenceNumber, type, description
@@ -413,7 +425,8 @@ const NewProduct = () => {
             );
 
             setApplicationsState({ applications: formattedApplications });
-          } else {
+          }
+          loadedProductIdRef.current = id;
           }
         }
         setIsLoadingProduct(false);

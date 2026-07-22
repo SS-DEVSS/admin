@@ -40,6 +40,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  extractApplicationYear,
+  extractYearFromAttributeValue,
+  extractYearFromDate,
+} from "@/utils/applicationYear";
 
 const APPLICATIONS_NOTE =
   'Cada aplicación muestra información del vehículo (Modelo, Submodelo, Año, etc.) seguida de un identificador único entre paréntesis. Este identificador corresponde a los últimos 8 caracteres del ID de la aplicación en la base de datos, lo que permite diferenciar cada aplicación y facilitar su búsqueda o referencia si es necesario. Si aparece "BASE" o "Aplicación", significa que esa aplicación no tiene información adicional de vehículo, pero el identificador único permite diferenciarla de las demás.';
@@ -91,15 +96,23 @@ type GroupedApplication = {
 
 type ApplicationActionsMenuProps = {
   application: Application;
+  deleteApplications?: Application[];
   onEdit: (application: Application) => void;
-  onDelete: (application: Application) => void;
+  onDelete: (applications: Application[]) => void;
 };
 
 const ApplicationActionsMenu = ({
   application,
+  deleteApplications,
   onEdit,
   onDelete,
-}: ApplicationActionsMenuProps) => (
+}: ApplicationActionsMenuProps) => {
+  const applicationsToDelete = deleteApplications ?? [application];
+  const deleteCount = applicationsToDelete.length;
+  const deleteLabel =
+    deleteCount > 1 ? `Eliminar grupo (${deleteCount})` : "Eliminar";
+
+  return (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted/50">
@@ -115,14 +128,20 @@ const ApplicationActionsMenu = ({
       </DropdownMenuItem>
       <DropdownMenuItem
         className="text-destructive focus:text-destructive"
-        onSelect={() => onDelete(application)}
+        onSelect={() => onDelete(applicationsToDelete)}
       >
         <Trash2 className="mr-2 h-4 w-4" />
-        Eliminar
+        {deleteLabel}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
-);
+  );
+};
+
+type ApplicationDeleteTarget = {
+  applications: Application[];
+  isGroupDelete: boolean;
+};
 
 const ApplicationsCard = ({
   state,
@@ -136,7 +155,7 @@ const ApplicationsCard = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // Always use table view - list view removed
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ApplicationDeleteTarget | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -259,14 +278,9 @@ const ApplicationsCard = ({
           }
           // Fallback to valueDate if valueNumber not available
           if (attr.valueDate) {
-            const date = new Date(attr.valueDate);
-            if (!isNaN(date.getTime())) {
-              return date.getFullYear().toString();
-            }
-            const dateStr = String(attr.valueDate);
-            const yearMatch = dateStr.match(/^(\d{4})/);
-            if (yearMatch) {
-              return yearMatch[1];
+            const year = extractYearFromDate(attr.valueDate);
+            if (year !== null) {
+              return year.toString();
             }
           }
           // Last resort: valueString
@@ -379,20 +393,71 @@ const ApplicationsCard = ({
     }
   }, [product?.id, formatApplications, setState, onApplicationsChange]);
 
+  const handleDeleteApplications = (applications: Application[]) => {
+    if (applications.length === 0) return;
+    setDeleteTarget({
+      applications,
+      isGroupDelete: applications.length > 1,
+    });
+  };
+
+  const getDeleteTargetDescription = (target: ApplicationDeleteTarget): string => {
+    if (!target.isGroupDelete) {
+      return "Se eliminará esta aplicación del producto.";
+    }
+
+    const years = target.applications
+      .map((application) => extractYear(application))
+      .filter((year): year is number => year !== null)
+      .sort((a, b) => a - b);
+
+    const yearLabel =
+      years.length > 0
+        ? years[0] === years[years.length - 1]
+          ? String(years[0])
+          : `${years[0]}-${years[years.length - 1]}`
+        : null;
+
+    const yearText = yearLabel ? ` (años ${yearLabel})` : "";
+    return `Se eliminarán ${target.applications.length} aplicaciones agrupadas${yearText}.`;
+  };
+
   const confirmDeleteApplication = async () => {
-    const applicationId = deleteTarget?.id;
-    if (!applicationId) return;
+    const applicationIds = (deleteTarget?.applications ?? [])
+      .map((application) => application.id)
+      .filter((id): id is string => Boolean(id));
+
+    if (applicationIds.length === 0) return;
 
     setDeleteLoading(true);
     try {
-      await axiosClient().delete(`/applications/${applicationId}`);
+      if (applicationIds.length === 1) {
+        await axiosClient().delete(`/applications/${applicationIds[0]}`);
+      } else {
+        await axiosClient().delete("/applications/bulk", {
+          data: { applicationIds },
+        });
+      }
+
+      setState((prev) => ({
+        applications: prev.applications.filter(
+          (application) => !application.id || !applicationIds.includes(application.id),
+        ),
+      }));
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        next.delete(applicationId);
+        applicationIds.forEach((id) => next.delete(id));
         return next;
       });
       await refreshApplicationsFromBackend();
-      toast({ title: "Aplicación eliminada", variant: "success" });
+
+      toast({
+        title: deleteTarget?.isGroupDelete ? "Grupo eliminado" : "Aplicación eliminada",
+        variant: "success",
+        description: deleteTarget?.isGroupDelete
+          ? `Se eliminaron ${applicationIds.length} aplicación(es) del grupo.`
+          : undefined,
+      });
       setDeleteTarget(null);
     } catch (error: unknown) {
       const msg =
@@ -474,26 +539,7 @@ const ApplicationsCard = ({
 
     // For year attributes, prioritize valueNumber (as it's stored now)
     if (isYearAttribute) {
-      if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-        return attr.valueNumber;
-      }
-      // Fallback to valueDate if valueNumber not available
-      if (attr.valueDate) {
-        const date = new Date(attr.valueDate);
-        if (!isNaN(date.getTime())) {
-          return date.getFullYear();
-        }
-      }
-      // Last resort: valueString
-      if (attr.valueString) {
-        const str = String(attr.valueString);
-        const yearMatch = str.match(/^(\d{4})/);
-        if (yearMatch) {
-          return parseInt(yearMatch[1], 10);
-        }
-        return str;
-      }
-      return null;
+      return extractYearFromAttributeValue(attr);
     }
 
     // For non-year attributes, use standard priority
@@ -519,68 +565,8 @@ const ApplicationsCard = ({
     return `${origin}|${fabricante}|${modelo}|${submodelo}|${litrosMotor}|${ccMotor}|${cidMotor}|${cilindrosMotor}|${bloqueMotor}|${motor}|${tipoMotor}|${transmision}`;
   };
 
-  // Helper function to extract year value (single year, not range)
-  const extractYear = (application: Application): number | null => {
-    // First, try to get from attributeValues directly (checking valueDate)
-    const attr = application.attributeValues?.find((av: any) => {
-      const attrName = av.attribute?.name || "";
-      return attrName.toLowerCase().includes("año") ||
-        attrName.toLowerCase().includes("anio") ||
-        attrName.toLowerCase().includes("year");
-    });
-
-    if (attr) {
-      // Prioritize valueNumber (as year is stored as number now)
-      if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-        return typeof attr.valueNumber === 'number' ? attr.valueNumber : parseInt(String(attr.valueNumber), 10);
-      }
-
-      // Fallback to valueDate - extract year from date
-      if (attr.valueDate) {
-        const date = new Date(attr.valueDate);
-        if (!isNaN(date.getTime())) {
-          return date.getFullYear();
-        }
-      }
-
-      // Handle valueString (could be range or single year)
-      if (attr.valueString) {
-        const match = attr.valueString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
-        if (match) {
-          return parseInt(match[1], 10); // Return first year only
-        }
-        const singleYear = parseInt(attr.valueString, 10);
-        if (!isNaN(singleYear)) return singleYear;
-      }
-
-      // Handle valueNumber (legacy support)
-      if (typeof attr.valueNumber === "number") {
-        return attr.valueNumber;
-      }
-    }
-
-    // Fallback to getAttributeValue helper
-    const añoValue = getAttributeValue(application, 'Año');
-    if (!añoValue) return null;
-
-    // If it's a range string like "1998-2024", extract the first year
-    if (typeof añoValue === "string") {
-      const match = añoValue.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
-      if (match) {
-        return parseInt(match[1], 10); // Return first year only
-      }
-      // If it's just a single year string
-      const singleYear = parseInt(añoValue, 10);
-      if (!isNaN(singleYear)) return singleYear;
-    }
-
-    // If it's a number
-    if (typeof añoValue === "number") {
-      return añoValue;
-    }
-
-    return null;
-  };
+  const extractYear = (application: Application): number | null =>
+    extractApplicationYear(application.attributeValues);
 
   const buildMotorDescripcion = (application: Application): string | null => {
     const motor = getAttributeValue(application, "Motor");
@@ -881,8 +867,9 @@ const ApplicationsCard = ({
                               {group.applications.length > 0 && (
                                 <ApplicationActionsMenu
                                   application={group.applications[0]}
+                                  deleteApplications={group.applications}
                                   onEdit={handleEditApplication}
-                                  onDelete={setDeleteTarget}
+                                  onDelete={handleDeleteApplications}
                                 />
                               )}
                             </TableCell>
@@ -939,7 +926,7 @@ const ApplicationsCard = ({
                                     <ApplicationActionsMenu
                                       application={app}
                                       onEdit={handleEditApplication}
-                                      onDelete={setDeleteTarget}
+                                      onDelete={handleDeleteApplications}
                                     />
                                   </TableCell>
                                 </TableRow>
@@ -968,9 +955,22 @@ const ApplicationsCard = ({
       <ConfirmActionDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Eliminar aplicación"
-        description="Se eliminará esta aplicación del producto."
-        consequences={["La aplicación y sus atributos asociados se eliminarán permanentemente."]}
+        title={
+          deleteTarget?.isGroupDelete
+            ? "Eliminar grupo de aplicaciones"
+            : "Eliminar aplicación"
+        }
+        description={
+          deleteTarget ? getDeleteTargetDescription(deleteTarget) : undefined
+        }
+        consequences={
+          deleteTarget?.isGroupDelete
+            ? [
+                `Se eliminarán permanentemente las ${deleteTarget.applications.length} aplicaciones de este grupo, una por cada año u origen incluido.`,
+                "Esta acción no se puede deshacer.",
+              ]
+            : ["La aplicación y sus atributos asociados se eliminarán permanentemente."]
+        }
         loading={deleteLoading}
         onConfirm={confirmDeleteApplication}
       />

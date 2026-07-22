@@ -23,6 +23,7 @@ import { useMemo, useState, useEffect } from "react";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
 import { translateAttributeName } from "@/utils/attributeTranslations";
+import { createYearDate, extractYearFromDate } from "@/utils/applicationYear";
 import { Loader2 } from "lucide-react";
 
 type AttributeFormValues = Record<string, string | number | boolean | Date | undefined>;
@@ -296,9 +297,9 @@ const EditApplicationDialog = ({
             } else if (attrValue.valueString) {
               value = attrValue.valueString;
             } else if (attrValue.valueDate) {
-              const date = new Date(attrValue.valueDate);
-              if (!isNaN(date.getTime())) {
-                value = date.getFullYear().toString();
+              const year = extractYearFromDate(attrValue.valueDate);
+              if (year !== null) {
+                value = year.toString();
               }
             }
           } else {
@@ -324,9 +325,10 @@ const EditApplicationDialog = ({
                 const date = new Date(attrValue.valueDate);
                 if (!isNaN(date.getTime())) {
                   if (attr.type === CategoryAttributesTypes.DATE) {
-                    value = date.toISOString().split('T')[0];
+                    value = date.toISOString().split("T")[0];
                   } else {
-                    value = date.getFullYear().toString();
+                    const year = extractYearFromDate(date);
+                    value = year !== null ? year.toString() : "";
                   }
                 }
               }
@@ -422,7 +424,7 @@ const EditApplicationDialog = ({
           isDateAttribute(attr)
         ) {
           if (yearValue !== undefined) {
-            attributeValue.valueDate = new Date(yearValue, 0, 1);
+            attributeValue.valueDate = createYearDate(yearValue);
           }
           return attributeValue;
         }
@@ -666,9 +668,9 @@ const EditApplicationDialog = ({
                 const num = parseInt(String(existingAttr.valueString), 10);
                 if (!isNaN(num)) attributeValue.valueNumber = num;
               } else if (existingAttr.valueDate) {
-                const date = new Date(String(existingAttr.valueDate));
-                if (!isNaN(date.getTime())) {
-                  attributeValue.valueNumber = date.getFullYear();
+                const year = extractYearFromDate(String(existingAttr.valueDate));
+                if (year !== null) {
+                  attributeValue.valueNumber = year;
                 }
               }
             } else {
