@@ -27,6 +27,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Item, Variant } from "@/models/product";
 import { Category } from "@/models/category";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
+import type { ApplicationFilterMap } from "@/utils/productApplicationFilters";
+import { buildApplicationFiltersPayload } from "@/utils/productApplicationFilters";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   DropdownMenu,
@@ -58,6 +60,7 @@ interface DataTableProps {
   searchFilter?: string;
   subcategoryId?: string | null;
   catalogVisibilityFilter?: CatalogVisibilityFilter;
+  applicationFilters?: ApplicationFilterMap;
 }
 
 const DataTable = ({
@@ -65,6 +68,7 @@ const DataTable = ({
   searchFilter,
   subcategoryId,
   catalogVisibilityFilter = "all",
+  applicationFilters = {},
 }: DataTableProps) => {
   const navigate = useNavigate();
   const [mappedData, setMappedData] = useState<Variant[]>([]);
@@ -122,6 +126,11 @@ const DataTable = ({
     return () => clearTimeout(timer);
   }, [searchFilter]);
 
+  const attributeFiltersPayload = useMemo(
+    () => buildApplicationFiltersPayload(applicationFilters),
+    [applicationFilters]
+  );
+
   // Fetch products (by category or all when no category selected)
   useEffect(() => {
     const fetchProducts = async () => {
@@ -144,6 +153,9 @@ const DataTable = ({
         if (category?.id) {
           if (subcategoryId && subcategoryId.trim()) {
             params.idSubcategory = subcategoryId.trim();
+          }
+          if (Object.keys(attributeFiltersPayload).length > 0) {
+            params.filters = JSON.stringify(attributeFiltersPayload);
           }
           response = await client.get(`/products/category/${category.id}`, {
             params,
@@ -187,11 +199,11 @@ const DataTable = ({
     };
 
     fetchProducts();
-  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, refreshKey, client]);
+  }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, attributeFiltersPayload, refreshKey, client]);
 
   useEffect(() => {
     setPage(1);
-  }, [category?.id, subcategoryId, catalogVisibilityFilter]);
+  }, [category?.id, subcategoryId, catalogVisibilityFilter, attributeFiltersPayload]);
 
   const getProductIdFromRow = (row: Variant & { _originalItem?: Item | null }) =>
     row._originalItem?.id || row.idProduct || row.id;

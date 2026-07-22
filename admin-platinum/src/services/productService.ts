@@ -146,6 +146,7 @@ export const productService = {
       search?: string;
       idSubcategory?: string;
       catalogVisibility?: CatalogVisibilityFilter;
+      filters?: Record<string, string | string[]>;
     }
   ): Promise<CategoryProductsResponse> => {
     const client = axiosClient();
@@ -159,10 +160,33 @@ export const productService = {
     if (options?.catalogVisibility && options.catalogVisibility !== "all") {
       params.catalogVisibility = options.catalogVisibility;
     }
+    if (options?.filters && Object.keys(options.filters).length > 0) {
+      params.filters = JSON.stringify(options.filters);
+    }
 
     const response = await client.get<CategoryProductsResponse>(
       `/products/category/${categoryId}`,
       { params, timeout: LIST_REQUEST_TIMEOUT_MS }
+    );
+    return response.data;
+  },
+
+  getCategoryFilterOptions: async (
+    categoryId: string,
+    filters?: Record<string, string | string[]>,
+    options?: { flat?: boolean; signal?: AbortSignal }
+  ): Promise<Record<string, string[]>> => {
+    const client = axiosClient();
+    const params: Record<string, string> = {};
+    if (filters && Object.keys(filters).length > 0) {
+      params.filters = JSON.stringify(filters);
+    }
+    if (options?.flat) {
+      params.flat = "true";
+    }
+    const response = await client.get<Record<string, string[]>>(
+      `/products/category/${categoryId}/filters`,
+      { params, signal: options?.signal, timeout: LIST_REQUEST_TIMEOUT_MS }
     );
     return response.data;
   },
