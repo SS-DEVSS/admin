@@ -128,7 +128,7 @@ const DynamicComponent = ({ type, name, required, value, onChange }: getComponen
         if (value >= 1900 && value <= 2100) {
           yearValue = value.toString();
         } else {
-          const year = extractYearFromDate(value);
+          const year = extractYearFromDate(String(value));
           if (year !== null) {
             yearValue = year.toString();
           }

@@ -330,7 +330,9 @@ const Products = () => {
     return () => {
       cancelled = true;
     };
-  }, [category?.id, getCategoryById]);
+    // getCategoryById is stable via useCallback in CategoryContext
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category?.id]);
 
   const getSelectedFilterLabel = () => {
     if (!category) return "Todas las categorías";

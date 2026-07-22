@@ -8,6 +8,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -54,7 +55,7 @@ export const CategoryContextProvider = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [, setErrorMsg] = useState("");
 
   const categoriesRef = useRef<Category[]>([]);
   const inflightRef = useRef<Promise<Category[]> | null>(null);
@@ -120,141 +121,198 @@ export const CategoryContextProvider = ({
     }
   }, [authState.isAuthenticated, authState.loading, getCategories]);
 
-  const getCategoryById = async (id: CategoryRespone["id"]) => {
-    try {
-      const { data } = await client.get(
-        `/categories/${id}?attributes=true&products=true`
-      );
-      setCategory(data);
-      return data;
-    } catch (error: unknown) {
-      setCategory(null);
-      const message =
-        error &&
-        typeof error === "object" &&
-        "response" in error &&
-        error.response &&
-        typeof error.response === "object" &&
-        "data" in error.response &&
-        error.response.data &&
-        typeof error.response.data === "object" &&
-        "error" in error.response.data
-          ? String((error.response.data as { error?: string }).error)
-          : "No se pudo cargar la categoría";
-      toast({
-        title: "Error al cargar categoría",
-        variant: "destructive",
-        description: message,
-      });
-      return undefined;
-    }
-  };
+  const getCategoryById = useCallback(
+    async (id: CategoryRespone["id"]) => {
+      try {
+        const { data } = await client.get(
+          `/categories/${id}?attributes=true&products=true`
+        );
+        setCategory((current) => (current?.id === data.id ? current : data));
+        return data;
+      } catch (error: unknown) {
+        setCategory((current) => (current?.id === id ? null : current));
+        const message =
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "error" in error.response.data
+            ? String((error.response.data as { error?: string }).error)
+            : "No se pudo cargar la categoría";
+        toast({
+          title: "Error al cargar categoría",
+          variant: "destructive",
+          description: message,
+        });
+        return undefined;
+      }
+    },
+    [client]
+  );
 
-  const deleteCategory = async (id: Category["id"]) => {
-    try {
-      setLoading(true);
-      const response = await client.delete(`/categories/${id}`);
-      toast({
-        title: "Categoría eliminada correctamente.",
-        variant: "success",
-        description: response.data.message,
-      });
-      await getCategories(true);
-    } catch (error: any) {
-      setErrorMsg(error.response.data.error);
-      toast({
-        title: "Error al eliminar categoría",
-        variant: "destructive",
-        description: errorMsg,
-      });
-    } finally {
-      setLoading(false);
-      setErrorMsg("");
-    }
-  };
+  const deleteCategory = useCallback(
+    async (id: Category["id"]) => {
+      try {
+        setLoading(true);
+        const response = await client.delete(`/categories/${id}`);
+        toast({
+          title: "Categoría eliminada correctamente.",
+          variant: "success",
+          description: response.data.message,
+        });
+        await getCategories(true);
+      } catch (error: unknown) {
+        const message =
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "error" in error.response.data
+            ? String((error.response.data as { error?: string }).error)
+            : "Error al eliminar categoría";
+        toast({
+          title: "Error al eliminar categoría",
+          variant: "destructive",
+          description: message,
+        });
+      } finally {
+        setLoading(false);
+        setErrorMsg("");
+      }
+    },
+    [client, getCategories]
+  );
 
-  const addCategory = async (
-    category: Omit<Category, "id">
-  ): Promise<CategoryRespone | null> => {
-    try {
-      const headers = {
-        "Content-Type": "application/json",
-      };
-      setLoading(true);
-      const response = await client.post<CategoryRespone>(
-        "/categories",
-        category,
-        { headers }
-      );
-      toast({
-        title: "Categoría agregada correctamente.",
-        variant: "success",
-        description: response.data.message,
-      });
-      await getCategories(true);
-      return response.data;
-    } catch (error: any) {
-      toast({
-        title: "Error al crear categoría",
-        variant: "destructive",
-        description: error.response.data.error,
-      });
-      return null;
-    } finally {
-      setLoading(false);
-      setErrorMsg("");
-    }
-  };
+  const addCategory = useCallback(
+    async (category: Omit<Category, "id">): Promise<CategoryRespone | null> => {
+      try {
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        setLoading(true);
+        const response = await client.post<CategoryRespone>(
+          "/categories",
+          category,
+          { headers }
+        );
+        toast({
+          title: "Categoría agregada correctamente.",
+          variant: "success",
+          description: response.data.message,
+        });
+        await getCategories(true);
+        return response.data;
+      } catch (error: unknown) {
+        const message =
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "error" in error.response.data
+            ? String((error.response.data as { error?: string }).error)
+            : "Error al crear categoría";
+        toast({
+          title: "Error al crear categoría",
+          variant: "destructive",
+          description: message,
+        });
+        return null;
+      } finally {
+        setLoading(false);
+        setErrorMsg("");
+      }
+    },
+    [client, getCategories]
+  );
 
-  const updateCategory = async (category: Category): Promise<CategoryRespone | null> => {
-    try {
-      const headers = {
-        "Content-Type": "application/json",
-      };
-      setLoading(true);
-      const response = await client.patch<CategoryRespone>(
-        `/categories/${category.id}`,
-        category,
-        {
-          headers,
-        }
-      );
-      toast({
-        title: "Categoría actualizada correctamente.",
-        variant: "success",
-        description: response.data.message || "La categoría se actualizó exitosamente.",
-      });
-      await getCategories(true);
-      return response.data;
-    } catch (error: any) {
-      setErrorMsg(error.response?.data?.error || "Error al actualizar la categoría");
-      toast({
-        title: "Error al actualizar categoría",
-        variant: "destructive",
-        description: errorMsg,
-      });
-      return null;
-    } finally {
-      setLoading(false);
-      setErrorMsg("");
-    }
-  };
+  const updateCategory = useCallback(
+    async (category: Category): Promise<CategoryRespone | null> => {
+      try {
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        setLoading(true);
+        const response = await client.patch<CategoryRespone>(
+          `/categories/${category.id}`,
+          category,
+          {
+            headers,
+          }
+        );
+        toast({
+          title: "Categoría actualizada correctamente.",
+          variant: "success",
+          description: response.data.message || "La categoría se actualizó exitosamente.",
+        });
+        await getCategories(true);
+        return response.data;
+      } catch (error: unknown) {
+        const message =
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          error.response &&
+          typeof error.response === "object" &&
+          "data" in error.response &&
+          error.response.data &&
+          typeof error.response.data === "object" &&
+          "error" in error.response.data
+            ? String((error.response.data as { error?: string }).error)
+            : "Error al actualizar la categoría";
+        toast({
+          title: "Error al actualizar categoría",
+          variant: "destructive",
+          description: message,
+        });
+        return null;
+      } finally {
+        setLoading(false);
+        setErrorMsg("");
+      }
+    },
+    [client, getCategories]
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      loading,
+      selectedCategory,
+      setSelectedCategory,
+      category,
+      categories,
+      getCategoryById,
+      getCategories,
+      addCategory,
+      updateCategory,
+      deleteCategory,
+    }),
+    [
+      loading,
+      selectedCategory,
+      category,
+      categories,
+      getCategoryById,
+      getCategories,
+      addCategory,
+      updateCategory,
+      deleteCategory,
+    ]
+  );
 
   return (
-    <CategoryContext.Provider
-      value={{
-        loading,
-        selectedCategory,
-        setSelectedCategory,
-        category,
-        categories,
-        getCategoryById,
-        getCategories,
-        addCategory,
-        updateCategory,
-        deleteCategory,
-      }}
-    >
+    <CategoryContext.Provider value={contextValue}>
       {children}
     </CategoryContext.Provider>
   );

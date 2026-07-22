@@ -9,7 +9,6 @@ import { Product } from "@/models/product";
 import { Application } from "@/models/application";
 import { PlusCircle, Pencil, ChevronDown, ChevronUp, Trash2, MoreVertical, Info } from "lucide-react";
 import ConfirmActionDialog from "@/components/ConfirmActionDialog";
-import { toast } from "@/hooks/use-toast";
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import NoData from "../NoData";
