@@ -15,6 +15,7 @@ import { CategoryResponse } from "@/models/category";
 import { productService } from "@/services/productService";
 import {
   ApplicationFilterMap,
+  buildApplicationFiltersPayload,
   countActiveApplicationFilters,
   getApplicationAttributesFromCategory,
   sanitizeApplicationFilters,
@@ -34,6 +35,8 @@ type ProductApplicationFiltersSheetProps = {
   disabled?: boolean;
 };
 
+const FILTER_OPTIONS_DEBOUNCE_MS = 300;
+
 const ProductApplicationFiltersSheet = ({
   categoryId,
   categoryDetails,
@@ -43,7 +46,7 @@ const ProductApplicationFiltersSheet = ({
 }: ProductApplicationFiltersSheetProps) => {
   const [open, setOpen] = useState(false);
   const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>(
-    () => (categoryId ? getCachedFilterOptions(categoryId, { flat: true }) : null) ?? {}
+    {}
   );
   const [loadingOptions, setLoadingOptions] = useState(false);
 
@@ -52,14 +55,39 @@ const ProductApplicationFiltersSheet = ({
     [categoryDetails]
   );
 
+  const filtersPayload = useMemo(
+    () => buildApplicationFiltersPayload(filters),
+    [filters]
+  );
+
+  const [debouncedFiltersPayload, setDebouncedFiltersPayload] = useState(
+    filtersPayload
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedFiltersPayload(filtersPayload);
+    }, FILTER_OPTIONS_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [filtersPayload]);
+
   const activeCount = countActiveApplicationFilters(filters);
   const hasAttributes = applicationAttributes.length > 0;
+
+  const cacheQuery = useMemo(() => {
+    const hasActiveFilters = Object.keys(debouncedFiltersPayload).length > 0;
+    return {
+      flat: true as const,
+      filters: hasActiveFilters ? debouncedFiltersPayload : undefined,
+    };
+  }, [debouncedFiltersPayload]);
 
   const loadFilterOptions = useCallback(
     async (force = false) => {
       if (!categoryId || !hasAttributes) return;
 
-      const cached = getCachedFilterOptions(categoryId, { flat: true });
+      const cached = getCachedFilterOptions(categoryId, cacheQuery);
       if (cached && !force) {
         setFilterOptions(cached);
         return;
@@ -67,12 +95,13 @@ const ProductApplicationFiltersSheet = ({
 
       setLoadingOptions(true);
       try {
+        const hasActiveFilters = Object.keys(debouncedFiltersPayload).length > 0;
         const options = await productService.getCategoryFilterOptions(
           categoryId,
-          undefined,
+          hasActiveFilters ? debouncedFiltersPayload : undefined,
           { flat: true }
         );
-        setCachedFilterOptions(categoryId, options, { flat: true });
+        setCachedFilterOptions(categoryId, options, cacheQuery);
         setFilterOptions(options);
       } catch {
         if (!cached) {
@@ -82,7 +111,7 @@ const ProductApplicationFiltersSheet = ({
         setLoadingOptions(false);
       }
     },
-    [categoryId, hasAttributes]
+    [categoryId, hasAttributes, debouncedFiltersPayload, cacheQuery]
   );
 
   const mergedFilterOptions = useMemo(() => {
@@ -97,12 +126,6 @@ const ProductApplicationFiltersSheet = ({
   useEffect(() => {
     if (!categoryId) {
       setFilterOptions({});
-      return;
-    }
-
-    const cached = getCachedFilterOptions(categoryId, { flat: true });
-    if (cached) {
-      setFilterOptions(cached);
       return;
     }
 
