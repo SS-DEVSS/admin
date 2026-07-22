@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Layout from "@/components/Layouts/Layout";
 import { Button } from "@/components/ui/button";
 import { detailsType, stateSkeleton, useFormState } from "@/hooks/useFormProduct";
@@ -14,6 +14,7 @@ import { resolveProductNameForSave } from "@/utils/adminFieldVisibility";
 import { invalidateProductListCache } from "@/utils/productListCache";
 import Loader from "@/components/Loader";
 import { Reference } from "@/models/reference";
+import { Application } from "@/models/application";
 import { persistNewReferences } from "@/services/referenceService";
 
 function normalizeAttributeValue(value: unknown): unknown {
@@ -99,6 +100,12 @@ const NewProduct = () => {
     references: [],
   });
   const [formResetKey, setFormResetKey] = useState(0);
+
+  const handleApplicationsChange = useCallback((applications: Application[]) => {
+    setCurrentProduct((prev: { applications?: Application[] } | null) =>
+      prev ? { ...prev, applications } : prev,
+    );
+  }, []);
 
   const {
     detailsState,
@@ -802,6 +809,7 @@ const NewProduct = () => {
             attributesState={attributesState}
             setAttributesState={setAttributesState}
             setCanContinue={setCanContinue}
+            onApplicationsChange={handleApplicationsChange}
           />
           {isEditMode && (
             <>

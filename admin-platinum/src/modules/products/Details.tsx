@@ -30,6 +30,7 @@ type DetailsInterface = {
   attributesState?: any;
   setAttributesState?: React.Dispatch<React.SetStateAction<any>>;
   setCanContinue?: React.Dispatch<React.SetStateAction<boolean>>;
+  onApplicationsChange?: (applications: Application[]) => void;
 };
 
 const Details = ({
@@ -43,6 +44,7 @@ const Details = ({
   attributesState,
   setAttributesState,
   setCanContinue,
+  onApplicationsChange,
 }: DetailsInterface) => {
   const isEditMode = !!product;
 
@@ -77,6 +79,7 @@ const Details = ({
             state={applicationsState}
             setState={setApplicationsState}
             product={product}
+            onApplicationsChange={onApplicationsChange}
           />
         ) : (
           <Card>
