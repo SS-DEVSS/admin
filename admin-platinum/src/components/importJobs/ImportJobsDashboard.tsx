@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useImportJobs } from "@/hooks/useImportJobs";
 import { ImportJob, ImportJobError, ImportJobType, ImportJobStatus } from "@/models/importJob";
 import { useCategoryContext } from "@/context/categories-context";
@@ -29,6 +30,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import BulkImageMatchPreview from "@/components/products/BulkImageMatchPreview";
 import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, RefreshCw, Ban, AlertTriangle, StopCircle, SlidersHorizontal } from "lucide-react";
 import {
   Tooltip,
@@ -248,10 +250,11 @@ const getStatusBadge = (
 };
 
 const getTypeLabel = (type: ImportJobType) => {
-  const labels = {
+  const labels: Record<ImportJobType, string> = {
     products: "Productos",
     references: "Referencias",
     applications: "Aplicaciones",
+    bulk_images: "Imágenes por SKU",
   };
   return labels[type];
 };
@@ -295,6 +298,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
     return m;
   }, [categories]);
 
+  const [searchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = useState<ImportJobType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<ImportJobStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -303,6 +307,18 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
   const [stopTarget, setStopTarget] = useState<ImportJob | null>(null);
   const [stopBusy, setStopBusy] = useState(false);
   const limit = 10;
+
+  useEffect(() => {
+    const typeParam = searchParams.get("type");
+    if (
+      typeParam === "products" ||
+      typeParam === "references" ||
+      typeParam === "applications" ||
+      typeParam === "bulk_images"
+    ) {
+      setTypeFilter(typeParam);
+    }
+  }, [searchParams]);
 
   const { jobs, loading, error, pagination, stopImportJob } = useImportJobs({
     type: typeFilter !== "all" ? typeFilter : undefined,
@@ -331,6 +347,16 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
   };
 
   const selectedJobData = jobs.find((j) => j.id === selectedJob);
+
+  const selectedBulkImageRows = useMemo(() => {
+    if (!selectedJobData || selectedJobData.type !== "bulk_images" || !selectedJobData.result) {
+      return [];
+    }
+    const result = selectedJobData.result as {
+      bulkImageRows?: Array<{ status: string; sku: string; file: string; reason?: string }>;
+    };
+    return result.bulkImageRows ?? [];
+  }, [selectedJobData]);
 
   const selectedJobErrors = useMemo(
     () => (selectedJobData ? collectErrorsFromJob(selectedJobData) : []),
@@ -394,6 +420,7 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
         <SelectItem value="products">Productos</SelectItem>
         <SelectItem value="references">Referencias</SelectItem>
         <SelectItem value="applications">Aplicaciones</SelectItem>
+        <SelectItem value="bulk_images">Imágenes por SKU</SelectItem>
       </SelectContent>
     </Select>
   );
@@ -539,19 +566,36 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                           <div className="text-sm space-y-1">
                             {job.status === "completed" && (
                               <>
-                                <div className="flex items-center gap-1.5 text-green-600">
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  Creados: {job.created}
-                                </div>
-                                <div className="flex items-center gap-1.5 text-blue-600">
-                                  <RefreshCw className="h-3.5 w-3.5" />
-                                  Actualizados: {job.updated}
-                                </div>
-                                {job.skipped > 0 && (
-                                  <div className="flex items-center gap-1.5 text-yellow-600">
-                                    <Ban className="h-3.5 w-3.5" />
-                                    Omitidos: {job.skipped}
-                                  </div>
+                                {job.type === "bulk_images" ? (
+                                  <>
+                                    <div className="flex items-center gap-1.5 text-green-600">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      Subidas: {job.created}
+                                    </div>
+                                    {job.skipped > 0 && (
+                                      <div className="flex items-center gap-1.5 text-yellow-600">
+                                        <Ban className="h-3.5 w-3.5" />
+                                        Omitidas: {job.skipped}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-1.5 text-green-600">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      Creados: {job.created}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-blue-600">
+                                      <RefreshCw className="h-3.5 w-3.5" />
+                                      Actualizados: {job.updated}
+                                    </div>
+                                    {job.skipped > 0 && (
+                                      <div className="flex items-center gap-1.5 text-yellow-600">
+                                        <Ban className="h-3.5 w-3.5" />
+                                        Omitidos: {job.skipped}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </>
                             )}
@@ -762,7 +806,9 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                 </label>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Total de filas: </span>
+                    <span className="text-muted-foreground">
+                      {selectedJobData.type === "bulk_images" ? "Total de imágenes: " : "Total de filas: "}
+                    </span>
                     <span className="font-medium">{selectedJobData.totalRows}</span>
                   </div>
                   <div>
@@ -770,13 +816,17 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                     <span className="font-medium">{selectedJobData.processedRows}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Creadas: </span>
+                    <span className="text-muted-foreground">
+                      {selectedJobData.type === "bulk_images" ? "Subidas: " : "Creadas: "}
+                    </span>
                     <span className="font-medium text-green-600">{selectedJobData.created}</span>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Actualizadas: </span>
-                    <span className="font-medium text-blue-600">{selectedJobData.updated}</span>
-                  </div>
+                  {selectedJobData.type !== "bulk_images" && (
+                    <div>
+                      <span className="text-muted-foreground">Actualizadas: </span>
+                      <span className="font-medium text-blue-600">{selectedJobData.updated}</span>
+                    </div>
+                  )}
                   {selectedJobData.skipped > 0 && (
                     <div>
                       <span className="text-muted-foreground">Omitidas: </span>
@@ -791,6 +841,20 @@ const ImportJobsDashboard = ({ onJobClick, headerActions }: ImportJobsDashboardP
                   )}
                 </div>
               </div>
+
+              {selectedBulkImageRows.length > 0 && (
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    Detalle por imagen
+                  </label>
+                  <BulkImageMatchPreview
+                    total={selectedJobData.totalRows}
+                    matched={selectedJobData.created}
+                    skipped={selectedJobData.skipped}
+                    rows={selectedBulkImageRows}
+                  />
+                </div>
+              )}
 
               {selectedJobErrors.length > 0 && (
                 <div className="border-t pt-4">

@@ -1,4 +1,4 @@
-export type ImportJobType = 'products' | 'references' | 'applications';
+export type ImportJobType = 'products' | 'references' | 'applications' | 'bulk_images';
 export type ImportJobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'stopped';
 
 export interface ImportJobEta {

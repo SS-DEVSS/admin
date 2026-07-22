@@ -214,13 +214,26 @@ export const productService = {
     return response.data;
   },
 
-  uploadBulkImages: async (files: File[]) => {
+  uploadBulkImages: async (
+    files: File[],
+    onUploadProgress?: (percent: number) => void
+  ): Promise<{
+    jobId: string;
+    status: string;
+    message: string;
+    progress: number;
+  }> => {
     const client = axiosClient();
     const formData = new FormData();
     files.forEach((file) => formData.append("images", file));
     const response = await client.post("/products/bulk/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
-      timeout: LIST_REQUEST_TIMEOUT_MS,
+      timeout: 120000,
+      validateStatus: (status) => status === 202 || (status >= 200 && status < 300),
+      onUploadProgress: (event) => {
+        if (!onUploadProgress || !event.total) return;
+        onUploadProgress(Math.round((event.loaded * 100) / event.total));
+      },
     });
     return response.data;
   },
