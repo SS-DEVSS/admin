@@ -156,10 +156,8 @@ const ApplicationsCard = ({
   // Always use table view - list view removed
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<ApplicationDeleteTarget | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   const allApplicationIds = useMemo(
     () => getApplicationIds(state.applications),
@@ -205,6 +203,28 @@ const ApplicationsCard = ({
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const removeApplicationsLocally = useCallback(
+    (applications: Application[]) => {
+      const idsToRemove = new Set(getApplicationIds(applications));
+      if (idsToRemove.size === 0) return;
+
+      setState((prev) => {
+        const nextApplications = prev.applications.filter(
+          (application) => !application.id || !idsToRemove.has(application.id),
+        );
+        onApplicationsChange?.(nextApplications);
+        return { applications: nextApplications };
+      });
+
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        idsToRemove.forEach((applicationId) => next.delete(applicationId));
+        return next;
+      });
+    },
+    [setState, onApplicationsChange],
+  );
 
   // Get category attributes (only application attributes)
   const categoryAttributes = useMemo(() => {
@@ -395,9 +415,15 @@ const ApplicationsCard = ({
 
   const handleDeleteApplications = (applications: Application[]) => {
     if (applications.length === 0) return;
+
+    if (applications.length === 1) {
+      removeApplicationsLocally(applications);
+      return;
+    }
+
     setDeleteTarget({
       applications,
-      isGroupDelete: applications.length > 1,
+      isGroupDelete: true,
     });
   };
 
@@ -422,88 +448,22 @@ const ApplicationsCard = ({
     return `Se eliminarán ${target.applications.length} aplicaciones agrupadas${yearText}.`;
   };
 
-  const confirmDeleteApplication = async () => {
-    const applicationIds = (deleteTarget?.applications ?? [])
-      .map((application) => application.id)
-      .filter((id): id is string => Boolean(id));
-
-    if (applicationIds.length === 0) return;
-
-    setDeleteLoading(true);
-    try {
-      if (applicationIds.length === 1) {
-        await axiosClient().delete(`/applications/${applicationIds[0]}`);
-      } else {
-        await axiosClient().delete("/applications/bulk", {
-          data: { applicationIds },
-        });
-      }
-
-      setState((prev) => ({
-        applications: prev.applications.filter(
-          (application) => !application.id || !applicationIds.includes(application.id),
-        ),
-      }));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        applicationIds.forEach((id) => next.delete(id));
-        return next;
-      });
-      await refreshApplicationsFromBackend();
-
-      toast({
-        title: deleteTarget?.isGroupDelete ? "Grupo eliminado" : "Aplicación eliminada",
-        variant: "success",
-        description: deleteTarget?.isGroupDelete
-          ? `Se eliminaron ${applicationIds.length} aplicación(es) del grupo.`
-          : undefined,
-      });
-      setDeleteTarget(null);
-    } catch (error: unknown) {
-      const msg =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Error al eliminar aplicación";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setDeleteLoading(false);
-    }
+  const confirmDeleteApplication = () => {
+    if (!deleteTarget) return;
+    removeApplicationsLocally(deleteTarget.applications);
+    setDeleteTarget(null);
   };
 
-  const confirmBulkDeleteApplications = async () => {
+  const confirmBulkDeleteApplications = () => {
     const applicationIds = Array.from(selectedIds);
     if (applicationIds.length === 0) return;
 
-    setBulkDeleteLoading(true);
-    try {
-      const response = await axiosClient().delete("/applications/bulk", {
-        data: { applicationIds },
-      });
-      clearSelection();
-      setBulkDeleteOpen(false);
-      await refreshApplicationsFromBackend();
-
-      const deletedCount = response.data?.deletedCount ?? applicationIds.length;
-      toast({
-        title: "Aplicaciones eliminadas",
-        variant: "success",
-        description: `Se eliminaron ${deletedCount} aplicación(es).`,
-      });
-
-      if (response.data?.errors?.length) {
-        toast({
-          title: "Algunas aplicaciones no se eliminaron",
-          description: response.data.errors.join(" "),
-          variant: "destructive",
-        });
-      }
-    } catch (error: unknown) {
-      const msg =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Error al eliminar aplicaciones";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setBulkDeleteLoading(false);
-    }
+    const applicationsToRemove = state.applications.filter(
+      (application) => application.id && applicationIds.includes(application.id),
+    );
+    removeApplicationsLocally(applicationsToRemove);
+    clearSelection();
+    setBulkDeleteOpen(false);
   };
 
   // Hydrate once per product from parent payload; avoid overwriting after local deletes/edits
@@ -955,23 +915,15 @@ const ApplicationsCard = ({
       <ConfirmActionDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={
-          deleteTarget?.isGroupDelete
-            ? "Eliminar grupo de aplicaciones"
-            : "Eliminar aplicación"
-        }
+        title="Eliminar grupo de aplicaciones"
         description={
           deleteTarget ? getDeleteTargetDescription(deleteTarget) : undefined
         }
-        consequences={
-          deleteTarget?.isGroupDelete
-            ? [
-                `Se eliminarán permanentemente las ${deleteTarget.applications.length} aplicaciones de este grupo, una por cada año u origen incluido.`,
-                "Esta acción no se puede deshacer.",
-              ]
-            : ["La aplicación y sus atributos asociados se eliminarán permanentemente."]
-        }
-        loading={deleteLoading}
+        consequences={[
+          deleteTarget
+            ? `Se quitarán ${deleteTarget.applications.length} aplicaciones del listado. Los cambios se aplicarán al guardar el producto.`
+            : "Los cambios se aplicarán al guardar el producto.",
+        ]}
         onConfirm={confirmDeleteApplication}
       />
 
@@ -979,12 +931,10 @@ const ApplicationsCard = ({
         open={bulkDeleteOpen}
         onOpenChange={setBulkDeleteOpen}
         title="Eliminar aplicaciones seleccionadas"
-        description={`Se eliminarán ${selectedIds.size} aplicación(es) de forma permanente.`}
+        description={`Se quitarán ${selectedIds.size} aplicación(es) del listado.`}
         consequences={[
-          "Las aplicaciones y sus atributos asociados se eliminarán del producto.",
-          "Esta acción no se puede deshacer.",
+          "Las aplicaciones seleccionadas se eliminarán al guardar el producto.",
         ]}
-        loading={bulkDeleteLoading}
         onConfirm={confirmBulkDeleteApplications}
       />
     </Card>

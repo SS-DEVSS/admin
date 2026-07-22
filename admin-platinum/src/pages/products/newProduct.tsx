@@ -16,6 +16,7 @@ import Loader from "@/components/Loader";
 import { Reference } from "@/models/reference";
 import { Application } from "@/models/application";
 import { persistNewReferences } from "@/services/referenceService";
+import axiosClient from "@/services/axiosInstance";
 
 function normalizeAttributeValue(value: unknown): unknown {
   if (value === undefined || value === null || value === "") return null;
@@ -26,6 +27,7 @@ function buildFormSnapshot(
   details: detailsType,
   attributes: Record<string, unknown>,
   references: Reference[],
+  applications: Application[] = [],
 ): string {
   const categoryId =
     typeof details.category === "string"
@@ -46,6 +48,11 @@ function buildFormSnapshot(
     )
     .sort();
 
+  const applicationIds = applications
+    .map((application) => application.id ?? "")
+    .filter(Boolean)
+    .sort();
+
   return JSON.stringify({
     details: {
       sku: details.sku.trim(),
@@ -57,6 +64,7 @@ function buildFormSnapshot(
     },
     attributes: normalizedAttributes,
     referenceKeys,
+    applicationIds,
   });
 }
 
@@ -64,6 +72,7 @@ type InitialFormData = {
   details: detailsType;
   attributes: Record<string, unknown>;
   references: Reference[];
+  applications: Application[];
 };
 
 function cloneInitialFormData(data: InitialFormData): InitialFormData {
@@ -75,6 +84,7 @@ function cloneInitialFormData(data: InitialFormData): InitialFormData {
     },
     attributes: { ...data.attributes },
     references: data.references.map((reference) => ({ ...reference })),
+    applications: data.applications.map((application) => ({ ...application })),
   };
 }
 
@@ -92,12 +102,13 @@ const NewProduct = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const savingStartTimeRef = useRef<number | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(() =>
-    id ? null : buildFormSnapshot(stateSkeleton, {}, []),
+    id ? null : buildFormSnapshot(stateSkeleton, {}, [], []),
   );
   const initialFormDataRef = useRef<InitialFormData>({
     details: { ...stateSkeleton },
     attributes: {},
     references: [],
+    applications: [],
   });
   const [formResetKey, setFormResetKey] = useState(0);
   const loadedProductIdRef = useRef<string | null>(null);
@@ -253,12 +264,13 @@ const NewProduct = () => {
           }
 
           setInitialSnapshot(
-            buildFormSnapshot(loadedDetails, attrs, loadedReferences),
+            buildFormSnapshot(loadedDetails, attrs, loadedReferences, []),
           );
           initialFormDataRef.current = cloneInitialFormData({
             details: loadedDetails,
             attributes: attrs,
             references: loadedReferences,
+            applications: [],
           });
 
           // 4. Populate Applications (only on initial load for this product)
@@ -425,6 +437,20 @@ const NewProduct = () => {
             );
 
             setApplicationsState({ applications: formattedApplications });
+            initialFormDataRef.current = cloneInitialFormData({
+              ...initialFormDataRef.current,
+              applications: formattedApplications,
+            });
+            setInitialSnapshot(
+              buildFormSnapshot(
+                initialFormDataRef.current.details,
+                initialFormDataRef.current.attributes,
+                initialFormDataRef.current.references,
+                formattedApplications,
+              ),
+            );
+          } else {
+            setApplicationsState({ applications: [] });
           }
           loadedProductIdRef.current = id;
           }
@@ -445,15 +471,17 @@ const NewProduct = () => {
         detailsState,
         attributesState,
         referencesState.references,
+        applicationsState.applications,
       ) !== initialSnapshot
     );
-  }, [initialSnapshot, detailsState, attributesState, referencesState]);
+  }, [initialSnapshot, detailsState, attributesState, referencesState, applicationsState.applications]);
 
   const handleDiscard = () => {
     const initial = cloneInitialFormData(initialFormDataRef.current);
     setDetailsState(initial.details);
     setAttributesState(initial.attributes);
     setReferencesState({ references: initial.references });
+    setApplicationsState({ applications: initial.applications });
     setFormResetKey((key) => key + 1);
   };
 
@@ -668,6 +696,26 @@ const NewProduct = () => {
         }
 
         await updateProduct(id, productPayload);
+
+        const existingApplicationIds = (existingProduct?.applications ?? [])
+          .map((application: { id?: string }) => application.id)
+          .filter((applicationId: string | undefined): applicationId is string =>
+            Boolean(applicationId),
+          );
+        const currentApplicationIds = applicationsState.applications
+          .map((application) => application.id)
+          .filter((applicationId): applicationId is string => Boolean(applicationId));
+        const applicationIdsToDelete = existingApplicationIds.filter(
+          (applicationId: string) => !currentApplicationIds.includes(applicationId),
+        );
+
+        if (applicationIdsToDelete.length === 1) {
+          await axiosClient().delete(`/applications/${applicationIdsToDelete[0]}`);
+        } else if (applicationIdsToDelete.length > 1) {
+          await axiosClient().delete("/applications/bulk", {
+            data: { applicationIds: applicationIdsToDelete },
+          });
+        }
 
         toast({
           title: "Producto actualizado",

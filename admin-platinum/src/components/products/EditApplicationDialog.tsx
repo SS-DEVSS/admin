@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Application } from "@/models/application";
 import { CategoryAtributes, CategoryAttributesTypes } from "@/models/category";
 import DynamicComponent from "@/components/DynamicComponent";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
 import { translateAttributeName } from "@/utils/attributeTranslations";
@@ -232,15 +232,31 @@ const EditApplicationDialog = ({
   });
 
   const [yearFields, setYearFields] = useState<Record<string, YearFieldState>>({});
+  const wasOpenRef = useRef(false);
 
-  // Update form data when application changes
+  const resetCreateForm = () => {
+    setFormData({
+      origin: "Nueva aplicación",
+      attributeValues: {},
+    });
+    setYearFields({});
+  };
+
+  // Reset or hydrate form when the dialog opens or the target application changes
   useEffect(() => {
+    if (!open) {
+      setIsSaving(false);
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const didJustOpen = !wasOpenRef.current;
+    wasOpenRef.current = true;
+
     if (!application) {
-      setFormData({
-        origin: "Nueva aplicación",
-        attributeValues: {},
-      });
-      setYearFields({});
+      if (didJustOpen) {
+        resetCreateForm();
+      }
       return;
     }
 
@@ -366,13 +382,7 @@ const EditApplicationDialog = ({
       attributeValues: attributeValuesObj,
     });
     setYearFields(newYearFields);
-  }, [application, applicationAttributes, yearRangeDateAttribute?.id]);
-
-  useEffect(() => {
-    if (!open) {
-      setIsSaving(false);
-    }
-  }, [open]);
+  }, [open, application, applicationAttributes, yearRangeDateAttribute?.id]);
 
   const validateRequiredFields = (): string | null => {
     for (const attr of applicationAttributes) {
