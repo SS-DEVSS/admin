@@ -47,13 +47,13 @@ export const useBrands = () => {
       await client.delete(`/brands/${id}`);
       await getBrands();
       toast({
-        title: "Marca eliminada correctamente.",
+        title: "Línea de producto eliminada correctamente.",
         variant: "success",
       });
     } catch (error: any) {
       setErrorMsg(error.response?.data?.error || "Error inesperado.");
       toast({
-        title: "Error al eliminar marca",
+        title: "Error al eliminar línea de producto",
         variant: "destructive",
         description: errorMsg,
       });
@@ -71,7 +71,7 @@ export const useBrands = () => {
       setLoading(true);
       const response = await client.post("/brands/", brand, { headers });
       toast({
-        title: "Marca creada correctamente.",
+        title: "Línea de producto creada correctamente.",
         variant: "success",
         description: response.data.message,
       });
@@ -79,7 +79,7 @@ export const useBrands = () => {
     } catch (error: any) {
       setErrorMsg(error.response.data.error);
       toast({
-        title: "Error al eliminar marca",
+        title: "Error al crear línea de producto",
         variant: "destructive",
         description: errorMsg,
       });
@@ -99,7 +99,7 @@ export const useBrands = () => {
         headers,
       });
       toast({
-        title: "Marca actualizada correctamente.",
+        title: "Línea de producto actualizada correctamente.",
         variant: "success",
         description: response.data.message,
       });
@@ -107,7 +107,7 @@ export const useBrands = () => {
     } catch (error: any) {
       setErrorMsg(error.response.data.error);
       toast({
-        title: "Error al actualizar marca",
+        title: "Error al actualizar línea de producto",
         variant: "destructive",
         description: errorMsg,
       });

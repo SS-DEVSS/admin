@@ -46,7 +46,7 @@ const NewBlog = () => {
   const missingFields = [
     !title.trim() && "título",
     !hasDescriptionContent && "descripción",
-    !hasMainContent && "contenido del blog",
+    !hasMainContent && "contenido de la noticia",
     !hasCoverImage && "imagen de portada",
   ].filter(Boolean) as string[];
 
@@ -94,7 +94,7 @@ const NewBlog = () => {
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-2xl font-semibold leading-none tracking-tight">Nuevo blog</h1>
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">Nueva noticia</h1>
         </header>
         <div className="space-y-6">
             <div className="space-y-2">
@@ -105,7 +105,7 @@ const NewBlog = () => {
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título del blog"
+                placeholder="Título de la noticia"
                 maxLength={255}
               />
             </div>
@@ -115,7 +115,7 @@ const NewBlog = () => {
               required
               value={description}
               onChange={setDescription}
-              placeholder="Escribe una descripción corta del blog."
+              placeholder="Escribe una descripción corta de la noticia."
               minHeight="120px"
             />
 
@@ -132,16 +132,16 @@ const NewBlog = () => {
             </div>
 
             <MarkdownEditor
-              label="Contenido del blog"
+              label="Contenido de la noticia"
               required
               value={content}
               onChange={setContent}
-              placeholder="Escribe el contenido del blog. Usa la barra de herramientas para títulos, listas, enlaces, etc."
+              placeholder="Escribe el contenido de la noticia. Usa la barra de herramientas para títulos, listas, enlaces, etc."
               minHeight="280px"
             />
 
             <div className="space-y-2">
-              <Label>Vínculos del blog</Label>
+              <Label>Vínculos de la noticia</Label>
               <BlogRelatedLinksEditor
                 relatedLinks={relatedLinks}
                 onChange={setRelatedLinks}
@@ -173,7 +173,7 @@ const NewBlog = () => {
                   disabled={!canSubmit || submitting}
                   onClick={handleSubmit}
                 >
-                  {submitting ? "Guardando..." : "Publicar blog"}
+                  {submitting ? "Guardando..." : "Publicar noticia"}
                 </Button>
               </div>
             </div>

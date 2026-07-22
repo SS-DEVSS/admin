@@ -65,7 +65,7 @@ const BlogsDashboard = () => {
   return (
     <Layout>
       <DashboardPageShell
-        title="Blogs"
+        title="Noticias"
         description="Gestiona el contenido publicado y sus vínculos relacionados."
         filters={
           <>
@@ -73,7 +73,7 @@ const BlogsDashboard = () => {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar blog..."
+                placeholder="Buscar noticia..."
                 onChange={(e) => setSearchFilter(e.target.value)}
                 value={searchFilter}
                 className="w-full rounded-lg bg-background pl-8"
@@ -84,7 +84,7 @@ const BlogsDashboard = () => {
                 value={sortOrder}
                 onValueChange={(value) => setSortOrder(value as "newest" | "oldest")}
               >
-                <SelectTrigger className="flex-1 min-w-[210px] lg:flex-none lg:w-[210px]" aria-label="Ordenar blogs por fecha">
+                <SelectTrigger className="flex-1 min-w-[210px] lg:flex-none lg:w-[210px]" aria-label="Ordenar noticias por fecha">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -96,7 +96,7 @@ const BlogsDashboard = () => {
                 <Button size="sm" className="h-10 px-6 gap-1">
                   <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Crear blog
+                    Crear noticia
                   </span>
                 </Button>
               </Link>
@@ -106,19 +106,19 @@ const BlogsDashboard = () => {
       >
           {!loading && (
             <div className="mb-3 text-sm text-muted-foreground">
-              {listToShow.length} {listToShow.length === 1 ? "blog encontrado" : "blogs encontrados"}
+              {listToShow.length} {listToShow.length === 1 ? "noticia encontrada" : "noticias encontradas"}
             </div>
           )}
           {showInitialLoading ? (
             <div className="flex items-center justify-center min-h-[320px]">
               <div className="flex flex-col items-center gap-2">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">Cargando blogs...</p>
+                <p className="text-sm text-muted-foreground">Cargando noticias...</p>
               </div>
             </div>
           ) : listToShow.length === 0 ? (
             <NoData>
-              <p className="text-muted-foreground">No hay blogs disponibles.</p>
+              <p className="text-muted-foreground">No hay noticias disponibles.</p>
             </NoData>
           ) : (
             <div className="relative min-h-[220px]">
@@ -136,7 +136,7 @@ const BlogsDashboard = () => {
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px] rounded-lg">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                    <p className="text-sm text-muted-foreground">Actualizando blogs...</p>
+                    <p className="text-sm text-muted-foreground">Actualizando noticias...</p>
                   </div>
                 </div>
               )}

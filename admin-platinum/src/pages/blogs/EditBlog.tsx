@@ -88,7 +88,7 @@ const EditBlog = () => {
   const missingFields = [
     !title.trim() && "título",
     !hasDescriptionContent && "descripción",
-    !hasMainContent && "contenido del blog",
+    !hasMainContent && "contenido de la noticia",
   ].filter(Boolean) as string[];
 
   const handleSave = async () => {
@@ -145,7 +145,7 @@ const EditBlog = () => {
           >
             <ChevronLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-2xl font-semibold leading-none tracking-tight">Editar blog</h1>
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">Editar noticia</h1>
         </header>
         <div className="space-y-6">
           <div className="space-y-2">
@@ -154,7 +154,7 @@ const EditBlog = () => {
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Título del blog"
+              placeholder="Título de la noticia"
               maxLength={255}
             />
           </div>
@@ -164,7 +164,7 @@ const EditBlog = () => {
             required
             value={description}
             onChange={setDescription}
-            placeholder="Escribe una descripción corta del blog."
+            placeholder="Escribe una descripción corta de la noticia."
             minHeight="120px"
           />
 
@@ -172,11 +172,11 @@ const EditBlog = () => {
             <Label>Imagen de portada</Label>
             {existingCoverUrl && !coverImage ? (
               <p className="text-sm text-muted-foreground">
-                Este blog ya tiene imagen de portada. Puedes mantenerla o subir otra.
+                Esta noticia ya tiene imagen de portada. Puedes mantenerla o subir otra.
               </p>
             ) : !existingCoverUrl ? (
               <p className="text-sm text-muted-foreground">
-                Este blog no tiene portada. Sube una imagen (JPG, PNG o WebP).
+                Esta noticia no tiene portada. Sube una imagen (JPG, PNG o WebP).
               </p>
             ) : null}
             <MyDropzone
@@ -185,12 +185,12 @@ const EditBlog = () => {
               fileSetter={setCoverImage}
               type="image"
               currentImageUrl={existingCoverUrl && !coverImage ? existingCoverUrl : undefined}
-              currentImageLabel="Portada actual del blog"
+              currentImageLabel="Portada actual de la noticia"
             />
           </div>
 
           <MarkdownEditor
-            label="Contenido del blog"
+            label="Contenido de la noticia"
             required
             value={content}
             onChange={setContent}
@@ -198,7 +198,7 @@ const EditBlog = () => {
           />
 
           <div className="space-y-2">
-            <Label>Vínculos del blog</Label>
+            <Label>Vínculos de la noticia</Label>
             <BlogRelatedLinksEditor
               relatedLinks={relatedLinks}
               onChange={setRelatedLinks}

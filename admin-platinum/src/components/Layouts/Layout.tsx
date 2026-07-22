@@ -34,12 +34,12 @@ type MenuItem = {
 };
 
 const menuItems: MenuItem[] = [
-  { href: "/dashboard/marcas", icon: ShoppingCart, text: "Marcas" },
+  { href: "/dashboard/marcas", icon: ShoppingCart, text: "Líneas de Producto" },
   { href: "/dashboard/categorias", icon: LayoutGrid, text: "Categorías" },
   { href: "/dashboard/productos", icon: Package, text: "Productos" },
-  { href: "/dashboard/productos-destacados", icon: Star, text: "Productos Destacados" },
+  { href: "/dashboard/productos-destacados", icon: Star, text: "Nuevas Integraciones" },
   { href: "/dashboard/boletines", icon: Newspaper, text: "Boletines" },
-  { href: "/dashboard/blogs", icon: BookOpen, text: "Blogs" },
+  { href: "/dashboard/blogs", icon: BookOpen, text: "Noticias" },
   { href: "/dashboard/banners", icon: Dock, text: "Banners" },
   { href: "/dashboard/importaciones", icon: Import, text: "Importaciones" },
   { href: "/dashboard/archivos", icon: Folder, text: "Administrador de Archivos" },

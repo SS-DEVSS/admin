@@ -119,7 +119,7 @@ const FeatureProductModal = ({
     if (!selectedApplicationId && !isCurrentlyFeatured) {
       toast({
         title: "Error",
-        description: "Por favor selecciona una aplicación para destacar el producto.",
+        description: "Por favor selecciona una aplicación para destacar como nueva integración.",
         variant: "destructive",
       });
       return;
@@ -133,15 +133,15 @@ const FeatureProductModal = ({
       toast({
         title: "Éxito",
         description: applicationId
-          ? "Producto destacado exitosamente."
-          : "Producto desmarcado como destacado.",
+          ? "Producto destacado como nueva integración."
+          : "Producto removido de nuevas integraciones.",
       });
 
       onSuccess?.();
       onOpenChange(false);
     } catch (error: any) {
       console.error('[FeatureProductModal] Error setting featured product:', error);
-      let errorMessage = "Error al actualizar el producto destacado.";
+      let errorMessage = "Error al actualizar la nueva integración.";
 
       if (error.response?.data) {
         // Try to get the error message from the response
@@ -170,12 +170,12 @@ const FeatureProductModal = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {isCurrentlyFeatured ? "Editar Producto Destacado" : "Destacar Producto"}
+            {isCurrentlyFeatured ? "Editar Nueva Integración" : "Destacar como Nueva Integración"}
           </DialogTitle>
           <DialogDescription>
             {isCurrentlyFeatured
-              ? "Selecciona la aplicación que se mostrará para este producto destacado."
-              : "Selecciona una aplicación para destacar este producto. Se mostrará en la página principal."}
+              ? "Selecciona la aplicación que se mostrará para esta nueva integración."
+              : "Selecciona una aplicación para destacar este producto como nueva integración. Se mostrará en la página principal."}
           </DialogDescription>
         </DialogHeader>
 
@@ -183,7 +183,7 @@ const FeatureProductModal = ({
           <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-800">
-              Ya hay 6 productos destacados. Por favor, deselecciona uno primero.
+              Ya hay 6 nuevas integraciones. Por favor, quita una primero.
             </AlertDescription>
           </Alert>
         )}
@@ -192,14 +192,14 @@ const FeatureProductModal = ({
           <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-800">
-              Este producto no tiene aplicaciones. Agrega al menos una aplicación antes de destacarlo.
+              Este producto no tiene aplicaciones. Agrega al menos una aplicación antes de destacarlo como nueva integración.
             </AlertDescription>
           </Alert>
         )}
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <label className="text-sm font-medium">Aplicación Destacada</label>
+            <label className="text-sm font-medium">Aplicación</label>
             <Select
               value={selectedApplicationId}
               onValueChange={setSelectedApplicationId}
@@ -237,13 +237,13 @@ const FeatureProductModal = ({
                   await productService.setFeaturedProduct(product.id, null);
                   toast({
                     title: "Éxito",
-                    description: "Producto desmarcado como destacado.",
+                    description: "Producto removido de nuevas integraciones.",
                   });
                   onSuccess?.();
                   onOpenChange(false);
                 } catch (error: any) {
                   console.error('[FeatureProductModal] Error removing featured product:', error);
-                  let errorMessage = "Error al desmarcar el producto.";
+                  let errorMessage = "Error al quitar la nueva integración.";
 
                   if (error.response?.data) {
                     errorMessage = error.response.data.message ||
@@ -265,14 +265,14 @@ const FeatureProductModal = ({
               }}
               disabled={isSubmitting}
             >
-              Quitar Destacado
+              Quitar de Nuevas Integraciones
             </Button>
           )}
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || applications.length === 0 || isAtMaxLimit}
           >
-            {isSubmitting ? "Guardando..." : isCurrentlyFeatured ? "Actualizar" : "Destacar"}
+            {isSubmitting ? "Guardando..." : isCurrentlyFeatured ? "Actualizar" : "Destacar como nueva integración"}
           </Button>
         </DialogFooter>
       </DialogContent>
