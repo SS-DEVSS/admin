@@ -9,7 +9,9 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { MoreVertical, Upload, Star, FolderOpen, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Pencil, Trash2 } from "lucide-react";
-import ConfirmActionDialog from "@/components/ConfirmActionDialog";
+import BulkDeleteProductsDialog, {
+  BulkDeleteScopeSelection,
+} from "@/components/products/BulkDeleteProductsDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { productService } from "@/services/productService";
 
@@ -29,6 +31,12 @@ import { Category } from "@/models/category";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 import type { ApplicationFilterMap } from "@/utils/productApplicationFilters";
 import { buildApplicationFiltersPayload } from "@/utils/productApplicationFilters";
+import {
+  buildProductListCacheKey,
+  getProductListCache,
+  invalidateProductListCache,
+  setProductListCache,
+} from "@/utils/productListCache";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   DropdownMenu,
@@ -102,6 +110,7 @@ const DataTable = ({
   const [debouncedSearch, setDebouncedSearch] = useState(searchFilter || '');
   const [goToPageValue, setGoToPageValue] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const fetchSeqRef = useRef(0);
   const [catalogVisibilityPending, setCatalogVisibilityPending] = useState(false);
   const [catalogVisibilityTargetIds, setCatalogVisibilityTargetIds] = useState<string[]>([]);
   const catalogVisibilityPendingRef = useRef(false);
@@ -131,9 +140,38 @@ const DataTable = ({
     [applicationFilters]
   );
 
+  const bumpProductListRefresh = useCallback(() => {
+    invalidateProductListCache(category?.id);
+    setRefreshKey((key) => key + 1);
+  }, [category?.id]);
+
   // Fetch products (by category or all when no category selected)
   useEffect(() => {
+    const seq = ++fetchSeqRef.current;
+    const controller = new AbortController();
+
     const fetchProducts = async () => {
+      const filtersJson = JSON.stringify(attributeFiltersPayload);
+      const cacheKey = buildProductListCacheKey({
+        categoryId: category?.id ?? null,
+        page,
+        pageSize,
+        search: debouncedSearch,
+        subcategoryId,
+        catalogVisibility: catalogVisibilityFilter,
+        filtersPayload: attributeFiltersPayload,
+      });
+
+      const cached = getProductListCache(cacheKey);
+      if (cached) {
+        if (seq !== fetchSeqRef.current) return;
+        setProducts(cached.products);
+        setTotalItems(cached.totalItems);
+        setTotalPages(cached.totalPages);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const params: Record<string, string | number | boolean> = {
@@ -155,11 +193,12 @@ const DataTable = ({
             params.idSubcategory = subcategoryId.trim();
           }
           if (Object.keys(attributeFiltersPayload).length > 0) {
-            params.filters = JSON.stringify(attributeFiltersPayload);
+            params.filters = filtersJson;
           }
           response = await client.get(`/products/category/${category.id}`, {
             params,
             timeout: 120000,
+            signal: controller.signal,
           });
         } else {
           response = await client.get("/products", {
@@ -169,15 +208,29 @@ const DataTable = ({
               ...(params.search ? { search: params.search } : {}),
             },
             timeout: 120000,
+            signal: controller.signal,
           });
         }
 
+        if (seq !== fetchSeqRef.current) return;
+
         const { products: fetchedProducts, total: totalItems, totalPages: pages } = response.data;
 
-        setProducts(fetchedProducts || []);
-        setTotalItems(totalItems || 0);
-        setTotalPages(pages || 1);
+        const nextProducts = fetchedProducts || [];
+        const nextTotalItems = totalItems || 0;
+        const nextTotalPages = pages || 1;
+
+        setProducts(nextProducts);
+        setTotalItems(nextTotalItems);
+        setTotalPages(nextTotalPages);
+
+        setProductListCache(cacheKey, {
+          products: nextProducts,
+          totalItems: nextTotalItems,
+          totalPages: nextTotalPages,
+        });
       } catch (error) {
+        if (controller.signal.aborted || seq !== fetchSeqRef.current) return;
         console.error('[ProductsTable] Error fetching products:', error);
         const msg = error instanceof Error ? error.message : "";
         const isTimeout = /timeout|ECONNABORTED/i.test(msg);
@@ -194,11 +247,17 @@ const DataTable = ({
         setTotalItems(0);
         setTotalPages(1);
       } finally {
-        setLoading(false);
+        if (seq === fetchSeqRef.current) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchProducts();
+    void fetchProducts();
+
+    return () => {
+      controller.abort();
+    };
   }, [category?.id, page, pageSize, debouncedSearch, subcategoryId, catalogVisibilityFilter, attributeFiltersPayload, refreshKey, client]);
 
   useEffect(() => {
@@ -235,7 +294,7 @@ const DataTable = ({
         variant: "success",
       });
       setRowSelection({});
-      setRefreshKey((key) => key + 1);
+      bumpProductListRefresh();
     } catch (error: unknown) {
       const message =
         (error as { response?: { data?: { message?: string } } })?.response?.data
@@ -252,7 +311,7 @@ const DataTable = ({
       setCatalogVisibilityPending(false);
       setCatalogVisibilityTargetIds([]);
     }
-  }, []);
+  }, [bumpProductListRefresh]);
 
   const handleImageClick = (variant: Variant) => {
     setSelectedVariant(variant);
@@ -988,7 +1047,7 @@ const DataTable = ({
       .filter((id): id is string => !!id);
   }, [rowSelection, mappedData]);
 
-  const handleBulkDelete = useCallback(async () => {
+  const handleBulkDelete = useCallback(async (scope: BulkDeleteScopeSelection) => {
     setDeletePending(true);
     setDeleteError(null);
     try {
@@ -1001,9 +1060,14 @@ const DataTable = ({
             search: debouncedSearch || undefined,
             catalogVisibility: catalogVisibilityFilter,
             includeHidden: true,
+            applicationFilters:
+              Object.keys(attributeFiltersPayload).length > 0
+                ? attributeFiltersPayload
+                : undefined,
           },
+          scope,
         }
-        : { productIds: selectedProductIds };
+        : { productIds: selectedProductIds, scope };
 
       const result = await productService.bulkDeleteProducts(payload);
 
@@ -1012,16 +1076,34 @@ const DataTable = ({
           ? ` ${result.failed.length} producto(s) no se pudieron eliminar.`
           : "";
 
+      const partialDetails = scope.deleteProduct
+        ? `${result.deletedCount} producto(s) eliminado(s).`
+        : [
+            scope.deleteApplications && result.deletedApplicationsCount
+              ? `${result.deletedApplicationsCount} aplicación(es)`
+              : null,
+            scope.deleteReferences && result.deletedReferencesCount
+              ? `${result.deletedReferencesCount} referencia(s)`
+              : null,
+            scope.deleteImages && result.deletedImagesCount
+              ? `${result.deletedImagesCount} imagen(es)`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(", ") || "Datos eliminados";
+
       toast({
         title: "Eliminación completada",
-        description: `${result.deletedCount} producto(s) eliminado(s).${failedMsg}`,
+        description: scope.deleteProduct
+          ? `${partialDetails}${failedMsg}`
+          : `Se actualizaron ${result.deletedCount} producto(s): ${partialDetails}.${failedMsg}`,
         variant: result.failed.length > 0 ? "destructive" : "default",
       });
 
       setDeleteDialogOpen(false);
       setDeleteAllFiltered(false);
       setRowSelection({});
-      setRefreshKey((k) => k + 1);
+      bumpProductListRefresh();
     } catch (error: unknown) {
       const msg =
         (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -1037,7 +1119,9 @@ const DataTable = ({
     subcategoryId,
     debouncedSearch,
     catalogVisibilityFilter,
+    attributeFiltersPayload,
     selectedProductIds,
+    bumpProductListRefresh,
   ]);
 
   const bulkDeleteCount = deleteAllFiltered ? totalItems : selectedProductIds.length;
@@ -1103,18 +1187,10 @@ const DataTable = ({
         </div>
       )}
 
-      <ConfirmActionDialog
+      <BulkDeleteProductsDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Eliminar productos"
-        description={`Se eliminarán ${bulkDeleteCount} producto(s) de forma permanente.`}
-        consequences={[
-          "Se eliminarán todas las imágenes asociadas a los productos.",
-          "Se eliminarán todas las aplicaciones asociadas.",
-          "Se eliminarán todas las referencias asociadas.",
-          "Se eliminarán variantes, notas y vínculos técnicos.",
-          "Esta acción no se puede deshacer.",
-        ]}
+        productCount={bulkDeleteCount}
         loading={deletePending}
         error={deleteError}
         onConfirm={handleBulkDelete}

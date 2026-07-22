@@ -213,16 +213,35 @@ export const productService = {
   bulkDeleteProducts: async (payload: {
     productIds?: string[];
     selectAll?: boolean;
+    scope?: {
+      deleteProduct?: boolean;
+      deleteApplications?: boolean;
+      deleteReferences?: boolean;
+      deleteImages?: boolean;
+    };
     filters?: {
       categoryId?: string;
       subcategoryId?: string;
       search?: string;
       catalogVisibility?: CatalogVisibilityFilter;
       includeHidden?: boolean;
+      applicationFilters?: Record<string, string | string[]>;
     };
-  }): Promise<{ deletedCount: number; failed: { id: string; reason: string }[] }> => {
+  }): Promise<{
+    deletedCount: number;
+    deletedApplicationsCount: number;
+    deletedReferencesCount: number;
+    deletedImagesCount: number;
+    failed: { id: string; reason: string }[];
+  }> => {
     const client = axiosClient();
-    const response = await client.post<{ deletedCount: number; failed: { id: string; reason: string }[] }>(
+    const response = await client.post<{
+      deletedCount: number;
+      deletedApplicationsCount: number;
+      deletedReferencesCount: number;
+      deletedImagesCount: number;
+      failed: { id: string; reason: string }[];
+    }>(
       "/products/bulk/delete",
       payload,
       { timeout: LIST_REQUEST_TIMEOUT_MS }
