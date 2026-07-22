@@ -59,18 +59,32 @@ const findDateAttributeForYearRange = (
 
 const resolveYearsToCreate = (
   startStr: string,
-  endStr: string
-): { years: number[] } | { error: string } => {
-  const startYear = parseInt(startStr, 10);
-  if (!startStr.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
+  endStr: string,
+  options?: { optional?: boolean }
+): { years: number[] | null } | { error: string } => {
+  const startTrimmed = startStr.trim();
+  const endTrimmed = endStr.trim();
+
+  if (!startTrimmed) {
+    if (endTrimmed) {
+      return { error: "Ingresa un año de inicio antes del año de fin." };
+    }
+    if (options?.optional) {
+      return { years: null };
+    }
     return { error: "Ingresa un año de inicio válido (1900-2100)." };
   }
 
-  if (!endStr.trim()) {
+  const startYear = parseInt(startTrimmed, 10);
+  if (isNaN(startYear) || startYear < 1900 || startYear > 2100) {
+    return { error: "Ingresa un año de inicio válido (1900-2100)." };
+  }
+
+  if (!endTrimmed) {
     return { years: [startYear] };
   }
 
-  const endYear = parseInt(endStr, 10);
+  const endYear = parseInt(endTrimmed, 10);
   if (isNaN(endYear) || endYear < 1900 || endYear > 2100) {
     return { error: "Ingresa un año de fin válido (1900-2100)." };
   }
@@ -90,6 +104,76 @@ const hasAttributeValue = (value: string | number | boolean | Date | undefined):
   if (typeof value === "string") return value.trim() !== "";
   return true;
 };
+
+const applyFormValueToAttributePayload = (
+  attr: CategoryAtributes,
+  formValue: string | number | boolean | Date | undefined,
+  attributeValue: AttributePayload
+): void => {
+  if (!hasAttributeValue(formValue)) return;
+
+  if (isYearAttributeName(attr.name) && !isDateAttribute(attr)) {
+    const yearString = typeof formValue === "string" ? formValue : String(formValue);
+    const match = yearString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+    const yearToSave = match ? parseInt(match[1], 10) : parseInt(yearString, 10);
+    if (!isNaN(yearToSave) && yearToSave >= 1900 && yearToSave <= 2100) {
+      attributeValue.valueNumber = yearToSave;
+    }
+    return;
+  }
+
+  const normalizedType = String(attr.type || "").toLowerCase();
+
+  if (
+    normalizedType === "string" ||
+    normalizedType === "text" ||
+    normalizedType === CategoryAttributesTypes.STRING
+  ) {
+    attributeValue.valueString = String(formValue);
+  } else if (
+    normalizedType === "number" ||
+    normalizedType === "numeric" ||
+    normalizedType === "integer" ||
+    normalizedType === "decimal" ||
+    normalizedType === CategoryAttributesTypes.NUMERIC
+  ) {
+    let numValue: number;
+    if (typeof formValue === "string") {
+      numValue = parseFloat(formValue.trim());
+    } else {
+      numValue = Number(formValue);
+    }
+    if (!isNaN(numValue) && isFinite(numValue)) {
+      attributeValue.valueNumber = numValue;
+    } else {
+      const strValue = String(formValue).trim();
+      if (strValue && !isNaN(Number(strValue))) {
+        attributeValue.valueNumber = Number(strValue);
+      }
+    }
+  } else if (
+    normalizedType === "boolean" ||
+    normalizedType === CategoryAttributesTypes.BOOLEAN
+  ) {
+    attributeValue.valueBoolean = Boolean(formValue);
+  } else if (isDateAttribute(attr)) {
+    if (formValue instanceof Date) {
+      attributeValue.valueDate = formValue;
+    } else if (typeof formValue === "string") {
+      const date = new Date(formValue);
+      if (!isNaN(date.getTime())) {
+        attributeValue.valueDate = date;
+      }
+    }
+  } else {
+    attributeValue.valueString = String(formValue);
+  }
+};
+
+const sortApplicationAttributes = (
+  attributes: CategoryAtributes[]
+): CategoryAtributes[] =>
+  [...attributes].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
 
 type EditApplicationDialogProps = {
   open: boolean;
@@ -118,14 +202,18 @@ const EditApplicationDialog = ({
     
     if (Array.isArray(categoryAttributes)) {
       // Filter by scope, case-insensitive
-      return categoryAttributes.filter((attr) => {
-        const scope = String(attr.scope || '').toUpperCase();
-        return scope === "APPLICATION" || scope === "APLICACION";
-      });
+      return sortApplicationAttributes(
+        categoryAttributes.filter((attr) => {
+          const scope = String(attr.scope || "").toUpperCase();
+          return scope === "APPLICATION" || scope === "APLICACION";
+        })
+      );
     }
-    
-    if (typeof categoryAttributes === 'object' && 'application' in categoryAttributes) {
-      return (categoryAttributes as { application: CategoryAtributes[] }).application || [];
+
+    if (typeof categoryAttributes === "object" && "application" in categoryAttributes) {
+      return sortApplicationAttributes(
+        (categoryAttributes as { application: CategoryAtributes[] }).application || []
+      );
     }
     
     return [];
@@ -329,34 +417,21 @@ const EditApplicationDialog = ({
         };
 
         if (
-          yearValue !== undefined &&
           yearAttrId !== undefined &&
           attr.id === yearAttrId &&
           isDateAttribute(attr)
         ) {
-          attributeValue.valueDate = new Date(yearValue, 0, 1);
+          if (yearValue !== undefined) {
+            attributeValue.valueDate = new Date(yearValue, 0, 1);
+          }
           return attributeValue;
         }
 
-        const value = formData.attributeValues[attr.name];
-        if (!hasAttributeValue(value)) return attributeValue;
-
-        if (attr.type === CategoryAttributesTypes.STRING) {
-          attributeValue.valueString = String(value);
-        } else if (attr.type === CategoryAttributesTypes.NUMERIC) {
-          attributeValue.valueNumber = Number(value);
-        } else if (attr.type === CategoryAttributesTypes.BOOLEAN) {
-          attributeValue.valueBoolean = Boolean(value);
-        } else if (isDateAttribute(attr)) {
-          if (value instanceof Date) {
-            attributeValue.valueDate = value;
-          } else if (typeof value === "string") {
-            const date = new Date(value);
-            if (!isNaN(date.getTime())) {
-              attributeValue.valueDate = date;
-            }
-          }
-        }
+        applyFormValueToAttributePayload(
+          attr,
+          formData.attributeValues[attr.name],
+          attributeValue
+        );
 
         return attributeValue;
       })
@@ -415,7 +490,9 @@ const EditApplicationDialog = ({
             start: "",
             end: "",
           };
-          const resolved = resolveYearsToCreate(yearState.start, yearState.end);
+          const resolved = resolveYearsToCreate(yearState.start, yearState.end, {
+            optional: !yearRangeDateAttribute.required,
+          });
           if ("error" in resolved) {
             toast({
               title: "Año no válido",
@@ -429,23 +506,26 @@ const EditApplicationDialog = ({
 
         let createdCount = 0;
 
-        const createOneApplication = async (year?: number) => {
+        if (yearsToCreate && yearAttrId) {
           const createData = {
             sku: productSku,
             origin: formData.origin || "Nueva aplicación",
             idProduct: productId,
-            attributes: buildCreateAttributes(year, yearAttrId),
+            attributes: buildCreateAttributes(undefined, yearAttrId),
+            years: yearsToCreate,
+            yearAttributeId: yearAttrId,
+          };
+          const response = await client.post("/applications/bulk", createData);
+          createdCount = response.data?.createdCount ?? yearsToCreate.length;
+        } else {
+          const createData = {
+            sku: productSku,
+            origin: formData.origin || "Nueva aplicación",
+            idProduct: productId,
+            attributes: buildCreateAttributes(undefined, yearAttrId),
           };
           await client.post("/applications", createData);
-          createdCount += 1;
-        };
-
-        if (yearsToCreate) {
-          for (const year of yearsToCreate) {
-            await createOneApplication(year);
-          }
-        } else {
-          await createOneApplication(undefined);
+          createdCount = 1;
         }
 
         const isRange = createdCount > 1;
@@ -791,9 +871,15 @@ const EditApplicationDialog = ({
                                 </div>
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                {currentYearState.end.trim()
-                                  ? `Se crearán ${appsToCreate} aplicación(es), una por cada año, con los mismos datos y solo cambiando el año.`
-                                  : "Se creará una aplicación para el año indicado. Agrega año fin para crear una por cada año del rango."}
+                                {!attr.required &&
+                                !currentYearState.start.trim() &&
+                                !currentYearState.end.trim()
+                                  ? "Opcional. Puedes dejarlo vacío y crear la aplicación sin año."
+                                  : currentYearState.end.trim()
+                                    ? `Se crearán ${appsToCreate} aplicación(es), una por cada año, con los mismos datos y solo cambiando el año.`
+                                    : currentYearState.start.trim()
+                                      ? "Se creará una aplicación para el año indicado. Agrega año fin para crear una por cada año del rango."
+                                      : "Opcional. Agrega año inicio (y fin si aplica) para crear una o más aplicaciones por año."}
                               </p>
                             </div>
                           );

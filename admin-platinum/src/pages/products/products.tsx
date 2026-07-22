@@ -29,9 +29,10 @@ import {
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useDeferredValue, useMemo } from "react";
+import { useEffect, useState, useDeferredValue, useMemo, useRef } from "react";
 import { Category, CategoryResponse } from "@/models/category";
 import { useCategoryContext } from "@/context/categories-context";
+import { useImportContext } from "@/context/import-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
@@ -55,7 +56,9 @@ import {
   loadApplicationFilters,
   saveApplicationFilters,
   sanitizeApplicationFilters,
+  clearApplicationFiltersStorage,
 } from "@/utils/productApplicationFilters";
+import { invalidateProductListCache } from "@/utils/productListCache";
 
 type DrillLevel =
   | { type: "category"; category: Category }
@@ -96,6 +99,8 @@ const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { categories = [], loading: categoriesLoading, getCategoryById } = useCategoryContext();
+  const { importState } = useImportContext();
+  const handledImportCompletionRef = useRef<string | null>(null);
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem("products-search-filter");
@@ -135,10 +140,18 @@ const Products = () => {
     (catalogVisibilityFilter !== "all" ? 1 : 0) +
     applicationFilterCount;
   const clearProductFilters = () => {
+    const prevCategoryId = category?.id;
+    if (prevCategoryId) {
+      clearApplicationFiltersStorage(prevCategoryId);
+    }
+    setSearchFilter("");
+    localStorage.removeItem("products-search-filter");
     selectCategoryAndSubcategory(null, null);
     setCatalogVisibilityFilter("all");
     setApplicationFilters({});
     localStorage.removeItem("products-catalog-visibility");
+    invalidateProductListCache();
+    setTableRefreshKey((k) => k + 1);
   };
 
   const handleApplicationFiltersChange = (filters: ApplicationFilterMap) => {
@@ -153,6 +166,19 @@ const Products = () => {
     () => getApplicationAttributesFromCategory(categoryDetails),
     [categoryDetails]
   );
+
+  useEffect(() => {
+    if (
+      importState.jobStatus === "completed" &&
+      importState.importType === "products" &&
+      importState.jobId &&
+      handledImportCompletionRef.current !== importState.jobId
+    ) {
+      handledImportCompletionRef.current = importState.jobId;
+      invalidateProductListCache();
+      setTableRefreshKey((k) => k + 1);
+    }
+  }, [importState.jobStatus, importState.importType, importState.jobId]);
 
   // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
   useEffect(() => {
@@ -750,7 +776,10 @@ const Products = () => {
       <BulkImageUploadDialog
         open={bulkImagesOpen}
         onOpenChange={setBulkImagesOpen}
-        onComplete={() => setTableRefreshKey((k) => k + 1)}
+        onComplete={() => {
+          invalidateProductListCache();
+          setTableRefreshKey((k) => k + 1);
+        }}
       />
     </Layout>
   );

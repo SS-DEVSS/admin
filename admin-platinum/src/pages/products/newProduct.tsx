@@ -11,6 +11,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/context/categories-context";
 import { useToast } from "@/hooks/use-toast";
 import { resolveProductNameForSave } from "@/utils/adminFieldVisibility";
+import { invalidateProductListCache } from "@/utils/productListCache";
 import Loader from "@/components/Loader";
 import { Reference } from "@/models/reference";
 import { persistNewReferences } from "@/services/referenceService";
@@ -726,7 +727,7 @@ const NewProduct = () => {
       setTimeout(() => {
         setIsSubmitting(false);
         savingStartTimeRef.current = null;
-        // Navigate back to products list
+        invalidateProductListCache();
         navigate("/dashboard/productos");
       }, remainingTime);
     } catch (error: any) {
@@ -754,6 +755,7 @@ const NewProduct = () => {
     try {
       await deleteProduct(id);
       toast({ title: "Producto eliminado", variant: "success" });
+      invalidateProductListCache();
       navigate("/dashboard/productos");
     } catch (error: unknown) {
       const msg =
