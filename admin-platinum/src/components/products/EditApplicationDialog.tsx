@@ -19,10 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Application } from "@/models/application";
 import { CategoryAtributes, CategoryAttributesTypes } from "@/models/category";
 import DynamicComponent from "@/components/DynamicComponent";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import axiosClient from "@/services/axiosInstance";
 import { useToast } from "@/hooks/use-toast";
 import { translateAttributeName } from "@/utils/attributeTranslations";
+import { createYearDate, extractYearFromDate } from "@/utils/applicationYear";
 import { Loader2 } from "lucide-react";
 
 type AttributeFormValues = Record<string, string | number | boolean | Date | undefined>;
@@ -57,25 +58,59 @@ const findDateAttributeForYearRange = (
   return attributes.find((attr) => isDateAttribute(attr));
 };
 
+const MIN_APPLICATION_YEAR = 1900;
+const MAX_APPLICATION_YEAR = 2100;
+const MAX_APPLICATIONS_PER_CREATE = 200;
+
+const sanitizeYearInput = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+  const year = parseInt(digits, 10);
+  if (Number.isNaN(year)) return digits;
+  if (year > MAX_APPLICATION_YEAR) return String(MAX_APPLICATION_YEAR);
+  return digits;
+};
+
 const resolveYearsToCreate = (
   startStr: string,
-  endStr: string
-): { years: number[] } | { error: string } => {
-  const startYear = parseInt(startStr, 10);
-  if (!startStr.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
-    return { error: "Ingresa un año de inicio válido (1900-2100)." };
+  endStr: string,
+  options?: { optional?: boolean }
+): { years: number[] | null } | { error: string } => {
+  const startTrimmed = startStr.trim();
+  const endTrimmed = endStr.trim();
+
+  if (!startTrimmed) {
+    if (endTrimmed) {
+      return { error: "Ingresa un año de inicio antes del año de fin." };
+    }
+    if (options?.optional) {
+      return { years: null };
+    }
+    return { error: `Ingresa un año de inicio válido (${MIN_APPLICATION_YEAR}-${MAX_APPLICATION_YEAR}).` };
   }
 
-  if (!endStr.trim()) {
+  const startYear = parseInt(startTrimmed, 10);
+  if (Number.isNaN(startYear) || startYear < MIN_APPLICATION_YEAR || startYear > MAX_APPLICATION_YEAR) {
+    return { error: `Ingresa un año de inicio válido (${MIN_APPLICATION_YEAR}-${MAX_APPLICATION_YEAR}).` };
+  }
+
+  if (!endTrimmed) {
     return { years: [startYear] };
   }
 
-  const endYear = parseInt(endStr, 10);
-  if (isNaN(endYear) || endYear < 1900 || endYear > 2100) {
-    return { error: "Ingresa un año de fin válido (1900-2100)." };
+  const endYear = parseInt(endTrimmed, 10);
+  if (Number.isNaN(endYear) || endYear < MIN_APPLICATION_YEAR || endYear > MAX_APPLICATION_YEAR) {
+    return { error: `Ingresa un año de fin válido (${MIN_APPLICATION_YEAR}-${MAX_APPLICATION_YEAR}).` };
   }
   if (endYear < startYear) {
     return { error: "El año de fin debe ser mayor o igual al año de inicio." };
+  }
+
+  const totalYears = endYear - startYear + 1;
+  if (totalYears > MAX_APPLICATIONS_PER_CREATE) {
+    return {
+      error: `El rango no puede superar ${MAX_APPLICATIONS_PER_CREATE} años (${MAX_APPLICATIONS_PER_CREATE} aplicaciones).`,
+    };
   }
 
   const years: number[] = [];
@@ -90,6 +125,76 @@ const hasAttributeValue = (value: string | number | boolean | Date | undefined):
   if (typeof value === "string") return value.trim() !== "";
   return true;
 };
+
+const applyFormValueToAttributePayload = (
+  attr: CategoryAtributes,
+  formValue: string | number | boolean | Date | undefined,
+  attributeValue: AttributePayload
+): void => {
+  if (!hasAttributeValue(formValue)) return;
+
+  if (isYearAttributeName(attr.name) && !isDateAttribute(attr)) {
+    const yearString = typeof formValue === "string" ? formValue : String(formValue);
+    const match = yearString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+    const yearToSave = match ? parseInt(match[1], 10) : parseInt(yearString, 10);
+    if (!isNaN(yearToSave) && yearToSave >= MIN_APPLICATION_YEAR && yearToSave <= MAX_APPLICATION_YEAR) {
+      attributeValue.valueNumber = yearToSave;
+    }
+    return;
+  }
+
+  const normalizedType = String(attr.type || "").toLowerCase();
+
+  if (
+    normalizedType === "string" ||
+    normalizedType === "text" ||
+    normalizedType === CategoryAttributesTypes.STRING
+  ) {
+    attributeValue.valueString = String(formValue);
+  } else if (
+    normalizedType === "number" ||
+    normalizedType === "numeric" ||
+    normalizedType === "integer" ||
+    normalizedType === "decimal" ||
+    normalizedType === CategoryAttributesTypes.NUMERIC
+  ) {
+    let numValue: number;
+    if (typeof formValue === "string") {
+      numValue = parseFloat(formValue.trim());
+    } else {
+      numValue = Number(formValue);
+    }
+    if (!isNaN(numValue) && isFinite(numValue)) {
+      attributeValue.valueNumber = numValue;
+    } else {
+      const strValue = String(formValue).trim();
+      if (strValue && !isNaN(Number(strValue))) {
+        attributeValue.valueNumber = Number(strValue);
+      }
+    }
+  } else if (
+    normalizedType === "boolean" ||
+    normalizedType === CategoryAttributesTypes.BOOLEAN
+  ) {
+    attributeValue.valueBoolean = Boolean(formValue);
+  } else if (isDateAttribute(attr)) {
+    if (formValue instanceof Date) {
+      attributeValue.valueDate = formValue;
+    } else if (typeof formValue === "string") {
+      const date = new Date(formValue);
+      if (!isNaN(date.getTime())) {
+        attributeValue.valueDate = date;
+      }
+    }
+  } else {
+    attributeValue.valueString = String(formValue);
+  }
+};
+
+const sortApplicationAttributes = (
+  attributes: CategoryAtributes[]
+): CategoryAtributes[] =>
+  [...attributes].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
 
 type EditApplicationDialogProps = {
   open: boolean;
@@ -118,14 +223,18 @@ const EditApplicationDialog = ({
     
     if (Array.isArray(categoryAttributes)) {
       // Filter by scope, case-insensitive
-      return categoryAttributes.filter((attr) => {
-        const scope = String(attr.scope || '').toUpperCase();
-        return scope === "APPLICATION" || scope === "APLICACION";
-      });
+      return sortApplicationAttributes(
+        categoryAttributes.filter((attr) => {
+          const scope = String(attr.scope || "").toUpperCase();
+          return scope === "APPLICATION" || scope === "APLICACION";
+        })
+      );
     }
-    
-    if (typeof categoryAttributes === 'object' && 'application' in categoryAttributes) {
-      return (categoryAttributes as { application: CategoryAtributes[] }).application || [];
+
+    if (typeof categoryAttributes === "object" && "application" in categoryAttributes) {
+      return sortApplicationAttributes(
+        (categoryAttributes as { application: CategoryAtributes[] }).application || []
+      );
     }
     
     return [];
@@ -143,15 +252,31 @@ const EditApplicationDialog = ({
   });
 
   const [yearFields, setYearFields] = useState<Record<string, YearFieldState>>({});
+  const wasOpenRef = useRef(false);
 
-  // Update form data when application changes
+  const resetCreateForm = () => {
+    setFormData({
+      origin: "Nueva aplicación",
+      attributeValues: {},
+    });
+    setYearFields({});
+  };
+
+  // Reset or hydrate form when the dialog opens or the target application changes
   useEffect(() => {
+    if (!open) {
+      setIsSaving(false);
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const didJustOpen = !wasOpenRef.current;
+    wasOpenRef.current = true;
+
     if (!application) {
-      setFormData({
-        origin: "Nueva aplicación",
-        attributeValues: {},
-      });
-      setYearFields({});
+      if (didJustOpen) {
+        resetCreateForm();
+      }
       return;
     }
 
@@ -208,9 +333,9 @@ const EditApplicationDialog = ({
             } else if (attrValue.valueString) {
               value = attrValue.valueString;
             } else if (attrValue.valueDate) {
-              const date = new Date(attrValue.valueDate);
-              if (!isNaN(date.getTime())) {
-                value = date.getFullYear().toString();
+              const year = extractYearFromDate(attrValue.valueDate);
+              if (year !== null) {
+                value = year.toString();
               }
             }
           } else {
@@ -236,9 +361,10 @@ const EditApplicationDialog = ({
                 const date = new Date(attrValue.valueDate);
                 if (!isNaN(date.getTime())) {
                   if (attr.type === CategoryAttributesTypes.DATE) {
-                    value = date.toISOString().split('T')[0];
+                    value = date.toISOString().split("T")[0];
                   } else {
-                    value = date.getFullYear().toString();
+                    const year = extractYearFromDate(date);
+                    value = year !== null ? year.toString() : "";
                   }
                 }
               }
@@ -276,13 +402,7 @@ const EditApplicationDialog = ({
       attributeValues: attributeValuesObj,
     });
     setYearFields(newYearFields);
-  }, [application, applicationAttributes, yearRangeDateAttribute?.id]);
-
-  useEffect(() => {
-    if (!open) {
-      setIsSaving(false);
-    }
-  }, [open]);
+  }, [open, application, applicationAttributes, yearRangeDateAttribute?.id]);
 
   const validateRequiredFields = (): string | null => {
     for (const attr of applicationAttributes) {
@@ -294,12 +414,12 @@ const EditApplicationDialog = ({
       if (isDateYearField) {
         const yearState = yearFields[attr.name] || { start: "", end: "" };
         const startYear = parseInt(yearState.start, 10);
-        if (!yearState.start.trim() || isNaN(startYear) || startYear < 1900 || startYear > 2100) {
-          return `El campo "${translateAttributeName(attr.name, false)}" es obligatorio (año válido entre 1900 y 2100).`;
+        if (!yearState.start.trim() || isNaN(startYear) || startYear < MIN_APPLICATION_YEAR || startYear > MAX_APPLICATION_YEAR) {
+          return `El campo "${translateAttributeName(attr.name, false)}" es obligatorio (año válido entre ${MIN_APPLICATION_YEAR} y ${MAX_APPLICATION_YEAR}).`;
         }
         if (yearState.end.trim()) {
           const endYear = parseInt(yearState.end, 10);
-          if (isNaN(endYear) || endYear < 1900 || endYear > 2100 || endYear < startYear) {
+          if (isNaN(endYear) || endYear < MIN_APPLICATION_YEAR || endYear > MAX_APPLICATION_YEAR || endYear < startYear) {
             return `El año de fin de "${translateAttributeName(attr.name, false)}" no es válido.`;
           }
         }
@@ -329,34 +449,21 @@ const EditApplicationDialog = ({
         };
 
         if (
-          yearValue !== undefined &&
           yearAttrId !== undefined &&
           attr.id === yearAttrId &&
           isDateAttribute(attr)
         ) {
-          attributeValue.valueDate = new Date(yearValue, 0, 1);
+          if (yearValue !== undefined) {
+            attributeValue.valueDate = createYearDate(yearValue);
+          }
           return attributeValue;
         }
 
-        const value = formData.attributeValues[attr.name];
-        if (!hasAttributeValue(value)) return attributeValue;
-
-        if (attr.type === CategoryAttributesTypes.STRING) {
-          attributeValue.valueString = String(value);
-        } else if (attr.type === CategoryAttributesTypes.NUMERIC) {
-          attributeValue.valueNumber = Number(value);
-        } else if (attr.type === CategoryAttributesTypes.BOOLEAN) {
-          attributeValue.valueBoolean = Boolean(value);
-        } else if (isDateAttribute(attr)) {
-          if (value instanceof Date) {
-            attributeValue.valueDate = value;
-          } else if (typeof value === "string") {
-            const date = new Date(value);
-            if (!isNaN(date.getTime())) {
-              attributeValue.valueDate = date;
-            }
-          }
-        }
+        applyFormValueToAttributePayload(
+          attr,
+          formData.attributeValues[attr.name],
+          attributeValue
+        );
 
         return attributeValue;
       })
@@ -415,7 +522,9 @@ const EditApplicationDialog = ({
             start: "",
             end: "",
           };
-          const resolved = resolveYearsToCreate(yearState.start, yearState.end);
+          const resolved = resolveYearsToCreate(yearState.start, yearState.end, {
+            optional: !yearRangeDateAttribute.required,
+          });
           if ("error" in resolved) {
             toast({
               title: "Año no válido",
@@ -429,23 +538,26 @@ const EditApplicationDialog = ({
 
         let createdCount = 0;
 
-        const createOneApplication = async (year?: number) => {
+        if (yearsToCreate && yearAttrId) {
           const createData = {
             sku: productSku,
             origin: formData.origin || "Nueva aplicación",
             idProduct: productId,
-            attributes: buildCreateAttributes(year, yearAttrId),
+            attributes: buildCreateAttributes(undefined, yearAttrId),
+            years: yearsToCreate,
+            yearAttributeId: yearAttrId,
+          };
+          const response = await client.post("/applications/bulk", createData);
+          createdCount = response.data?.createdCount ?? yearsToCreate.length;
+        } else {
+          const createData = {
+            sku: productSku,
+            origin: formData.origin || "Nueva aplicación",
+            idProduct: productId,
+            attributes: buildCreateAttributes(undefined, yearAttrId),
           };
           await client.post("/applications", createData);
-          createdCount += 1;
-        };
-
-        if (yearsToCreate) {
-          for (const year of yearsToCreate) {
-            await createOneApplication(year);
-          }
-        } else {
-          await createOneApplication(undefined);
+          createdCount = 1;
         }
 
         const isRange = createdCount > 1;
@@ -524,7 +636,7 @@ const EditApplicationDialog = ({
               const yearToSave = match
                 ? parseInt(match[1], 10)
                 : parseInt(yearString, 10);
-              if (!isNaN(yearToSave) && yearToSave >= 1900 && yearToSave <= 2100) {
+              if (!isNaN(yearToSave) && yearToSave >= MIN_APPLICATION_YEAR && yearToSave <= MAX_APPLICATION_YEAR) {
                 attributeValue.valueNumber = yearToSave;
               }
             } else {
@@ -586,9 +698,9 @@ const EditApplicationDialog = ({
                 const num = parseInt(String(existingAttr.valueString), 10);
                 if (!isNaN(num)) attributeValue.valueNumber = num;
               } else if (existingAttr.valueDate) {
-                const date = new Date(String(existingAttr.valueDate));
-                if (!isNaN(date.getTime())) {
-                  attributeValue.valueNumber = date.getFullYear();
+                const year = extractYearFromDate(String(existingAttr.valueDate));
+                if (year !== null) {
+                  attributeValue.valueNumber = year;
                 }
               }
             } else {
@@ -725,10 +837,11 @@ const EditApplicationDialog = ({
                           field: "start" | "end",
                           newValue: string
                         ) => {
+                          const sanitizedValue = sanitizeYearInput(newValue);
                           const updatedState = {
                             start:
-                              field === "start" ? newValue : currentYearState.start,
-                            end: field === "end" ? newValue : currentYearState.end,
+                              field === "start" ? sanitizedValue : currentYearState.start,
+                            end: field === "end" ? sanitizedValue : currentYearState.end,
                           };
                           setYearFields({
                             ...yearFields,
@@ -738,20 +851,11 @@ const EditApplicationDialog = ({
                         };
 
                         if (!application) {
-                          const endYear = currentYearState.end.trim()
-                            ? parseInt(currentYearState.end, 10)
-                            : null;
-                          const startYear = currentYearState.start.trim()
-                            ? parseInt(currentYearState.start, 10)
-                            : null;
-                          const appsToCreate =
-                            startYear &&
-                            endYear &&
-                            !isNaN(startYear) &&
-                            !isNaN(endYear) &&
-                            endYear >= startYear
-                              ? endYear - startYear + 1
-                              : 1;
+                          const yearRangePreview = resolveYearsToCreate(
+                            currentYearState.start,
+                            currentYearState.end,
+                            { optional: !attr.required },
+                          );
 
                           return (
                             <div className="space-y-2">
@@ -765,8 +869,8 @@ const EditApplicationDialog = ({
                                   </Label>
                                   <Input
                                     type="number"
-                                    min="1900"
-                                    max="2100"
+                                    min={MIN_APPLICATION_YEAR}
+                                    max={MAX_APPLICATION_YEAR}
                                     value={currentYearState.start}
                                     onChange={(e) =>
                                       handleYearChange("start", e.target.value)
@@ -780,8 +884,8 @@ const EditApplicationDialog = ({
                                   </Label>
                                   <Input
                                     type="number"
-                                    min="1900"
-                                    max="2100"
+                                    min={MIN_APPLICATION_YEAR}
+                                    max={MAX_APPLICATION_YEAR}
                                     value={currentYearState.end}
                                     onChange={(e) =>
                                       handleYearChange("end", e.target.value)
@@ -790,10 +894,24 @@ const EditApplicationDialog = ({
                                   />
                                 </div>
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                {currentYearState.end.trim()
-                                  ? `Se crearán ${appsToCreate} aplicación(es), una por cada año, con los mismos datos y solo cambiando el año.`
-                                  : "Se creará una aplicación para el año indicado. Agrega año fin para crear una por cada año del rango."}
+                              <p
+                                className={`text-xs ${
+                                  "error" in yearRangePreview
+                                    ? "text-destructive"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {!attr.required &&
+                                !currentYearState.start.trim() &&
+                                !currentYearState.end.trim()
+                                  ? `Opcional. Puedes dejarlo vacío y crear la aplicación sin año (${MIN_APPLICATION_YEAR}-${MAX_APPLICATION_YEAR}).`
+                                  : "error" in yearRangePreview
+                                    ? yearRangePreview.error
+                                    : yearRangePreview.years && yearRangePreview.years.length > 1
+                                      ? `Se crearán ${yearRangePreview.years.length} aplicación(es), una por cada año, con los mismos datos y solo cambiando el año.`
+                                      : currentYearState.start.trim()
+                                        ? "Se creará una aplicación para el año indicado. Agrega año fin para crear una por cada año del rango."
+                                        : `Agrega año inicio (y fin si aplica) entre ${MIN_APPLICATION_YEAR} y ${MAX_APPLICATION_YEAR}.`}
                               </p>
                             </div>
                           );
@@ -803,8 +921,8 @@ const EditApplicationDialog = ({
                           <div className="space-y-1">
                             <Input
                               type="number"
-                              min="1900"
-                              max="2100"
+                              min={MIN_APPLICATION_YEAR}
+                              max={MAX_APPLICATION_YEAR}
                               value={currentYearState.start}
                               onChange={(e) => handleYearChange("start", e.target.value)}
                               placeholder="1998"

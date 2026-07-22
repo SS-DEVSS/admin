@@ -174,8 +174,9 @@ const FileUploadModal = ({ open, onOpenChange, onUploadComplete }: FileUploadMod
 
       let productMatchMessage = '';
       if (matchProductsBySku && imageFiles.length > 0) {
-        const result = (await productService.uploadBulkImages(imageFiles)) as BulkImageResult;
-        productMatchMessage = ` Productos: ${result.uploaded} imagen(es) asociada(s), ${result.skipped} omitida(s), ${result.errors} error(es).`;
+        await productService.uploadBulkImages(imageFiles);
+        productMatchMessage =
+          ' Asociación por SKU iniciada en segundo plano — revisa Importaciones (Imágenes por SKU).';
       }
 
       toast({

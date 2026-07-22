@@ -721,7 +721,7 @@ const CategoryCU = ({
                   </div>
                   <div className="grid gap-3">
                     <div className="flex items-center gap-2">
-                      <Label>Marcas asociadas</Label>
+                      <Label>Líneas de producto asociadas</Label>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -729,8 +729,8 @@ const CategoryCU = ({
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              Las marcas asociadas a esta categoría. Los
-                              productos de estas marcas podrán usar esta
+                              Las líneas de producto asociadas a esta categoría. Los
+                              productos de estas líneas podrán usar esta
                               categoría como template.
                             </p>
                           </TooltipContent>
@@ -756,14 +756,14 @@ const CategoryCU = ({
                         ) : null;
                       })}
                       <Input
-                        placeholder="Buscar y agregar marca..."
+                        placeholder="Buscar y agregar línea de producto..."
                         value={brandSearchQuery}
                         onChange={(e) => setBrandSearchQuery(e.target.value)}
                         className="h-8 flex-1 min-w-[160px] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Selecciona las marcas a asociar con esta categoría.
+                      Selecciona las líneas de producto a asociar con esta categoría.
                     </p>
                     {(() => {
                       const unselectedBrands = brands.filter(

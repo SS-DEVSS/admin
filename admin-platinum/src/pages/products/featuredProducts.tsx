@@ -56,7 +56,7 @@ const FeaturedProducts = () => {
     } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: 'Error al cargar productos destacados.',
+        description: 'Error al cargar nuevas integraciones.',
         variant: 'destructive',
       });
     } finally {
@@ -143,11 +143,11 @@ const FeaturedProducts = () => {
       await productService.setFeaturedProduct(productId, null);
       toast({
         title: 'Éxito',
-        description: 'Producto desmarcado como destacado.',
+        description: 'Producto removido de nuevas integraciones.',
       });
       fetchFeaturedProducts();
     } catch (error: unknown) {
-      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al desmarcar el producto.';
+      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al quitar la nueva integración.';
       toast({
         title: 'Error',
         description: errorMessage,
@@ -202,8 +202,8 @@ const FeaturedProducts = () => {
   return (
     <Layout>
       <DashboardPageShell
-        title="Productos Destacados"
-        description="Gestiona los productos destacados que se muestran en la página principal (máximo 6)"
+        title="Nuevas Integraciones"
+        description="Gestiona las nuevas integraciones que se muestran en la página principal (máximo 6)"
         actions={
           <Button
             className="w-full sm:w-auto"
@@ -222,15 +222,15 @@ const FeaturedProducts = () => {
             ) : featuredProducts.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hay productos destacados.</p>
-                <p className="text-sm mt-2">Haz clic en "Agregar Producto" para comenzar a destacar productos.</p>
+                <p>No hay nuevas integraciones.</p>
+                <p className="text-sm mt-2">Haz clic en "Agregar Producto" para comenzar a destacar como nueva integración.</p>
               </div>
             ) : (
               <>
                 {featuredProducts.length >= 6 && (
                   <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                      <strong>Límite alcanzado:</strong> Ya tienes 6 productos destacados. Desmarca uno para agregar otro.
+                      <strong>Límite alcanzado:</strong> Ya tienes 6 nuevas integraciones. Quita una para agregar otra.
                     </p>
                   </div>
                 )}
@@ -241,7 +241,7 @@ const FeaturedProducts = () => {
                         <TableHead className="w-[50px]"></TableHead>
                         <TableHead>SKU</TableHead>
                         <TableHead>Nombre</TableHead>
-                        <TableHead>Aplicación Destacada</TableHead>
+                        <TableHead>Aplicación</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -249,7 +249,7 @@ const FeaturedProducts = () => {
                       {featuredProducts.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="h-24 text-center">
-                            No hay productos destacados.
+                            No hay nuevas integraciones.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -263,7 +263,7 @@ const FeaturedProducts = () => {
                             <TableCell className="text-muted-foreground">
                               {product.featuredApplication
                                 ? formatApplicationDisplay(product.featuredApplication)
-                                : 'Sin aplicación destacada'}
+                                : 'Sin aplicación asignada'}
                             </TableCell>
                             <TableCell>
                               <DropdownMenu>
@@ -299,7 +299,7 @@ const FeaturedProducts = () => {
                   </Table>
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground px-6">
-                  Total: {featuredProducts.length} / 6 productos destacados
+                  Total: {featuredProducts.length} / 6 nuevas integraciones
                 </div>
               </>
             )}
@@ -323,7 +323,7 @@ const FeaturedProducts = () => {
           <DialogHeader>
             <DialogTitle>Seleccionar Producto</DialogTitle>
             <DialogDescription>
-              Busca y selecciona un producto para destacar. Solo se muestran productos que aún no están destacados.
+              Busca y selecciona un producto para destacar como nueva integración. Solo se muestran productos que aún no están en la lista.
             </DialogDescription>
           </DialogHeader>
 
@@ -347,7 +347,7 @@ const FeaturedProducts = () => {
                 <p>
                   {productSearchQuery
                     ? 'No se encontraron productos con ese criterio de búsqueda.'
-                    : 'No hay productos disponibles para destacar.'}
+                    : 'No hay productos disponibles para agregar como nueva integración.'}
                 </p>
               </div>
             ) : (

@@ -88,8 +88,8 @@ const CardTemplate = ({
     if (getBrandById) {
       getBrandById(brand?.id!);
       openModalBrand({
-        title: "Editar Marca",
-        description: "Edita la marca seleccionada.",
+        title: "Editar Línea de Producto",
+        description: "Edita la línea de producto seleccionada.",
         action: "",
       });
     }
@@ -295,13 +295,13 @@ const CardTemplate = ({
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem onClick={handleEditBrand}>
-                      Editar Marca
+                      Editar Línea de Producto
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={brands.length <= 1}
                       onClick={() => setBrandDeleteOpen(true)}
                     >
-                      Eliminar Marca
+                      Eliminar Línea de Producto
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
@@ -348,7 +348,7 @@ const CardTemplate = ({
           <section>
             <Separator />
             <CardContent className="mt-4">
-              <p className="font-bold">Marcas Asociadas</p>
+              <p className="font-bold">Líneas de Producto Asociadas</p>
               <div className="rounded-md my-3 py-1 flex flex-wrap gap-2">
                 {category!.brands.map((brand: any) => (
                   <Badge
@@ -418,12 +418,12 @@ const CardTemplate = ({
       <ConfirmActionDialog
         open={brandDeleteOpen}
         onOpenChange={setBrandDeleteOpen}
-        title="Eliminar marca"
-        description={`Se eliminará la marca "${brand?.name}".`}
+        title="Eliminar línea de producto"
+        description={`Se eliminará la línea de producto "${brand?.name}".`}
         consequences={[
           "Los productos y categorías permanecerán en el sistema.",
-          "Solo se quitará la vinculación con esta marca.",
-          "Debe existir al menos una marca en el sistema.",
+          "Solo se quitará la vinculación con esta línea de producto.",
+          "Debe existir al menos una línea de producto en el sistema.",
         ]}
         loading={brandDeleteLoading}
         onConfirm={handleBrandDeleteConfirm}

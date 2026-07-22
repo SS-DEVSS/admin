@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import axiosClient from "@/services/axiosInstance";
 import { ImportJobStatus } from "@/models/importJob";
 import { useAuthContext } from "./auth-context";
+import { invalidateProductListCache } from "@/utils/productListCache";
 
 type ImportType = "products" | "references" | "applications";
 
@@ -143,6 +144,10 @@ export const ImportProvider = ({
             const created = job.created || 0;
             const updated = job.updated || 0;
             const failed = job.failed || 0;
+
+            if (importType === "products") {
+              invalidateProductListCache();
+            }
             
             let description = `Los ${getImportTypeLabel(importType)} se han importado correctamente.`;
             if (created > 0 || updated > 0) {

@@ -43,6 +43,7 @@ const BulkImageUploadDialog = ({ open, onOpenChange, onComplete }: BulkImageUplo
   const [preview, setPreview] = useState<BulkImageResult | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const resetState = () => {
@@ -50,6 +51,7 @@ const BulkImageUploadDialog = ({ open, onOpenChange, onComplete }: BulkImageUplo
     setPreview(null);
     setPreviewLoading(false);
     setUploadLoading(false);
+    setUploadProgress(0);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -85,11 +87,23 @@ const BulkImageUploadDialog = ({ open, onOpenChange, onComplete }: BulkImageUplo
   const handleUpload = async () => {
     if (files.length === 0) return;
     setUploadLoading(true);
+    setUploadProgress(0);
     try {
-      const result = (await productService.uploadBulkImages(files)) as BulkImageResult;
+      await productService.uploadBulkImages(files, setUploadProgress);
       toast({
-        title: "Carga completada",
-        description: `${result.uploaded} imagen(es) subida(s). ${result.skipped} omitida(s). ${result.errors} error(es). Las imágenes existentes fueron reemplazadas.`,
+        title: "Carga iniciada",
+        description: (
+          <span>
+            El procesamiento continúa en segundo plano.{" "}
+            <a
+              href="/dashboard/importaciones?type=bulk_images"
+              className="underline font-medium"
+            >
+              Ver progreso en Importaciones
+            </a>
+          </span>
+        ),
+        variant: "success",
       });
       setConfirmOpen(false);
       handleOpenChange(false);
@@ -176,6 +190,13 @@ const BulkImageUploadDialog = ({ open, onOpenChange, onComplete }: BulkImageUplo
         ]}
         confirmLabel="Subir imágenes"
         loading={uploadLoading}
+        loadingLabel={
+          uploadProgress > 0 && uploadProgress < 100
+            ? `Subiendo imágenes ${uploadProgress}%...`
+            : uploadProgress >= 100
+              ? "Iniciando job..."
+              : "Subiendo imágenes..."
+        }
         onConfirm={handleUpload}
       />
     </>

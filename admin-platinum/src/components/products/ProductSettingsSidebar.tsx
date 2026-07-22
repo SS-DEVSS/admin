@@ -193,7 +193,7 @@ const ProductSettingsSidebar = ({
                   <Star
                     className={`h-4 w-4 mr-2 ${product.isFeatured ? "fill-yellow-400 text-yellow-400" : ""}`}
                   />
-                  {product.isFeatured ? "Editar destacado" : "Destacar producto"}
+                  {product.isFeatured ? "Editar nueva integración" : "Destacar como nueva integración"}
                 </Button>
                 {product.isFeatured && (
                   <p className="text-xs text-muted-foreground">
@@ -373,18 +373,18 @@ const ProductSettingsSidebar = ({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="brand-sidebar">Marca</Label>
+            <Label htmlFor="brand-sidebar">Línea de Producto</Label>
             <Select value={state.brand || "none"} disabled>
               <SelectTrigger
                 id="brand-sidebar"
                 className="w-full bg-muted cursor-not-allowed"
               >
-                <SelectValue placeholder="Sin marca" />
+                <SelectValue placeholder="Sin línea de producto" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel>Marcas</SelectLabel>
-                  <SelectItem value="none">Sin marca</SelectItem>
+                  <SelectLabel>Líneas de Producto</SelectLabel>
+                  <SelectItem value="none">Sin línea de producto</SelectItem>
                   {brands.map((brand) => (
                     <SelectItem key={brand.id} value={brand.id || ""}>
                       {brand.name}

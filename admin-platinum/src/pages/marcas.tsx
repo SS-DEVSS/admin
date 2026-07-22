@@ -188,15 +188,15 @@ const Marcas = () => {
     if (brandToEdit) {
       setIsEditMode(true);
       openModal({
-        title: "Editar Marca",
-        description: "Edita la marca seleccionada.",
+        title: "Editar Línea de Producto",
+        description: "Edita la línea de producto seleccionada.",
         action: "",
       });
     } else {
       setIsEditMode(false);
       openModal({
-        title: "Agregar Marca",
-        description: "Agregar una nueva marca al sistema.",
+        title: "Agregar Línea de Producto",
+        description: "Agregar una nueva línea de producto al sistema.",
         action: "",
       });
     }
@@ -209,15 +209,15 @@ const Marcas = () => {
       )}
       <Layout>
         <DashboardPageShell
-          title="Marcas"
-          description="Maneja tus marcas y las categorías asociadas a cada una de ellas"
+          title="Líneas de Producto"
+          description="Maneja tus líneas de producto y las categorías asociadas a cada una de ellas"
           filters={
             <>
               <div className="relative flex-1 md:grow-0">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Buscar Marca..."
+                  placeholder="Buscar línea de producto..."
                   onChange={handleSearchFilter}
                   value={filterBrandSearch}
                   className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
@@ -245,7 +245,7 @@ const Marcas = () => {
                     >
                       <PlusCircle className="h-3.5 w-3.5 sm:mr-2" />
                       <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                        Agregar Marca
+                        Agregar Línea de Producto
                       </span>
                     </Button>
                   </DialogTrigger>
@@ -254,7 +254,7 @@ const Marcas = () => {
                       <div className="flex justify-center items-center py-12">
                         <div className="flex flex-col items-center gap-2">
                           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                          <p className="text-sm text-muted-foreground">Cargando marca...</p>
+                          <p className="text-sm text-muted-foreground">Cargando línea de producto...</p>
                         </div>
                       </div>
                     ) : (
@@ -282,7 +282,7 @@ const Marcas = () => {
                         <Textarea
                           id="description"
                           name="description"
-                          placeholder="ej. Marca de lujo"
+                          placeholder="ej. Línea premium"
                           value={form.description}
                           onChange={handleForm}
                           required
@@ -322,7 +322,7 @@ const Marcas = () => {
                             onClick={handleSubmit}
                             type="submit"
                           >
-                            {isSubmitting ? "Guardando..." : isEditMode ? "Actualizar Marca" : "Agregar Marca"}
+                            {isSubmitting ? "Guardando..." : isEditMode ? "Actualizar Línea de Producto" : "Agregar Línea de Producto"}
                           </Button>
                         </DialogFooter>
                       </>
@@ -344,7 +344,7 @@ const Marcas = () => {
                 <NoData>
                   <AlertTriangle className="text-[#4E5154]" />
                   <p className="text-[#4E5154]">
-                    No se ha encontrado ninguna marca
+                    No se ha encontrado ninguna línea de producto
                   </p>
                   <p className="text-[#94A3B8] font-semibold text-sm">
                     Agrega uno en la parte posterior

@@ -84,11 +84,11 @@ const Categorias = () => {
             <div className="flex items-center gap-3 w-full lg:w-auto">
               <Select value={brandFilter} onValueChange={setBrandFilter}>
                 <SelectTrigger className="flex-1 min-w-[160px] md:w-[280px] lg:flex-none">
-                  <SelectValue placeholder="Selecciona una marca" />
+                  <SelectValue placeholder="Selecciona una línea de producto" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Marcas</SelectLabel>
+                    <SelectLabel>Líneas de Producto</SelectLabel>
                     <SelectItem value={"-"}>Seleccionar</SelectItem>
                     {brands.map((brand: Brand) => (
                       <SelectItem key={brand.id} value={brand.id!}>

@@ -9,9 +9,8 @@ import { Product } from "@/models/product";
 import { Application } from "@/models/application";
 import { PlusCircle, Pencil, ChevronDown, ChevronUp, Trash2, MoreVertical, Info } from "lucide-react";
 import ConfirmActionDialog from "@/components/ConfirmActionDialog";
-import { toast } from "@/hooks/use-toast";
 import * as React from "react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import NoData from "../NoData";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -40,6 +39,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  extractApplicationYear,
+  extractYearFromAttributeValue,
+  extractYearFromDate,
+} from "@/utils/applicationYear";
 
 const APPLICATIONS_NOTE =
   'Cada aplicación muestra información del vehículo (Modelo, Submodelo, Año, etc.) seguida de un identificador único entre paréntesis. Este identificador corresponde a los últimos 8 caracteres del ID de la aplicación en la base de datos, lo que permite diferenciar cada aplicación y facilitar su búsqueda o referencia si es necesario. Si aparece "BASE" o "Aplicación", significa que esa aplicación no tiene información adicional de vehículo, pero el identificador único permite diferenciarla de las demás.';
@@ -69,6 +73,7 @@ type ApplicationsCardProps = {
   };
   setState: React.Dispatch<React.SetStateAction<{ applications: Application[] }>>;
   product?: Product | null;
+  onApplicationsChange?: (applications: Application[]) => void;
 };
 
 type GroupedApplication = {
@@ -90,15 +95,23 @@ type GroupedApplication = {
 
 type ApplicationActionsMenuProps = {
   application: Application;
+  deleteApplications?: Application[];
   onEdit: (application: Application) => void;
-  onDelete: (application: Application) => void;
+  onDelete: (applications: Application[]) => void;
 };
 
 const ApplicationActionsMenu = ({
   application,
+  deleteApplications,
   onEdit,
   onDelete,
-}: ApplicationActionsMenuProps) => (
+}: ApplicationActionsMenuProps) => {
+  const applicationsToDelete = deleteApplications ?? [application];
+  const deleteCount = applicationsToDelete.length;
+  const deleteLabel =
+    deleteCount > 1 ? `Eliminar grupo (${deleteCount})` : "Eliminar";
+
+  return (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted/50">
@@ -114,26 +127,36 @@ const ApplicationActionsMenu = ({
       </DropdownMenuItem>
       <DropdownMenuItem
         className="text-destructive focus:text-destructive"
-        onSelect={() => onDelete(application)}
+        onSelect={() => onDelete(applicationsToDelete)}
       >
         <Trash2 className="mr-2 h-4 w-4" />
-        Eliminar
+        {deleteLabel}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
-);
+  );
+};
 
-const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) => {
+type ApplicationDeleteTarget = {
+  applications: Application[];
+  isGroupDelete: boolean;
+};
+
+const ApplicationsCard = ({
+  state,
+  setState,
+  product,
+  onApplicationsChange,
+}: ApplicationsCardProps) => {
   const { categories } = useCategoryContext();
+  const hydratedProductIdRef = useRef<string | null>(null);
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   // Always use table view - list view removed
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ApplicationDeleteTarget | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   const allApplicationIds = useMemo(
     () => getApplicationIds(state.applications),
@@ -179,6 +202,28 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const removeApplicationsLocally = useCallback(
+    (applications: Application[]) => {
+      const idsToRemove = new Set(getApplicationIds(applications));
+      if (idsToRemove.size === 0) return;
+
+      setState((prev) => {
+        const nextApplications = prev.applications.filter(
+          (application) => !application.id || !idsToRemove.has(application.id),
+        );
+        onApplicationsChange?.(nextApplications);
+        return { applications: nextApplications };
+      });
+
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        idsToRemove.forEach((applicationId) => next.delete(applicationId));
+        return next;
+      });
+    },
+    [setState, onApplicationsChange],
+  );
 
   // Get category attributes (only application attributes)
   const categoryAttributes = useMemo(() => {
@@ -230,75 +275,6 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
     setIsEditDialogOpen(true);
   };
 
-  const confirmDeleteApplication = async () => {
-    if (!deleteTarget?.id) return;
-    setDeleteLoading(true);
-    try {
-      await axiosClient().delete(`/applications/${deleteTarget.id}`);
-      setState((prev) => ({
-        applications: prev.applications.filter((app) => app.id !== deleteTarget.id),
-      }));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(deleteTarget.id as string);
-        return next;
-      });
-      toast({ title: "Aplicación eliminada", variant: "success" });
-      setDeleteTarget(null);
-    } catch (error: unknown) {
-      const msg =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Error al eliminar aplicación";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const confirmBulkDeleteApplications = async () => {
-    const applicationIds = Array.from(selectedIds);
-    if (applicationIds.length === 0) return;
-
-    setBulkDeleteLoading(true);
-    try {
-      const response = await axiosClient().delete("/applications/bulk", {
-        data: { applicationIds },
-      });
-      const deletedIds = new Set(applicationIds);
-      setState((prev) => ({
-        applications: prev.applications.filter(
-          (application) => !application.id || !deletedIds.has(application.id)
-        ),
-      }));
-      clearSelection();
-      setBulkDeleteOpen(false);
-
-      const deletedCount = response.data?.deletedCount ?? applicationIds.length;
-      toast({
-        title: "Aplicaciones eliminadas",
-        variant: "success",
-        description: `Se eliminaron ${deletedCount} aplicación(es).`,
-      });
-
-      if (response.data?.errors?.length) {
-        toast({
-          title: "Algunas aplicaciones no se eliminaron",
-          description: response.data.errors.join(" "),
-          variant: "destructive",
-        });
-      }
-    } catch (error: unknown) {
-      const msg =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Error al eliminar aplicaciones";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setBulkDeleteLoading(false);
-    }
-  };
-
-  // Helper function to format applications (same logic as newProduct.tsx)
-  // Using useCallback to avoid dependency issues
   const formatApplications = useCallback((applications: any[]): Application[] => {
     return applications.map((app: any) => {
 
@@ -321,14 +297,9 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
           }
           // Fallback to valueDate if valueNumber not available
           if (attr.valueDate) {
-            const date = new Date(attr.valueDate);
-            if (!isNaN(date.getTime())) {
-              return date.getFullYear().toString();
-            }
-            const dateStr = String(attr.valueDate);
-            const yearMatch = dateStr.match(/^(\d{4})/);
-            if (yearMatch) {
-              return yearMatch[1];
+            const year = extractYearFromDate(attr.valueDate);
+            if (year !== null) {
+              return year.toString();
             }
           }
           // Last resort: valueString
@@ -427,43 +398,90 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
     });
   }, []);
 
-  // Load applications from product when editing (using useEffect to avoid render issues)
-  useEffect(() => {
-    if (!product) {
+  const refreshApplicationsFromBackend = useCallback(async () => {
+    if (!product?.id) return;
+
+    try {
+      const response = await axiosClient().get(`/applications/product/${product.id}`);
+      const backendApplications = response.data?.applications ?? [];
+      const formattedApplications = formatApplications(backendApplications);
+      setState({ applications: formattedApplications });
+      onApplicationsChange?.(formattedApplications);
+    } catch {
+      // Keep current list if refresh fails
+    }
+  }, [product?.id, formatApplications, setState, onApplicationsChange]);
+
+  const handleDeleteApplications = (applications: Application[]) => {
+    if (applications.length === 0) return;
+
+    if (applications.length === 1) {
+      removeApplicationsLocally(applications);
       return;
     }
 
-    const productApplications = (product as any).applications;
+    setDeleteTarget({
+      applications,
+      isGroupDelete: true,
+    });
+  };
 
-    if (productApplications && productApplications.length > 0) {
-      // Always format applications to ensure they have proper structure
-      // This ensures the table grouping works correctly from the start
-      const formattedApplications = formatApplications(productApplications);
+  const getDeleteTargetDescription = (target: ApplicationDeleteTarget): string => {
+    if (!target.isGroupDelete) {
+      return "Se eliminará esta aplicación del producto.";
+    }
 
-      // Always update to ensure applications are formatted correctly
-      // This ensures grouping works correctly even if state already has applications
-      setState({ applications: formattedApplications });
+    const years = target.applications
+      .map((application) => extractYear(application))
+      .filter((year): year is number => year !== null)
+      .sort((a, b) => a - b);
+
+    const yearLabel =
+      years.length > 0
+        ? years[0] === years[years.length - 1]
+          ? String(years[0])
+          : `${years[0]}-${years[years.length - 1]}`
+        : null;
+
+    const yearText = yearLabel ? ` (años ${yearLabel})` : "";
+    return `Se eliminarán ${target.applications.length} aplicaciones agrupadas${yearText}.`;
+  };
+
+  const confirmDeleteApplication = () => {
+    if (!deleteTarget) return;
+    removeApplicationsLocally(deleteTarget.applications);
+    setDeleteTarget(null);
+  };
+
+  const confirmBulkDeleteApplications = () => {
+    const applicationIds = Array.from(selectedIds);
+    if (applicationIds.length === 0) return;
+
+    const applicationsToRemove = state.applications.filter(
+      (application) => application.id && applicationIds.includes(application.id),
+    );
+    removeApplicationsLocally(applicationsToRemove);
+    clearSelection();
+    setBulkDeleteOpen(false);
+  };
+
+  // Hydrate once per product from parent payload; avoid overwriting after local deletes/edits
+  useEffect(() => {
+    if (!product?.id) return;
+    if (hydratedProductIdRef.current === product.id) return;
+
+    hydratedProductIdRef.current = product.id;
+    const productApplications = (product as { applications?: unknown[] }).applications ?? [];
+
+    if (productApplications.length > 0) {
+      setState({ applications: formatApplications(productApplications) });
     } else {
-      // Ensure state is set to empty array if no applications
       setState({ applications: [] });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, formatApplications]); // Include formatApplications in deps to ensure it uses the latest version
+  }, [product?.id, formatApplications, setState]);
 
   const handleEditSuccess = async () => {
-    // Refresh applications from backend if product ID is available
-    if (product?.id) {
-      try {
-        const client = axiosClient();
-        const response = await client.get(`/applications/product/${product.id}`);
-        if (response.data?.applications) {
-          // Format applications before setting state
-          const formattedApplications = formatApplications(response.data.applications);
-          setState({ applications: formattedApplications });
-        }
-      } catch (error) {
-      }
-    }
+    await refreshApplicationsFromBackend();
   };
 
   // Helper function to extract attribute value from application
@@ -480,26 +498,7 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
 
     // For year attributes, prioritize valueNumber (as it's stored now)
     if (isYearAttribute) {
-      if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-        return attr.valueNumber;
-      }
-      // Fallback to valueDate if valueNumber not available
-      if (attr.valueDate) {
-        const date = new Date(attr.valueDate);
-        if (!isNaN(date.getTime())) {
-          return date.getFullYear();
-        }
-      }
-      // Last resort: valueString
-      if (attr.valueString) {
-        const str = String(attr.valueString);
-        const yearMatch = str.match(/^(\d{4})/);
-        if (yearMatch) {
-          return parseInt(yearMatch[1], 10);
-        }
-        return str;
-      }
-      return null;
+      return extractYearFromAttributeValue(attr);
     }
 
     // For non-year attributes, use standard priority
@@ -525,70 +524,113 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
     return `${origin}|${fabricante}|${modelo}|${submodelo}|${litrosMotor}|${ccMotor}|${cidMotor}|${cilindrosMotor}|${bloqueMotor}|${motor}|${tipoMotor}|${transmision}`;
   };
 
-  // Helper function to extract year value (single year, not range)
-  const extractYear = (application: Application): number | null => {
-    // First, try to get from attributeValues directly (checking valueDate)
-    const attr = application.attributeValues?.find((av: any) => {
-      const attrName = av.attribute?.name || "";
-      return attrName.toLowerCase().includes("año") ||
-        attrName.toLowerCase().includes("anio") ||
-        attrName.toLowerCase().includes("year");
-    });
+  const extractYear = (application: Application): number | null =>
+    extractApplicationYear(application.attributeValues);
 
-    if (attr) {
-      // Prioritize valueNumber (as year is stored as number now)
-      if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-        return typeof attr.valueNumber === 'number' ? attr.valueNumber : parseInt(String(attr.valueNumber), 10);
-      }
+  const buildMotorDescripcion = (application: Application): string | null => {
+    const motor = getAttributeValue(application, "Motor");
+    const tipoMotor = getAttributeValue(application, "Tipo_Motor");
+    const litrosMotor = getAttributeValue(application, "Litros_Motor");
+    const ccMotor = getAttributeValue(application, "CC_Motor");
+    const cilindrosMotor = getAttributeValue(application, "Cilindros_Motor");
+    const bloqueMotor = getAttributeValue(application, "Bloque_Motor");
 
-      // Fallback to valueDate - extract year from date
-      if (attr.valueDate) {
-        const date = new Date(attr.valueDate);
-        if (!isNaN(date.getTime())) {
-          return date.getFullYear();
-        }
-      }
+    if (motor) return String(motor);
+    if (tipoMotor) return String(tipoMotor);
 
-      // Handle valueString (could be range or single year)
-      if (attr.valueString) {
-        const match = attr.valueString.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
-        if (match) {
-          return parseInt(match[1], 10); // Return first year only
-        }
-        const singleYear = parseInt(attr.valueString, 10);
-        if (!isNaN(singleYear)) return singleYear;
-      }
+    const parts: string[] = [];
+    if (bloqueMotor) parts.push(String(bloqueMotor));
+    if (cilindrosMotor) parts.push(`${cilindrosMotor}cil`);
+    if (litrosMotor) parts.push(`${litrosMotor}L`);
+    else if (ccMotor) parts.push(`${ccMotor}CC`);
 
-      // Handle valueNumber (legacy support)
-      if (typeof attr.valueNumber === "number") {
-        return attr.valueNumber;
-      }
-    }
-
-    // Fallback to getAttributeValue helper
-    const añoValue = getAttributeValue(application, 'Año');
-    if (!añoValue) return null;
-
-    // If it's a range string like "1998-2024", extract the first year
-    if (typeof añoValue === "string") {
-      const match = añoValue.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
-      if (match) {
-        return parseInt(match[1], 10); // Return first year only
-      }
-      // If it's just a single year string
-      const singleYear = parseInt(añoValue, 10);
-      if (!isNaN(singleYear)) return singleYear;
-    }
-
-    // If it's a number
-    if (typeof añoValue === "number") {
-      return añoValue;
-    }
-
-    return null;
+    return parts.length > 0 ? parts.join(" ") : null;
   };
 
-  // Group applications by similarity (all attributes except Año)
+  const buildEspecificaciones = (application: Application): string | null => {
+    const transmision =
+      getAttributeValue(application, "Transmisión") ||
+      getAttributeValue(application, "Transmision");
+    return transmision ? String(transmision) : null;
+  };
+
+  const sortApplicationsByYear = (applications: Application[]): Application[] => {
+    return [...applications].sort((a, b) => {
+      const yearA = extractYear(a);
+      const yearB = extractYear(b);
+      if (yearA === null && yearB === null) return 0;
+      if (yearA === null) return 1;
+      if (yearB === null) return -1;
+      return yearA - yearB;
+    });
+  };
+
+  const formatCellValue = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined || value === "") return "-";
+    return String(value);
+  };
+
+  const splitApplicationsByConsecutiveYears = (
+    applications: Application[]
+  ): Application[][] => {
+    const sorted = sortApplicationsByYear(applications);
+    if (sorted.length === 0) return [];
+    if (sorted.length === 1) return [sorted];
+
+    const chunks: Application[][] = [];
+    let currentChunk: Application[] = [sorted[0]];
+    let previousYear = extractYear(sorted[0]);
+
+    for (let index = 1; index < sorted.length; index += 1) {
+      const application = sorted[index];
+      const year = extractYear(application);
+      const belongsToSameBlock =
+        previousYear !== null &&
+        year !== null &&
+        (year === previousYear || year === previousYear + 1);
+
+      if (belongsToSameBlock) {
+        currentChunk.push(application);
+        if (year !== null) {
+          previousYear = year;
+        }
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [application];
+        previousYear = year;
+      }
+    }
+
+    chunks.push(currentChunk);
+    return chunks;
+  };
+
+  const buildGroupedApplication = (applications: Application[]): GroupedApplication => {
+    const sortedApplications = sortApplicationsByYear(applications);
+    const firstApp = sortedApplications[0];
+    const years = sortedApplications
+      .map((app) => extractYear(app))
+      .filter((year): year is number => year !== null);
+
+    return {
+      applications: sortedApplications,
+      origin: firstApp.origin,
+      fabricante: getAttributeValue(firstApp, "Fabricante"),
+      modelo: getAttributeValue(firstApp, "Modelo"),
+      submodelo: getAttributeValue(firstApp, "Submodelo"),
+      añoMin: years.length > 0 ? years[0] : null,
+      añoMax: years.length > 0 ? years[years.length - 1] : null,
+      litrosMotor: getAttributeValue(firstApp, "Litros_Motor"),
+      ccMotor: getAttributeValue(firstApp, "CC_Motor"),
+      cidMotor: getAttributeValue(firstApp, "CID_Motor"),
+      cilindrosMotor: getAttributeValue(firstApp, "Cilindros_Motor"),
+      bloqueMotor: getAttributeValue(firstApp, "Bloque_Motor"),
+      motorDescripcion: buildMotorDescripcion(firstApp),
+      especificaciones: buildEspecificaciones(firstApp),
+    };
+  };
+
+  // Group applications by similarity (all attributes except Año), then split by consecutive years
   const groupedApplications = useMemo((): GroupedApplication[] => {
     if (state.applications.length === 0) {
       return [];
@@ -606,164 +648,22 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
     });
 
 
-    // Convert groups to GroupedApplication format
-    const grouped = Array.from(groups.entries()).map(([, applications]) => {
-      const firstApp = applications[0];
+    // Convert groups to GroupedApplication format, splitting non-consecutive years
+    const grouped: GroupedApplication[] = [];
 
-      // Extract all years from applications in this group
-      const years = applications
-        .map(app => extractYear(app))
-        .filter((year): year is number => year !== null)
-        .sort((a, b) => a - b);
-
-      const añoMin = years.length > 0 ? years[0] : null;
-      const añoMax = years.length > 0 ? years[years.length - 1] : null;
-
-      // Extract motor description (build from available motor attributes)
-      const motor = getAttributeValue(firstApp, 'Motor');
-      const tipoMotor = getAttributeValue(firstApp, 'Tipo_Motor');
-      const litrosMotor = getAttributeValue(firstApp, 'Litros_Motor');
-      const ccMotor = getAttributeValue(firstApp, 'CC_Motor');
-      const cilindrosMotor = getAttributeValue(firstApp, 'Cilindros_Motor');
-      const bloqueMotor = getAttributeValue(firstApp, 'Bloque_Motor');
-
-      let motorDescripcion = "";
-      if (motor) {
-        motorDescripcion = String(motor);
-      } else if (tipoMotor) {
-        motorDescripcion = String(tipoMotor);
-      } else {
-        const parts: string[] = [];
-        if (bloqueMotor) parts.push(String(bloqueMotor));
-        if (cilindrosMotor) parts.push(`${cilindrosMotor}cil`);
-        if (litrosMotor) parts.push(`${litrosMotor}L`);
-        else if (ccMotor) parts.push(`${ccMotor}CC`);
-        motorDescripcion = parts.join(" ");
-      }
-
-      // Build especificaciones (Transmisión, etc.)
-      const transmision = getAttributeValue(firstApp, 'Transmisión') || getAttributeValue(firstApp, 'Transmision');
-      const especificacionesParts: string[] = [];
-      // You can add more specifications here as needed
-      if (transmision) especificacionesParts.push(String(transmision));
-      const especificaciones = especificacionesParts.length > 0 ? especificacionesParts.join(" | ") : null;
-
-      return {
-        applications,
-        origin: firstApp.origin,
-        fabricante: getAttributeValue(firstApp, 'Fabricante'),
-        modelo: getAttributeValue(firstApp, 'Modelo'),
-        submodelo: getAttributeValue(firstApp, 'Submodelo'),
-        añoMin,
-        añoMax,
-        litrosMotor: getAttributeValue(firstApp, 'Litros_Motor'),
-        ccMotor: getAttributeValue(firstApp, 'CC_Motor'),
-        cidMotor: getAttributeValue(firstApp, 'CID_Motor'),
-        cilindrosMotor: getAttributeValue(firstApp, 'Cilindros_Motor'),
-        bloqueMotor: getAttributeValue(firstApp, 'Bloque_Motor'),
-        motorDescripcion: motorDescripcion || null,
-        especificaciones,
-      };
+    groups.forEach((applications) => {
+      splitApplicationsByConsecutiveYears(applications).forEach((chunk) => {
+        grouped.push(buildGroupedApplication(chunk));
+      });
     });
 
-    return grouped;
+    return grouped.sort((a, b) => {
+      const minA = a.añoMin ?? Number.MAX_SAFE_INTEGER;
+      const minB = b.añoMin ?? Number.MAX_SAFE_INTEGER;
+      if (minA !== minB) return minA - minB;
+      return (a.añoMax ?? 0) - (b.añoMax ?? 0);
+    });
   }, [state.applications]);
-
-  // Helper function to format application display text
-  const getApplicationDisplayText = (application: Application): string => {
-    // If there's a displayText property (from formatted applications), use it
-    if ((application as any).displayText) {
-      return (application as any).displayText;
-    }
-
-    // Build display text from attribute values
-    if (application.attributeValues && application.attributeValues.length > 0) {
-      const parts: string[] = [];
-
-      const normalizeToYear = (input: any): string | null => {
-        if (input === null || input === undefined) return null;
-        const str = String(input);
-        const yearMatch = str.match(/^(\d{4})/);
-        if (yearMatch) return yearMatch[1];
-        return null;
-      };
-
-      application.attributeValues.forEach((attr: any) => {
-        const attrName = attr.attribute?.name || "";
-        const isYearAttribute = attrName.toLowerCase().includes("año") ||
-          attrName.toLowerCase().includes("anio") ||
-          attrName.toLowerCase().includes("year");
-
-        let value: any = null;
-
-        if (isYearAttribute) {
-          // Prioritize valueNumber (as it's stored now)
-          if (attr.valueNumber !== null && attr.valueNumber !== undefined) {
-            value = attr.valueNumber.toString();
-          } else if (attr.valueString) {
-            // If it's a string, try to extract year
-            const normalized = normalizeToYear(attr.valueString);
-            value = normalized ?? attr.valueString;
-          } else if (attr.valueDate) {
-            // If it's a date, extract year
-            const date = new Date(attr.valueDate);
-            if (!isNaN(date.getTime())) {
-              value = date.getFullYear().toString();
-            } else {
-              const normalized = normalizeToYear(attr.valueDate);
-              value = normalized ?? null;
-            }
-          } else {
-            value = null;
-          }
-
-          // Final check: if value is still a long string/timestamp, extract year
-          if (value && typeof value === "string" && (value.includes('T') || value.length > 4)) {
-            const normalized = normalizeToYear(value);
-            if (normalized) value = normalized;
-          }
-        } else if (attr.valueDate) {
-          // Para otros atributos de fecha, mostrar solo el año en el preview
-          const date = new Date(attr.valueDate);
-          if (!isNaN(date.getTime())) {
-            value = date.getFullYear().toString();
-          } else {
-            const normalized = normalizeToYear(attr.valueDate);
-            value = normalized ?? attr.valueDate;
-          }
-        } else {
-          // Fallback a string/number/boolean
-          value = attr.valueString ?? attr.valueNumber ?? attr.valueBoolean;
-          // Si parece timestamp/ISO y tiene año, muestra solo el año
-          if (typeof value === "string" && value.length > 4) {
-            const normalized = normalizeToYear(value);
-            if (normalized) value = normalized;
-          }
-        }
-
-        // If value is a string that looks like a timestamp, extract year
-        if (typeof value === "string" && isYearAttribute) {
-          if (value.includes('T') || (value.includes('-') && value.length > 4)) {
-            const yearMatch = value.match(/^(\d{4})/);
-            if (yearMatch) {
-              value = yearMatch[1];
-            }
-          }
-        }
-
-        if (value !== null && value !== undefined && attrName) {
-          parts.push(`${attrName}: ${value}`);
-        }
-      });
-      if (parts.length > 0) {
-        return parts.join(", ");
-      }
-    }
-
-    // Fallback to ID
-    const idSuffix = application.id ? application.id.substring(application.id.length - 8).toUpperCase() : '-';
-    return `Aplicación (${idSuffix})`;
-  };
 
   return (
     <Card className="w-full flex flex-col">
@@ -926,52 +826,71 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
                               {group.applications.length > 0 && (
                                 <ApplicationActionsMenu
                                   application={group.applications[0]}
+                                  deleteApplications={group.applications}
                                   onEdit={handleEditApplication}
-                                  onDelete={setDeleteTarget}
+                                  onDelete={handleDeleteApplications}
                                 />
                               )}
                             </TableCell>
                           </TableRow>
-                          {isExpanded && group.applications.length > 0 && (
-                            <TableRow className="bg-gray-50">
-                              <TableCell colSpan={14} className="p-4">
-                                <div className="space-y-2">
-                                  <h4 className="font-semibold text-sm mb-3">
-                                    Aplicaciones individuales en este grupo ({group.applications.length}):
-                                  </h4>
-                                  <div className="flex flex-wrap gap-2">
-                                    {group.applications.map((app) => (
-                                      <div
-                                        key={app.id}
-                                        className="bg-white border rounded-lg p-3 flex items-center gap-3 min-w-[200px]"
-                                      >
-                                        {app.id && (
-                                          <Checkbox
-                                            checked={selectedIds.has(app.id)}
-                                            onCheckedChange={() => toggleSelectOne(app.id as string)}
-                                            aria-label="Seleccionar aplicación"
-                                          />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium">
-                                            {getApplicationDisplayText(app)}
-                                          </p>
-                                          <p className="text-xs text-gray-500 mt-1">
-                                            ID: {app.id.substring(app.id.length - 8).toUpperCase()}
-                                          </p>
-                                        </div>
-                                        <ApplicationActionsMenu
-                                          application={app}
-                                          onEdit={handleEditApplication}
-                                          onDelete={setDeleteTarget}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
+                          {isExpanded &&
+                            group.applications.map((app) => {
+                              const year = extractYear(app);
+                              return (
+                                <TableRow key={app.id} className="bg-muted/30 hover:bg-muted/40">
+                                  <TableCell className="w-10 px-2">
+                                    {app.id && (
+                                      <Checkbox
+                                        checked={selectedIds.has(app.id)}
+                                        onCheckedChange={() => toggleSelectOne(app.id as string)}
+                                        aria-label="Seleccionar aplicación"
+                                      />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="pl-6">{formatCellValue(app.origin)}</span>
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Fabricante"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Modelo"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Submodelo"))}
+                                  </TableCell>
+                                  <TableCell>{year ? String(year) : "-"}</TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Litros_Motor"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "CC_Motor"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "CID_Motor"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Cilindros_Motor"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(getAttributeValue(app, "Bloque_Motor"))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(buildMotorDescripcion(app))}
+                                  </TableCell>
+                                  <TableCell>
+                                    {formatCellValue(buildEspecificaciones(app))}
+                                  </TableCell>
+                                  <TableCell>
+                                    <ApplicationActionsMenu
+                                      application={app}
+                                      onEdit={handleEditApplication}
+                                      onDelete={handleDeleteApplications}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                         </React.Fragment>
                       );
                     })}
@@ -995,10 +914,15 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
       <ConfirmActionDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Eliminar aplicación"
-        description="Se eliminará esta aplicación del producto."
-        consequences={["La aplicación y sus atributos asociados se eliminarán permanentemente."]}
-        loading={deleteLoading}
+        title="Eliminar grupo de aplicaciones"
+        description={
+          deleteTarget ? getDeleteTargetDescription(deleteTarget) : undefined
+        }
+        consequences={[
+          deleteTarget
+            ? `Se quitarán ${deleteTarget.applications.length} aplicaciones del listado. Los cambios se aplicarán al guardar el producto.`
+            : "Los cambios se aplicarán al guardar el producto.",
+        ]}
         onConfirm={confirmDeleteApplication}
       />
 
@@ -1006,12 +930,10 @@ const ApplicationsCard = ({ state, setState, product }: ApplicationsCardProps) =
         open={bulkDeleteOpen}
         onOpenChange={setBulkDeleteOpen}
         title="Eliminar aplicaciones seleccionadas"
-        description={`Se eliminarán ${selectedIds.size} aplicación(es) de forma permanente.`}
+        description={`Se quitarán ${selectedIds.size} aplicación(es) del listado.`}
         consequences={[
-          "Las aplicaciones y sus atributos asociados se eliminarán del producto.",
-          "Esta acción no se puede deshacer.",
+          "Las aplicaciones seleccionadas se eliminarán al guardar el producto.",
         ]}
-        loading={bulkDeleteLoading}
         onConfirm={confirmBulkDeleteApplications}
       />
     </Card>

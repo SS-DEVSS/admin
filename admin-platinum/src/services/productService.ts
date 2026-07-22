@@ -146,6 +146,7 @@ export const productService = {
       search?: string;
       idSubcategory?: string;
       catalogVisibility?: CatalogVisibilityFilter;
+      filters?: Record<string, string | string[]>;
     }
   ): Promise<CategoryProductsResponse> => {
     const client = axiosClient();
@@ -159,10 +160,33 @@ export const productService = {
     if (options?.catalogVisibility && options.catalogVisibility !== "all") {
       params.catalogVisibility = options.catalogVisibility;
     }
+    if (options?.filters && Object.keys(options.filters).length > 0) {
+      params.filters = JSON.stringify(options.filters);
+    }
 
     const response = await client.get<CategoryProductsResponse>(
       `/products/category/${categoryId}`,
       { params, timeout: LIST_REQUEST_TIMEOUT_MS }
+    );
+    return response.data;
+  },
+
+  getCategoryFilterOptions: async (
+    categoryId: string,
+    filters?: Record<string, string | string[]>,
+    options?: { flat?: boolean; signal?: AbortSignal }
+  ): Promise<Record<string, string[]>> => {
+    const client = axiosClient();
+    const params: Record<string, string> = {};
+    if (filters && Object.keys(filters).length > 0) {
+      params.filters = JSON.stringify(filters);
+    }
+    if (options?.flat) {
+      params.flat = "true";
+    }
+    const response = await client.get<Record<string, string[]>>(
+      `/products/category/${categoryId}/filters`,
+      { params, signal: options?.signal, timeout: LIST_REQUEST_TIMEOUT_MS }
     );
     return response.data;
   },
@@ -189,16 +213,35 @@ export const productService = {
   bulkDeleteProducts: async (payload: {
     productIds?: string[];
     selectAll?: boolean;
+    scope?: {
+      deleteProduct?: boolean;
+      deleteApplications?: boolean;
+      deleteReferences?: boolean;
+      deleteImages?: boolean;
+    };
     filters?: {
       categoryId?: string;
       subcategoryId?: string;
       search?: string;
       catalogVisibility?: CatalogVisibilityFilter;
       includeHidden?: boolean;
+      applicationFilters?: Record<string, string | string[]>;
     };
-  }): Promise<{ deletedCount: number; failed: { id: string; reason: string }[] }> => {
+  }): Promise<{
+    deletedCount: number;
+    deletedApplicationsCount: number;
+    deletedReferencesCount: number;
+    deletedImagesCount: number;
+    failed: { id: string; reason: string }[];
+  }> => {
     const client = axiosClient();
-    const response = await client.post<{ deletedCount: number; failed: { id: string; reason: string }[] }>(
+    const response = await client.post<{
+      deletedCount: number;
+      deletedApplicationsCount: number;
+      deletedReferencesCount: number;
+      deletedImagesCount: number;
+      failed: { id: string; reason: string }[];
+    }>(
       "/products/bulk/delete",
       payload,
       { timeout: LIST_REQUEST_TIMEOUT_MS }
@@ -214,13 +257,26 @@ export const productService = {
     return response.data;
   },
 
-  uploadBulkImages: async (files: File[]) => {
+  uploadBulkImages: async (
+    files: File[],
+    onUploadProgress?: (percent: number) => void
+  ): Promise<{
+    jobId: string;
+    status: string;
+    message: string;
+    progress: number;
+  }> => {
     const client = axiosClient();
     const formData = new FormData();
     files.forEach((file) => formData.append("images", file));
     const response = await client.post("/products/bulk/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
-      timeout: LIST_REQUEST_TIMEOUT_MS,
+      timeout: 120000,
+      validateStatus: (status) => status === 202 || (status >= 200 && status < 300),
+      onUploadProgress: (event) => {
+        if (!onUploadProgress || !event.total) return;
+        onUploadProgress(Math.round((event.loaded * 100) / event.total));
+      },
     });
     return response.data;
   },

@@ -24,7 +24,7 @@ export default function BlogPreview({
   return (
     <Card className="border-dashed">
       <CardHeader>
-        <CardTitle>Vista previa del blog</CardTitle>
+        <CardTitle>Vista previa de la noticia</CardTitle>
         <CardDescription>Así se mostrará el contenido principal al publicarlo.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -37,18 +37,18 @@ export default function BlogPreview({
         ) : null}
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold">{title || "Título del blog"}</h2>
+          <h2 className="text-2xl font-semibold">{title || "Título de la noticia"}</h2>
           <div
             className="text-muted-foreground leading-relaxed [&_p]:mb-2"
             dangerouslySetInnerHTML={{
-              __html: description || "<p>Descripción del blog...</p>",
+              __html: description || "<p>Descripción de la noticia...</p>",
             }}
           />
         </div>
 
         <article
           className="prose prose-sm max-w-none [&_img]:max-h-72 [&_img]:rounded-md [&_img]:object-cover"
-          dangerouslySetInnerHTML={{ __html: content || "<p>Contenido del blog...</p>" }}
+          dangerouslySetInnerHTML={{ __html: content || "<p>Contenido de la noticia...</p>" }}
         />
 
         {hasRelatedLinks ? (

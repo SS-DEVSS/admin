@@ -72,9 +72,9 @@ const CardBlogPost = ({ blogPost, deleteItem, editPath = "/dashboard/noticias/ed
                   <DropdownMenuItem
                     onClick={() =>
                       openModal({
-                        title: "Blog",
+                        title: "Noticia",
                         description:
-                          "¿Estás seguro de que deseas eliminar este blog? Esta acción no se puede deshacer.",
+                          "¿Estás seguro de que deseas eliminar esta noticia? Esta acción no se puede deshacer.",
                         handleDelete: handleDeleteBlogPost,
                       })
                     }

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Calendar } from "./ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { createYearDate, extractYearFromDate } from "@/utils/applicationYear";
 
 type getComponentProps = {
   type: CategoryAttributesTypes;
@@ -115,23 +116,21 @@ const DynamicComponent = ({ type, name, required, value, onChange }: getComponen
         if (/^\d{4}$/.test(value.trim())) {
           yearValue = value.trim();
         } else {
-          // If it's a date string or timestamp, extract the year
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            yearValue = date.getFullYear().toString();
+          const year = extractYearFromDate(value);
+          if (year !== null) {
+            yearValue = year.toString();
           }
         }
       } else if (value instanceof Date) {
-        yearValue = value.getFullYear().toString();
+        const year = extractYearFromDate(value);
+        yearValue = year !== null ? year.toString() : "";
       } else if (typeof value === "number") {
-        // If it's a number, assume it's a year if it's in a reasonable range
         if (value >= 1900 && value <= 2100) {
           yearValue = value.toString();
         } else {
-          // Otherwise, try to parse as timestamp
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            yearValue = date.getFullYear().toString();
+          const year = extractYearFromDate(String(value));
+          if (year !== null) {
+            yearValue = year.toString();
           }
         }
       }
@@ -148,8 +147,7 @@ const DynamicComponent = ({ type, name, required, value, onChange }: getComponen
           onChange={(e) => {
             const year = parseInt(e.target.value, 10);
             if (!isNaN(year) && year >= 1900 && year <= 2100) {
-              // Create a date with January 1st of that year
-              onChange?.(new Date(year, 0, 1));
+              onChange?.(createYearDate(year));
             } else if (e.target.value === "") {
               onChange?.(null);
             }

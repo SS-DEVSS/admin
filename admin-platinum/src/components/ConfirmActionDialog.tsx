@@ -20,6 +20,7 @@ type ConfirmActionDialogProps = {
   confirmWord?: string;
   confirmLabel?: string;
   loading?: boolean;
+  loadingLabel?: string;
   error?: string | null;
   onConfirm: () => void | Promise<void>;
 };
@@ -33,6 +34,7 @@ const ConfirmActionDialog = ({
   confirmWord = "Confirmar",
   confirmLabel = "Eliminar",
   loading = false,
+  loadingLabel = "Procesando...",
   error = null,
   onConfirm,
 }: ConfirmActionDialogProps) => {
@@ -92,7 +94,7 @@ const ConfirmActionDialog = ({
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Procesando...
+                {loadingLabel}
               </>
             ) : (
               confirmLabel

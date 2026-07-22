@@ -17,11 +17,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Product } from "@/models/product";
 import { Reference } from "@/models/reference";
-import { PlusCircle, X, Pencil } from "lucide-react";
-import ConfirmActionDialog from "@/components/ConfirmActionDialog";
-import { toast } from "@/hooks/use-toast";
+import { PlusCircle, X, Pencil, Link2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import NoData from "../NoData";
 import { Button } from "../ui/button";
 import EditReferenceDialog from "./EditReferenceDialog";
 import { CategoryAtributes } from "@/models/category";
@@ -48,8 +45,6 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
   const [referenceDescription, setReferenceDescription] = useState<string>("");
   const [editingReference, setEditingReference] = useState<Reference | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Reference | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Get category attributes
   const categoryAttributes = useMemo(() => {
@@ -123,36 +118,11 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
     }
   };
 
-  const handleRemoveReference = async (reference: Reference) => {
-    if (product?.id && reference.id && !reference.isNew) {
-      setDeleteTarget(reference);
-      return;
-    }
+  const handleRemoveReference = (reference: Reference) => {
     setState((prevForm) => ({
       ...prevForm,
       references: prevForm.references.filter((ref) => ref.id !== reference.id),
     }));
-  };
-
-  const confirmDeleteReference = async () => {
-    if (!deleteTarget?.id) return;
-    setDeleteLoading(true);
-    try {
-      const client = axiosClient();
-      await client.delete(`/references/${deleteTarget.id}`);
-      setState((prev) => ({
-        references: prev.references.filter((ref) => ref.id !== deleteTarget.id),
-      }));
-      toast({ title: "Referencia eliminada", variant: "success" });
-      setDeleteTarget(null);
-    } catch (error: unknown) {
-      const msg =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Error al eliminar referencia";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setDeleteLoading(false);
-    }
   };
 
   const handleEditReference = (reference: Reference) => {
@@ -193,11 +163,25 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
       </CardHeader>
       <CardContent className="flex-1">
         {state.references.length === 0 && showInput === false ? (
-          <NoData>
-            <p className="text-[#94A3B8] font-medium">
-              No hay números de referencia asociados
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 px-4 py-8 text-center">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border bg-background shadow-sm">
+              <Link2 className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Sin referencias</p>
+            <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
+              Agrega números OEM o aftermarket para vincular intercambios a este producto.
             </p>
-          </NoData>
+            <Button
+              size="sm"
+              type="button"
+              variant="outline"
+              className="mt-4 bg-background hover:bg-background"
+              onClick={handleAddClick}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Agregar referencia
+            </Button>
+          </div>
         ) : (
           <section className={isSidebar ? "flex flex-col gap-2" : "flex gap-3 flex-wrap"}>
             {state.references.map((reference) => (
@@ -219,7 +203,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
                     className="cursor-pointer h-3.5 w-3.5 text-muted-foreground hover:text-primary hover:scale-110 transition-all duration-200"
                   />
                   <X
-                    onClick={() => void handleRemoveReference(reference)}
+                    onClick={() => handleRemoveReference(reference)}
                     className="cursor-pointer h-3.5 w-3.5 text-muted-foreground hover:text-red-500 hover:scale-110 transition-all duration-200"
                   />
                 </div>
@@ -276,6 +260,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
           </div>
         )}
       </CardContent>
+      {state.references.length > 0 && (
       <CardFooter className="mt-auto border-t p-2 grid items-center">
         <Button
           size="sm"
@@ -288,6 +273,7 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
           Agregar número de Referencia
         </Button>
       </CardFooter>
+      )}
 
       <EditReferenceDialog
         open={isEditDialogOpen}
@@ -299,15 +285,6 @@ const ReferencesCard = ({ state, setState, product, layout = "default" }: Refere
         onSuccess={handleEditSuccess}
       />
 
-      <ConfirmActionDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Eliminar referencia"
-        description={`Se eliminará la referencia ${deleteTarget?.referenceNumber ?? ""}.`}
-        consequences={["La referencia se eliminará permanentemente del producto."]}
-        loading={deleteLoading}
-        onConfirm={confirmDeleteReference}
-      />
     </Card>
   );
 };

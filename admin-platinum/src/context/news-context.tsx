@@ -50,11 +50,11 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: { "Content-Type": "application/json" },
       });
       await getBlogPosts();
-      toast({ title: "Blog creado correctamente.", variant: "success" });
+      toast({ title: "Noticia creada correctamente.", variant: "success" });
     } catch (error: any) {
       setErrorMsg(error.response.data.error);
       toast({
-        title: "Error al crear blog",
+        title: "Error al crear noticia",
         variant: "destructive",
         description: errorMsg,
       });
@@ -118,14 +118,14 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: { "Content-Type": "application/json" },
       });
       await getBlogPosts();
-      toast({ title: "Blog actualizado correctamente.", variant: "success" });
+      toast({ title: "Noticia actualizada correctamente.", variant: "success" });
       return true;
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.error || "Error al actualizar blog");
+      setErrorMsg(error.response?.data?.error || "Error al actualizar noticia");
       toast({
-        title: "Error al actualizar blog",
+        title: "Error al actualizar noticia",
         variant: "destructive",
-        description: error.response?.data?.error || "No se pudo actualizar el blog",
+        description: error.response?.data?.error || "No se pudo actualizar la noticia",
       });
       return false;
     } finally {

@@ -29,9 +29,10 @@ import {
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useDeferredValue } from "react";
-import { Category } from "@/models/category";
+import { useEffect, useState, useDeferredValue, useMemo, useRef } from "react";
+import { Category, CategoryResponse } from "@/models/category";
 import { useCategoryContext } from "@/context/categories-context";
+import { useImportContext } from "@/context/import-context";
 import { useSubcategories } from "@/hooks/useSubcategories";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { SubcategoryTreeNode } from "@/models/subcategory";
@@ -46,6 +47,18 @@ import {
 } from "@/components/ui/select";
 import type { CatalogVisibilityFilter } from "@/models/catalogVisibility";
 import BulkImageUploadDialog from "@/components/products/BulkImageUploadDialog";
+import ProductApplicationFiltersSheet from "@/components/products/ProductApplicationFiltersSheet";
+import ApplicationFiltersActiveSummary from "@/components/products/ApplicationFiltersActiveSummary";
+import {
+  ApplicationFilterMap,
+  countActiveApplicationFilters,
+  getApplicationAttributesFromCategory,
+  loadApplicationFilters,
+  saveApplicationFilters,
+  sanitizeApplicationFilters,
+  clearApplicationFiltersStorage,
+} from "@/utils/productApplicationFilters";
+import { invalidateProductListCache } from "@/utils/productListCache";
 
 type DrillLevel =
   | { type: "category"; category: Category }
@@ -85,7 +98,9 @@ function flattenSearchHits(
 const Products = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { categories = [], loading: categoriesLoading } = useCategoryContext();
+  const { categories = [], loading: categoriesLoading, getCategoryById } = useCategoryContext();
+  const { importState } = useImportContext();
+  const handledImportCompletionRef = useRef<string | null>(null);
   const { getTree } = useSubcategories();
   const [searchFilter, setSearchFilter] = useState(() => {
     const saved = localStorage.getItem("products-search-filter");
@@ -115,15 +130,55 @@ const Products = () => {
     });
   const [bulkImagesOpen, setBulkImagesOpen] = useState(false);
   const [tableRefreshKey, setTableRefreshKey] = useState(0);
+  const [categoryDetails, setCategoryDetails] = useState<CategoryResponse | null>(null);
+  const [applicationFilters, setApplicationFilters] = useState<ApplicationFilterMap>({});
 
   const isDesktopFilters = useMediaQuery("(min-width: 1024px)");
+  const applicationFilterCount = countActiveApplicationFilters(applicationFilters);
   const activeProductFilterCount =
-    (category ? 1 : 0) + (catalogVisibilityFilter !== "all" ? 1 : 0);
+    (category ? 1 : 0) +
+    (catalogVisibilityFilter !== "all" ? 1 : 0) +
+    applicationFilterCount;
   const clearProductFilters = () => {
+    const prevCategoryId = category?.id;
+    if (prevCategoryId) {
+      clearApplicationFiltersStorage(prevCategoryId);
+    }
+    setSearchFilter("");
+    localStorage.removeItem("products-search-filter");
     selectCategoryAndSubcategory(null, null);
     setCatalogVisibilityFilter("all");
+    setApplicationFilters({});
     localStorage.removeItem("products-catalog-visibility");
+    invalidateProductListCache();
+    setTableRefreshKey((k) => k + 1);
   };
+
+  const handleApplicationFiltersChange = (filters: ApplicationFilterMap) => {
+    const sanitized = sanitizeApplicationFilters(filters);
+    setApplicationFilters(sanitized);
+    if (category?.id) {
+      saveApplicationFilters(category.id, sanitized);
+    }
+  };
+
+  const applicationAttributes = useMemo(
+    () => getApplicationAttributesFromCategory(categoryDetails),
+    [categoryDetails]
+  );
+
+  useEffect(() => {
+    if (
+      importState.jobStatus === "completed" &&
+      importState.importType === "products" &&
+      importState.jobId &&
+      handledImportCompletionRef.current !== importState.jobId
+    ) {
+      handledImportCompletionRef.current = importState.jobId;
+      invalidateProductListCache();
+      setTableRefreshKey((k) => k + 1);
+    }
+  }, [importState.jobStatus, importState.importType, importState.jobId]);
 
   // Precargar árbol de subcategorías solo al abrir el filtro (no bloquea la carga inicial)
   useEffect(() => {
@@ -179,8 +234,10 @@ const Products = () => {
     setSubcategoryId(subId);
     if (cat?.id) {
       localStorage.setItem("products-selected-category", cat.id);
+      setApplicationFilters(loadApplicationFilters(cat.id));
     } else {
       localStorage.setItem("products-selected-category", "all");
+      setApplicationFilters({});
     }
     if (subId) {
       localStorage.setItem("products-selected-subcategory", subId);
@@ -226,6 +283,7 @@ const Products = () => {
       if (cat) {
         setCategory(cat);
         setSubcategoryId(subFromUrl || null);
+        setApplicationFilters(loadApplicationFilters(fromUrl));
       }
       return;
     }
@@ -247,9 +305,34 @@ const Products = () => {
         "products-selected-subcategory",
       );
       setSubcategoryId(savedSubcategoryId || null);
+      setApplicationFilters(loadApplicationFilters(savedCategory.id!));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, searchParams]);
+
+  useEffect(() => {
+    if (!category?.id) {
+      setCategoryDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCategoryDetails = async () => {
+      const data = await getCategoryById(category.id!);
+      if (!cancelled && data) {
+        setCategoryDetails(data as CategoryResponse);
+      }
+    };
+
+    void loadCategoryDetails();
+
+    return () => {
+      cancelled = true;
+    };
+    // getCategoryById is stable via useCallback in CategoryContext
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category?.id]);
 
   const getSelectedFilterLabel = () => {
     if (!category) return "Todas las categorías";
@@ -592,64 +675,89 @@ const Products = () => {
                   />
                 </div>
                 {!isDesktopFilters && (
-                  <Drawer direction="bottom">
-                    <DrawerTrigger asChild>
-                      <Button variant="outline" className="gap-2 shrink-0">
-                        <SlidersHorizontal className="h-4 w-4" />
-                        Filtros
-                        {activeProductFilterCount > 0 && (
-                          <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
-                            {activeProductFilterCount}
-                          </Badge>
-                        )}
-                      </Button>
-                    </DrawerTrigger>
-                    <DrawerContent>
-                      <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
-                        <DrawerHeader>
-                          <DrawerTitle>Filtrar productos</DrawerTitle>
-                          <DrawerDescription>
-                            Filtra por categoría y visibilidad en catálogo.
-                          </DrawerDescription>
-                        </DrawerHeader>
-                        <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium">
-                              Categoría
-                            </label>
-                            {categoryFilterMenu}
+                  <>
+                    <Drawer direction="bottom">
+                      <DrawerTrigger asChild>
+                        <Button variant="outline" className="gap-2 shrink-0">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Filtros
+                          {activeProductFilterCount > 0 && (
+                            <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                              {activeProductFilterCount}
+                            </Badge>
+                          )}
+                        </Button>
+                      </DrawerTrigger>
+                      <DrawerContent>
+                        <div className="mx-auto flex w-full max-w-md flex-col min-h-0">
+                          <DrawerHeader>
+                            <DrawerTitle>Filtrar productos</DrawerTitle>
+                            <DrawerDescription>
+                              Filtra por categoría y visibilidad en catálogo.
+                            </DrawerDescription>
+                          </DrawerHeader>
+                          <div className="flex flex-col gap-4 overflow-y-auto px-4 py-1">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium">
+                                Categoría
+                              </label>
+                              {categoryFilterMenu}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium">
+                                Visibilidad en catálogo
+                              </label>
+                              {catalogVisibilitySelect}
+                            </div>
                           </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium">
-                              Visibilidad en catálogo
-                            </label>
-                            {catalogVisibilitySelect}
-                          </div>
+                          <DrawerFooter>
+                            <Button
+                              variant="outline"
+                              onClick={clearProductFilters}
+                              disabled={activeProductFilterCount === 0}
+                            >
+                              Limpiar filtros
+                            </Button>
+                            <DrawerClose asChild>
+                              <Button>Ver resultados</Button>
+                            </DrawerClose>
+                          </DrawerFooter>
                         </div>
-                        <DrawerFooter>
-                          <Button
-                            variant="outline"
-                            onClick={clearProductFilters}
-                            disabled={activeProductFilterCount === 0}
-                          >
-                            Limpiar filtros
-                          </Button>
-                          <DrawerClose asChild>
-                            <Button>Ver resultados</Button>
-                          </DrawerClose>
-                        </DrawerFooter>
-                      </div>
-                    </DrawerContent>
-                  </Drawer>
+                      </DrawerContent>
+                    </Drawer>
+                    <ProductApplicationFiltersSheet
+                      categoryId={category?.id}
+                      categoryDetails={categoryDetails}
+                      filters={applicationFilters}
+                      onFiltersChange={handleApplicationFiltersChange}
+                      disabled={categoriesLoading}
+                    />
+                  </>
                 )}
               </div>
               {isDesktopFilters && (
                 <>
                   {categoryFilterMenu}
                   {catalogVisibilitySelect}
+                  <ProductApplicationFiltersSheet
+                    categoryId={category?.id}
+                    categoryDetails={categoryDetails}
+                    filters={applicationFilters}
+                    onFiltersChange={handleApplicationFiltersChange}
+                    disabled={categoriesLoading}
+                  />
                 </>
               )}
             </div>
+            {category?.id && applicationFilterCount > 0 && (
+              <ApplicationFiltersActiveSummary
+                filters={applicationFilters}
+                attributes={applicationAttributes}
+                onFiltersChange={handleApplicationFiltersChange}
+                onClear={() => handleApplicationFiltersChange({})}
+                compact
+              />
+            )}
         </div>
         <div>
           {categoriesLoading && categories.length === 0 ? (
@@ -661,6 +769,7 @@ const Products = () => {
               searchFilter={searchFilter}
               subcategoryId={subcategoryId}
               catalogVisibilityFilter={catalogVisibilityFilter}
+              applicationFilters={applicationFilters}
             />
           )}
         </div>
@@ -669,7 +778,10 @@ const Products = () => {
       <BulkImageUploadDialog
         open={bulkImagesOpen}
         onOpenChange={setBulkImagesOpen}
-        onComplete={() => setTableRefreshKey((k) => k + 1)}
+        onComplete={() => {
+          invalidateProductListCache();
+          setTableRefreshKey((k) => k + 1);
+        }}
       />
     </Layout>
   );
