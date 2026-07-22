@@ -43,7 +43,7 @@ const ProductApplicationFiltersSheet = ({
 }: ProductApplicationFiltersSheetProps) => {
   const [open, setOpen] = useState(false);
   const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>(
-    () => (categoryId ? getCachedFilterOptions(categoryId) : null) ?? {}
+    () => (categoryId ? getCachedFilterOptions(categoryId, { flat: true }) : null) ?? {}
   );
   const [loadingOptions, setLoadingOptions] = useState(false);
 
@@ -59,7 +59,7 @@ const ProductApplicationFiltersSheet = ({
     async (force = false) => {
       if (!categoryId || !hasAttributes) return;
 
-      const cached = getCachedFilterOptions(categoryId);
+      const cached = getCachedFilterOptions(categoryId, { flat: true });
       if (cached && !force) {
         setFilterOptions(cached);
         return;
@@ -72,7 +72,7 @@ const ProductApplicationFiltersSheet = ({
           undefined,
           { flat: true }
         );
-        setCachedFilterOptions(categoryId, options);
+        setCachedFilterOptions(categoryId, options, { flat: true });
         setFilterOptions(options);
       } catch {
         if (!cached) {
@@ -85,13 +85,22 @@ const ProductApplicationFiltersSheet = ({
     [categoryId, hasAttributes]
   );
 
+  const mergedFilterOptions = useMemo(() => {
+    return Object.fromEntries(
+      applicationAttributes.map((attribute) => {
+        const attributeId = attribute.id ?? "";
+        return [attributeId, filterOptions[attributeId] ?? []];
+      })
+    );
+  }, [applicationAttributes, filterOptions]);
+
   useEffect(() => {
     if (!categoryId) {
       setFilterOptions({});
       return;
     }
 
-    const cached = getCachedFilterOptions(categoryId);
+    const cached = getCachedFilterOptions(categoryId, { flat: true });
     if (cached) {
       setFilterOptions(cached);
       return;
@@ -102,7 +111,7 @@ const ProductApplicationFiltersSheet = ({
 
   useEffect(() => {
     if (!open || !categoryId) return;
-    void loadFilterOptions();
+    void loadFilterOptions(true);
   }, [open, categoryId, loadFilterOptions]);
 
   const handleAttributeChange = (attributeId: string, values: string[]) => {
@@ -178,7 +187,7 @@ const ProductApplicationFiltersSheet = ({
                     key={attribute.id}
                     attribute={attribute}
                     selectedValues={filters[attribute.id ?? ""] ?? []}
-                    options={filterOptions[attribute.id ?? ""] ?? []}
+                    options={mergedFilterOptions[attribute.id ?? ""] ?? []}
                     onChange={(values) =>
                       handleAttributeChange(attribute.id ?? "", values)
                     }
