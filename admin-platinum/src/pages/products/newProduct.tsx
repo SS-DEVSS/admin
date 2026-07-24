@@ -17,6 +17,7 @@ import { Reference } from "@/models/reference";
 import { Application } from "@/models/application";
 import { persistNewReferences } from "@/services/referenceService";
 import axiosClient from "@/services/axiosInstance";
+import { syncProductApplicationDeletions } from "@/utils/syncProductApplicationDeletions";
 
 function normalizeAttributeValue(value: unknown): unknown {
   if (value === undefined || value === null || value === "") return null;
@@ -709,11 +710,12 @@ const NewProduct = () => {
           (applicationId: string) => !currentApplicationIds.includes(applicationId),
         );
 
-        if (applicationIdsToDelete.length === 1) {
-          await axiosClient().delete(`/applications/${applicationIdsToDelete[0]}`);
-        } else if (applicationIdsToDelete.length > 1) {
-          await axiosClient().delete("/applications/bulk", {
-            data: { applicationIds: applicationIdsToDelete },
+        if (applicationIdsToDelete.length > 0) {
+          await syncProductApplicationDeletions({
+            client: axiosClient(),
+            productId: id,
+            applicationIdsToDelete,
+            remainingApplicationCount: currentApplicationIds.length,
           });
         }
 
