@@ -3,16 +3,51 @@ type FilterOptionsCacheEntry = {
   flat: boolean;
 };
 
+type FilterOptionsCacheQuery = {
+  flat?: boolean;
+  filters?: Record<string, string | string[]>;
+};
+
 const filterOptionsCache = new Map<string, FilterOptionsCacheEntry>();
+
+function buildFilterOptionsCacheKey(
+  categoryId: string,
+  query?: FilterOptionsCacheQuery
+): string {
+  const flat = query?.flat === true ? "1" : "0";
+  const filters = query?.filters;
+
+  if (!filters || Object.keys(filters).length === 0) {
+    return `${categoryId}|${flat}|`;
+  }
+
+  const serialized = Object.entries(filters)
+    .filter(([, value]) => {
+      if (value === null || value === undefined) return false;
+      if (Array.isArray(value)) return value.some((item) => String(item).trim());
+      return String(value).trim() !== "";
+    })
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => {
+      if (Array.isArray(value)) {
+        return `${key}:${value.map((item) => String(item).trim()).filter(Boolean).join(",")}`;
+      }
+      return `${key}:${String(value).trim()}`;
+    })
+    .join(";");
+
+  return `${categoryId}|${flat}|${serialized}`;
+}
 
 export function getCachedFilterOptions(
   categoryId: string,
-  options?: { flat?: boolean }
+  query?: FilterOptionsCacheQuery
 ): Record<string, string[]> | null {
-  const entry = filterOptionsCache.get(categoryId);
+  const cacheKey = buildFilterOptionsCacheKey(categoryId, query);
+  const entry = filterOptionsCache.get(cacheKey);
   if (!entry) return null;
 
-  const wantsFlat = options?.flat === true;
+  const wantsFlat = query?.flat === true;
   if (wantsFlat && !entry.flat) {
     return null;
   }
@@ -23,18 +58,25 @@ export function getCachedFilterOptions(
 export function setCachedFilterOptions(
   categoryId: string,
   options: Record<string, string[]>,
-  cacheOptions?: { flat?: boolean }
+  query?: FilterOptionsCacheQuery
 ): void {
-  filterOptionsCache.set(categoryId, {
+  const cacheKey = buildFilterOptionsCacheKey(categoryId, query);
+  filterOptionsCache.set(cacheKey, {
     options,
-    flat: cacheOptions?.flat === true,
+    flat: query?.flat === true,
   });
 }
 
 export function invalidateFilterOptionsCache(categoryId?: string): void {
-  if (categoryId) {
-    filterOptionsCache.delete(categoryId);
+  if (!categoryId) {
+    filterOptionsCache.clear();
     return;
   }
-  filterOptionsCache.clear();
+
+  const prefix = `${categoryId}|`;
+  for (const key of filterOptionsCache.keys()) {
+    if (key.startsWith(prefix)) {
+      filterOptionsCache.delete(key);
+    }
+  }
 }
